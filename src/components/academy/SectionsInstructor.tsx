@@ -454,23 +454,9 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   }, [groupedWlUsers, selectedWlDate]);
 
   const renderRequestCard = (r: import("@/lib/api").TrainingRequest) => (
-    <div key={r.id} className={`border p-4 space-y-3 transition-colors ${r.type === "dismissal" ? "bg-red-950/20 border-red-500/80 shadow-[0_0_10px_rgba(220,38,38,0.15)]" : "bg-tactical-card border-tactical-border hover:border-primary/30"} ${r.id === highlightRequestId ? "border-primary" : ""} ${selectedRequestIds.includes(r.id) ? "border-primary bg-primary/5" : ""}`}>
+    <div key={r.id} className={`border p-4 space-y-3 transition-colors ${r.type === "dismissal" ? "bg-red-950/20 border-red-500/80 shadow-[0_0_10px_rgba(220,38,38,0.15)]" : "bg-tactical-card border-tactical-border hover:border-primary/30"} ${r.id === highlightRequestId ? "border-primary" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          {r.status === "pending" && (
-            <input
-              type="checkbox"
-              checked={selectedRequestIds.includes(r.id)}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setSelectedRequestIds((prev) => [...prev, r.id]);
-                } else {
-                  setSelectedRequestIds((prev) => prev.filter((id) => id !== r.id));
-                }
-              }}
-              className="mt-2 w-4 h-4 accent-primary cursor-pointer"
-            />
-          )}
           <div className={`w-8 h-8 border flex items-center justify-center flex-shrink-0 mt-0.5 ${r.type === "dismissal" ? "bg-red-950 border-red-500 text-red-500" : "bg-primary/10 border-primary/20 text-primary"}`}>
             <Icon name={r.type === "dismissal" ? "UserMinus" : "User"} size={14} />
           </div>
@@ -698,40 +684,6 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                 ))}
               </select>
             </div>
-            
-            {filterStatus === "pending" && filteredRequests.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={() => {
-                    const allPendingIds = filteredRequests.map(r => r.id);
-                    const allSelected = allPendingIds.every(id => selectedRequestIds.includes(id));
-                    if (allSelected) {
-                      setSelectedRequestIds(prev => prev.filter(id => !allPendingIds.includes(id)));
-                    } else {
-                      setSelectedRequestIds(prev => Array.from(new Set([...prev, ...allPendingIds])));
-                    }
-                  }}
-                  className="rank-badge text-muted-foreground border border-tactical-border px-3 py-1.5 hover:text-foreground transition-colors text-xs uppercase font-oswald tracking-wider"
-                >
-                  {filteredRequests.map(r => r.id).every(id => selectedRequestIds.includes(id)) ? "Снять выбор" : "Выбрать все"}
-                </button>
-                <button
-                  disabled={selectedRequestIds.length === 0 || bulkReviewLoading}
-                  onClick={() => handleBulkReview("approved")}
-                  className="rank-badge text-green-400 border border-green-800 px-3 py-1.5 hover:bg-green-900/30 transition-colors text-xs uppercase font-oswald tracking-wider disabled:opacity-40"
-                >
-                  Одобрить ({selectedRequestIds.length})
-                </button>
-                <button
-                  disabled={selectedRequestIds.length === 0 || bulkReviewLoading}
-                  onClick={() => handleBulkReview("rejected")}
-                  className="rank-badge text-red-400 border border-red-800 px-3 py-1.5 hover:bg-red-900/30 transition-colors text-xs uppercase font-oswald tracking-wider disabled:opacity-40"
-                >
-                  Отклонить ({selectedRequestIds.length})
-                </button>
-                {bulkReviewLoading && <Icon name="Loader2" size={14} className="text-primary animate-spin" />}
-              </div>
-            )}
           </div>
           {reqLoading ? <Spinner /> : allRequestsPlusDismissals.length === 0 ? <Empty text="Нет запросов" /> : (
             filteredRequests.length === 0 ? (
