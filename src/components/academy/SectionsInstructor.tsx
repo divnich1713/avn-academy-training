@@ -68,6 +68,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   const [selectedWlDate, setSelectedWlDate] = useState<string>(() => new Date().toLocaleDateString("ru-RU"));
   const [selectedReqDate, setSelectedReqDate] = useState<string>(() => new Date().toLocaleDateString("ru-RU"));
   const [selectedGradeDate, setSelectedGradeDate] = useState<string>(() => new Date().toLocaleDateString("ru-RU"));
+  const [wlSearchQuery, setWlSearchQuery] = useState("");
 
   const loadRequests = useCallback(async () => {
     setReqLoading(true);
@@ -405,8 +406,22 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
     });
 
   const groupedWlUsers = useMemo(() => {
+    // Filter by search query first if provided
+    let filtered = wlUsers;
+    if (wlSearchQuery.trim()) {
+      const q = wlSearchQuery.toLowerCase().trim();
+      filtered = wlUsers.filter((u) => {
+        return (
+          (u.name || "").toLowerCase().includes(q) ||
+          (u.static_id || "").toLowerCase().includes(q) ||
+          (u.rank || "").toLowerCase().includes(q) ||
+          (u.unit || "").toLowerCase().includes(q)
+        );
+      });
+    }
+
     // Sort users by created_at descending, then by name
-    const sorted = [...wlUsers].sort((a, b) => {
+    const sorted = [...filtered].sort((a, b) => {
       const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
       const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
       if (dateA !== dateB) return dateB - dateA;
@@ -1128,20 +1143,46 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       {activeTab === "whitelist" && (
         <div className="space-y-4 animate-fade-in">
           <div className="flex justify-between items-center flex-wrap gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-muted-foreground">Дата зачисления:</span>
-              <select
-                className="bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary cursor-pointer transition-colors"
-                value={selectedWlDate}
-                onChange={(e) => setSelectedWlDate(e.target.value)}
-              >
-                <option value="all">Все даты</option>
-                {wlDates.map((d) => (
-                  <option key={d} value={d}>
-                    {d} {d === new Date().toLocaleDateString("ru-RU") ? " (Сегодня)" : ""}
-                  </option>
-                ))}
-              </select>
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-muted-foreground">Дата зачисления:</span>
+                <select
+                  className="bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary cursor-pointer transition-colors"
+                  value={selectedWlDate}
+                  onChange={(e) => setSelectedWlDate(e.target.value)}
+                >
+                  <option value="all">Все даты</option>
+                  {wlDates.map((d) => (
+                    <option key={d} value={d}>
+                      {d} {d === new Date().toLocaleDateString("ru-RU") ? " (Сегодня)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-muted-foreground">Поиск:</span>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Static ID, имя, подразделение..."
+                    value={wlSearchQuery}
+                    onChange={(e) => setWlSearchQuery(e.target.value)}
+                    className="bg-tactical-panel border border-tactical-border px-3 py-1.5 pl-8 text-xs text-foreground font-ibm focus:outline-none focus:border-primary transition-colors w-60"
+                  />
+                  <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    <Icon name="Search" size={12} />
+                  </div>
+                  {wlSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setWlSearchQuery("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Icon name="X" size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
             <button
               onClick={() => setShowAddForm(!showAddForm)}
@@ -1322,7 +1363,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                   {filteredGroupedWlUsers.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground font-mono">
-                        Нет пользователей, зачисленных {selectedWlDate === new Date().toLocaleDateString("ru-RU") ? "сегодня" : `в день ${selectedWlDate}`}.
+                        {wlSearchQuery ? "Пользователи не найдены по вашему запросу." : `Нет пользователей, зачисленных ${selectedWlDate === new Date().toLocaleDateString("ru-RU") ? "сегодня" : `в день ${selectedWlDate}`}.`}
                       </td>
                     </tr>
                   ) : (
