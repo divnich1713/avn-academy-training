@@ -318,6 +318,44 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
 
   const pendingCount = allRequestsPlusDismissals.filter((r) => r.status === "pending").length;
 
+  const pendingCountByType = useMemo(() => {
+    const counts = {
+      all: 0,
+      lecture: 0,
+      practice: 0,
+      exam: 0,
+      dismissal: 0
+    };
+    allRequestsPlusDismissals.forEach((r) => {
+      if (r.status === "pending") {
+        counts.all++;
+        if (r.type === "lecture") counts.lecture++;
+        if (r.type === "practice") counts.practice++;
+        if (r.type === "exam") counts.exam++;
+        if (r.type === "dismissal") counts.dismissal++;
+      }
+    });
+    return counts;
+  }, [allRequestsPlusDismissals]);
+
+  const groupedRequests = useMemo(() => {
+    const groups: Record<string, typeof filteredRequests> = {
+      lecture: [],
+      practice: [],
+      exam: [],
+      dismissal: []
+    };
+    filteredRequests.forEach(r => {
+      if (groups[r.type]) {
+        groups[r.type].push(r);
+      } else {
+        if (!groups[r.type]) groups[r.type] = [];
+        groups[r.type].push(r);
+      }
+    });
+    return groups;
+  }, [filteredRequests]);
+
   const gradeDates = useMemo(() => {
     const dates = new Set<string>();
     dates.add(new Date().toLocaleDateString("ru-RU")); // always include today
@@ -415,6 +453,128 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
     return groupedWlUsers.filter((g) => g.dateStr === selectedWlDate);
   }, [groupedWlUsers, selectedWlDate]);
 
+  const renderRequestCard = (r: import("@/lib/api").TrainingRequest) => (
+    <div key={r.id} className={`border p-4 space-y-3 transition-colors ${r.type === "dismissal" ? "bg-red-950/20 border-red-500/80 shadow-[0_0_10px_rgba(220,38,38,0.15)]" : "bg-tactical-card border-tactical-border hover:border-primary/30"} ${r.id === highlightRequestId ? "border-primary" : ""} ${selectedRequestIds.includes(r.id) ? "border-primary bg-primary/5" : ""}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          {r.status === "pending" && (
+            <input
+              type="checkbox"
+              checked={selectedRequestIds.includes(r.id)}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setSelectedRequestIds((prev) => [...prev, r.id]);
+                } else {
+                  setSelectedRequestIds((prev) => prev.filter((id) => id !== r.id));
+                }
+              }}
+              className="mt-2 w-4 h-4 accent-primary cursor-pointer"
+            />
+          )}
+          <div className={`w-8 h-8 border flex items-center justify-center flex-shrink-0 mt-0.5 ${r.type === "dismissal" ? "bg-red-950 border-red-500 text-red-500" : "bg-primary/10 border-primary/20 text-primary"}`}>
+            <Icon name={r.type === "dismissal" ? "UserMinus" : "User"} size={14} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => onViewProfile?.({ id: r.cadet_id, name: r.cadet_name, rank: r.cadet_rank, static_id: r.cadet_static_id } as any)}
+                className={`font-ibm text-sm font-medium hover:text-primary transition-colors hover:underline text-left ${r.type === "dismissal" ? "text-red-400" : "text-foreground"}`}
+              >
+                {r.cadet_rank} {r.cadet_name}
+              </button>
+              <span className={`rank-badge px-1.5 py-0.5 border ${r.type === "dismissal" ? "text-red-400 bg-red-950/40 border-red-800" : "text-muted-foreground bg-tactical-panel border-tactical-border"}`}>{TYPE_LABEL[r.type]}</span>
+            </div>
+            <p className={`text-sm mt-0.5 ${r.type === "dismissal" ? "text-red-200 font-semibold" : "text-foreground"}`}>{r.subject}</p>
+            <p className="text-xs text-muted-foreground font-mono mt-0.5">
+              {fmt(r.created_at)}
+              {r.preferred_date && fmt(r.created_at) !== fmt(r.preferred_date) && ` · Дата: ${fmt(r.preferred_date)}`}
+            </p>
+            {r.description && (
+              <div className="text-xs text-muted-foreground mt-1 bg-tactical-panel border border-tactical-border/60 p-2 font-mono whitespace-pre-line text-[11px] leading-relaxed">
+                {r.description.split("\n").map((line, idx) => {
+                  const urlMatch = line.match(/(https?:\/\/[^\s]+)/);
+                  if (urlMatch) {
+                    const url = urlMatch[0];
+                    const label = line.substring(0, line.indexOf(url));
+                    return (
+                      <div key={idx} className="flex flex-wrap items-center gap-1">
+                        {label && <span className="text-muted-foreground">{label}</span>}
+                        <a 
+                          href={url} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="text-primary hover:underline flex items-center gap-0.5 break-all"
+                        >
+                          {url}
+                          <Icon name="ExternalLink" size={10} className="inline flex-shrink-0" />
+                        </a>
+                      </div>
+                    );
+                  }
+                  return <div key={idx}>{line}</div>;
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+        <StatusBadge status={r.status} />
+      </div>
+      {r.status === "pending" && (
+        <div className="border-t border-tactical-border pt-3 space-y-2">
+          <input
+            className="w-full bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary transition-colors"
+            placeholder="Комментарий инструктора (необязательно)..."
+            value={reviewComment[r.id] || ""}
+            onChange={(e) => setReviewComment((prev) => ({ ...prev, [r.id]: e.target.value }))}
+          />
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              disabled={reviewLoading[r.id]}
+              onClick={() => handleReview(r.id, "approved")}
+              className="rank-badge text-green-400 border border-green-800 px-3 py-1 hover:bg-green-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
+            >
+              <Icon name="Check" size={12} />Одобрить
+            </button>
+            <button
+              type="button"
+              disabled={reviewLoading[r.id]}
+              onClick={() => handleReview(r.id, "rejected")}
+              className="rank-badge text-red-400 border border-red-800 px-3 py-1 hover:bg-red-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
+            >
+              <Icon name="X" size={12} />Отклонить
+            </button>
+            {r.type !== "report" && !([
+              "Вышка — 30 мин",
+              "Патруль по территории — 30 мин",
+              "Заполнение личного дела",
+              "Наряд на КПП-1 — 30 мин",
+              "Наряд на КПП-2 — 1 час",
+              "Участие в государственной поставке",
+              "Участие в досмотровых мероприятиях"
+            ].some(subject => r.subject.startsWith(subject))) && (
+              <button
+                type="button"
+                onClick={() => openGradeFromRequest(r)}
+                className="rank-badge text-primary border border-primary/40 px-3 py-1 hover:bg-primary/10 transition-colors flex items-center gap-1"
+              >
+                <Icon name="Star" size={12} />Поставить оценку
+              </button>
+            )}
+            {reviewLoading[r.id] && <Icon name="Loader2" size={14} className="text-primary animate-spin" />}
+          </div>
+        </div>
+      )}
+      {r.status !== "pending" && r.reviewer_name && (
+        <p className="text-xs text-muted-foreground font-mono border-t border-tactical-border pt-2">
+          Рассмотрел: {r.reviewer_name}
+          {r.instructor_comment && ` · "${r.instructor_comment}"`}
+        </p>
+      )}
+    </div>
+  );
+
   return (
     <div className="animate-fade-in space-y-6">
       <SectionHeader title="Панель инструктора" sub="Управление курсантами, запросами и оценками" />
@@ -482,6 +642,37 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       {/* ── REQUESTS TAB ── */}
       {activeTab === "requests" && (
         <div className="space-y-4 animate-fade-in">
+          {/* Sub-tabs for separating requests */}
+          <div className="flex border-b border-tactical-border/60 pb-1.5 gap-2 overflow-x-auto scrollbar-none">
+            {([
+              { id: "all", label: "Все запросы" },
+              { id: "lecture", label: "Лекции" },
+              { id: "practice", label: "Практики" },
+              { id: "exam", label: "Экзамены" },
+              { id: "dismissal", label: "Увольнения" },
+            ] as const).map((subTab) => {
+              const pendingCountForTab = pendingCountByType[subTab.id];
+              return (
+                <button
+                  key={subTab.id}
+                  type="button"
+                  onClick={() => {
+                    setFilterType(subTab.id);
+                    setSelectedRequestIds([]);
+                  }}
+                  className={`font-oswald text-xs tracking-wider uppercase px-3 py-1.5 transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${filterType === subTab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                >
+                  {subTab.label}
+                  {pendingCountForTab > 0 && (
+                    <span className="bg-yellow-500 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                      {pendingCountForTab}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
           <div className="flex gap-2 flex-wrap items-center justify-between">
             <div className="flex gap-2 flex-wrap">
               <select
@@ -493,16 +684,6 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                 <option value="approved">Одобренные</option>
                 <option value="rejected">Отклонённые</option>
                 <option value="all">Все статусы</option>
-              </select>
-              <select
-                className="bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary"
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-              >
-                <option value="all">Все типы</option>
-                <option value="lecture">Лекции</option>
-                <option value="practice">Практики</option>
-                <option value="exam">Экзамены</option>
               </select>
               <select
                 className="bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary cursor-pointer transition-colors"
@@ -556,125 +737,46 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
             filteredRequests.length === 0 ? (
               <Empty text={`Нет запросов на ${selectedReqDate === new Date().toLocaleDateString("ru-RU") ? "сегодня" : `дату ${selectedReqDate}`}`} />
             ) : (
-              <div className="space-y-3">
-                {filteredRequests.map((r) => (
-                <div key={r.id} className={`border p-4 space-y-3 transition-colors ${r.type === "dismissal" ? "bg-red-950/20 border-red-500/80 shadow-[0_0_10px_rgba(220,38,38,0.15)]" : "bg-tactical-card border-tactical-border hover:border-primary/30"} ${r.id === highlightRequestId ? "border-primary" : ""} ${selectedRequestIds.includes(r.id) ? "border-primary bg-primary/5" : ""}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      {r.status === "pending" && (
-                        <input
-                          type="checkbox"
-                          checked={selectedRequestIds.includes(r.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedRequestIds((prev) => [...prev, r.id]);
-                            } else {
-                              setSelectedRequestIds((prev) => prev.filter((id) => id !== r.id));
-                            }
-                          }}
-                          className="mt-2 w-4 h-4 accent-primary cursor-pointer"
-                        />
-                      )}
-                      <div className={`w-8 h-8 border flex items-center justify-center flex-shrink-0 mt-0.5 ${r.type === "dismissal" ? "bg-red-950 border-red-500 text-red-500" : "bg-primary/10 border-primary/20 text-primary"}`}>
-                        <Icon name={r.type === "dismissal" ? "UserMinus" : "User"} size={14} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <button
-                            onClick={() => onViewProfile?.({ id: r.cadet_id, name: r.cadet_name, rank: r.cadet_rank, static_id: r.cadet_static_id } as any)}
-                            className={`font-ibm text-sm font-medium hover:text-primary transition-colors hover:underline text-left ${r.type === "dismissal" ? "text-red-400" : "text-foreground"}`}
-                          >
-                            {r.cadet_rank} {r.cadet_name}
-                          </button>
-                          <span className={`rank-badge px-1.5 py-0.5 border ${r.type === "dismissal" ? "text-red-400 bg-red-950/40 border-red-800" : "text-muted-foreground bg-tactical-panel border-tactical-border"}`}>{TYPE_LABEL[r.type]}</span>
-                        </div>
-                        <p className={`text-sm mt-0.5 ${r.type === "dismissal" ? "text-red-200 font-semibold" : "text-foreground"}`}>{r.subject}</p>
-                        <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                          {fmt(r.created_at)}
-                          {r.preferred_date && fmt(r.created_at) !== fmt(r.preferred_date) && ` · Дата: ${fmt(r.preferred_date)}`}
-                        </p>
-                        {r.description && (
-                          <div className="text-xs text-muted-foreground mt-1 bg-tactical-panel border border-tactical-border/60 p-2 font-mono whitespace-pre-line text-[11px] leading-relaxed">
-                            {r.description.split("\n").map((line, idx) => {
-                              const urlMatch = line.match(/(https?:\/\/[^\s]+)/);
-                              if (urlMatch) {
-                                const url = urlMatch[0];
-                                const label = line.substring(0, line.indexOf(url));
-                                return (
-                                  <div key={idx} className="flex flex-wrap items-center gap-1">
-                                    {label && <span className="text-muted-foreground">{label}</span>}
-                                    <a 
-                                      href={url} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer" 
-                                      className="text-primary hover:underline flex items-center gap-0.5 break-all"
-                                    >
-                                      {url}
-                                      <Icon name="ExternalLink" size={10} className="inline flex-shrink-0" />
-                                    </a>
-                                  </div>
-                                );
-                              }
-                              return <div key={idx}>{line}</div>;
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <StatusBadge status={r.status} />
-                  </div>
-                  {r.status === "pending" && (
-                    <div className="border-t border-tactical-border pt-3 space-y-2">
-                      <input
-                        className="w-full bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary transition-colors"
-                        placeholder="Комментарий инструктора (необязательно)..."
-                        value={reviewComment[r.id] || ""}
-                        onChange={(e) => setReviewComment((prev) => ({ ...prev, [r.id]: e.target.value }))}
-                      />
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <button
-                          disabled={reviewLoading[r.id]}
-                          onClick={() => handleReview(r.id, "approved")}
-                          className="rank-badge text-green-400 border border-green-800 px-3 py-1 hover:bg-green-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
-                        >
-                          <Icon name="Check" size={12} />Одобрить
-                        </button>
-                        <button
-                          disabled={reviewLoading[r.id]}
-                          onClick={() => handleReview(r.id, "rejected")}
-                          className="rank-badge text-red-400 border border-red-800 px-3 py-1 hover:bg-red-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
-                        >
-                          <Icon name="X" size={12} />Отклонить
-                        </button>
-                        {r.type !== "report" && !([
-                          "Вышка — 30 мин",
-                          "Патруль по территории — 30 мин",
-                          "Заполнение личного дела",
-                          "Наряд на КПП-1 — 30 мин",
-                          "Наряд на КПП-2 — 1 час",
-                          "Участие в государственной поставке",
-                          "Участие в досмотровых мероприятиях"
-                        ].some(subject => r.subject.startsWith(subject))) && (
-                          <button
-                            onClick={() => openGradeFromRequest(r)}
-                            className="rank-badge text-primary border border-primary/40 px-3 py-1 hover:bg-primary/10 transition-colors flex items-center gap-1"
-                          >
-                            <Icon name="Star" size={12} />Поставить оценку
-                          </button>
-                        )}
-                        {reviewLoading[r.id] && <Icon name="Loader2" size={14} className="text-primary animate-spin" />}
+              filterType === "all" ? (
+                <div className="space-y-6">
+                  {groupedRequests.lecture.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-oswald text-xs tracking-wider uppercase text-yellow-500 border-l-2 border-yellow-500 pl-2">Запросы на лекции ({groupedRequests.lecture.length})</h4>
+                      <div className="space-y-3">
+                        {groupedRequests.lecture.map(renderRequestCard)}
                       </div>
                     </div>
                   )}
-                  {r.status !== "pending" && r.reviewer_name && (
-                    <p className="text-xs text-muted-foreground font-mono border-t border-tactical-border pt-2">
-                      Рассмотрел: {r.reviewer_name}
-                      {r.instructor_comment && ` · "${r.instructor_comment}"`}
-                    </p>
+                  {groupedRequests.practice.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-oswald text-xs tracking-wider uppercase text-blue-500 border-l-2 border-blue-500 pl-2">Запросы на практики ({groupedRequests.practice.length})</h4>
+                      <div className="space-y-3">
+                        {groupedRequests.practice.map(renderRequestCard)}
+                      </div>
+                    </div>
+                  )}
+                  {groupedRequests.exam.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-oswald text-xs tracking-wider uppercase text-purple-500 border-l-2 border-purple-500 pl-2">Запросы на экзамены ({groupedRequests.exam.length})</h4>
+                      <div className="space-y-3">
+                        {groupedRequests.exam.map(renderRequestCard)}
+                      </div>
+                    </div>
+                  )}
+                  {groupedRequests.dismissal.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-oswald text-xs tracking-wider uppercase text-red-500 border-l-2 border-red-500 pl-2">Рапорты на увольнение ({groupedRequests.dismissal.length})</h4>
+                      <div className="space-y-3">
+                        {groupedRequests.dismissal.map(renderRequestCard)}
+                      </div>
+                    </div>
                   )}
                 </div>
-                ))}
-              </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredRequests.map(renderRequestCard)}
+                </div>
+              )
             )
           )}
         </div>
