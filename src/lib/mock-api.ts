@@ -33,7 +33,7 @@ const USERS: (AdminUser & { password: string })[] = [
     unit: "АВНГ",
     role: "cadet",
     is_whitelisted: true,
-    created_at: "2026-01-15T10:00:00Z",
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
     id: 2,
@@ -56,7 +56,7 @@ const USERS: (AdminUser & { password: string })[] = [
     unit: "АВНГ",
     role: "cadet",
     is_whitelisted: true,
-    created_at: "2026-01-20T09:00:00Z",
+    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
     id: 4,
@@ -67,7 +67,7 @@ const USERS: (AdminUser & { password: string })[] = [
     unit: "УВО",
     role: "cadet",
     is_whitelisted: true,
-    created_at: "2026-02-01T11:00:00Z",
+    created_at: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
     id: 5,
