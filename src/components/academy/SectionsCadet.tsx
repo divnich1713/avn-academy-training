@@ -1162,6 +1162,77 @@ export function Instructors({ onNavigate }: { onNavigate?: (s: import("./types")
     return "text-primary border-primary/30 bg-primary/10";
   };
 
+  const renderCard = (inst: User, extraWidthClass: string = "w-full md:w-[320px] flex-shrink-0") => (
+    <div key={inst.id} className={`corner-mark bg-tactical-card border border-tactical-border p-4 card-glow hover:border-primary/45 transition-all group flex flex-col justify-between ${extraWidthClass}`}>
+      <div className="flex items-start gap-3">
+        <div className="w-12 h-12 bg-primary/10 border border-primary/25 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/20 transition-colors overflow-hidden rounded-full">
+          <InstructorAvatar 
+            avatarUrl={inst.avatar_url} 
+            discordId={inst.discord_id} 
+            role={inst.role} 
+            size={48} 
+            className="w-full h-full" 
+          />
+        </div>
+        <div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onNavigate?.("profile", undefined, inst)}
+              className="font-oswald text-base font-semibold tracking-wide text-foreground leading-tight hover:text-primary transition-colors text-left"
+            >
+              {inst.name}
+            </button>
+            <OnlineStatus lastSeen={inst.last_seen} />
+          </div>
+          <div className="flex items-center gap-2 flex-wrap mt-0.5">
+            <span className="text-gold font-mono text-xs uppercase tracking-wider">{inst.rank || "Инструктор"}</span>
+            <span className={`rank-badge px-1.5 py-0.2 text-[10px] border leading-none ${getRoleStyle(inst.role)}`}>
+              {ROLE_LABELS[inst.role] || inst.role}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">{inst.unit || "Учебный центр"}</p>
+        </div>
+      </div>
+      <div className="mt-4 pt-3 border-t border-tactical-border flex justify-between items-center text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
+        <span>Static ID: <span className="text-primary">{fmtStaticId(inst.static_id)}</span></span>
+        <span>В штате с: {inst.created_at ? new Date(inst.created_at).toLocaleDateString("ru-RU") : "—"}</span>
+      </div>
+    </div>
+  );
+
+  const renderCommandGroup = () => {
+    if (commandStaff.length === 0) return null;
+    const heads = commandStaff.filter(i => i.role === "head_avng");
+    const deputies = commandStaff.filter(i => i.role === "deputy_head");
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 border-b border-tactical-border/40 pb-1.5">
+          <div className="w-5 h-5 flex items-center justify-center text-primary">
+            <Icon name="Shield" size={15} />
+          </div>
+          <h4 className="font-oswald text-xs font-bold tracking-widest uppercase text-muted-foreground">
+            Руководство академии ({commandStaff.length})
+          </h4>
+        </div>
+        
+        {/* Heads centered */}
+        {heads.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-4 w-full">
+            {heads.map(h => renderCard(h))}
+          </div>
+        )}
+
+        {/* Deputies centered underneath */}
+        {deputies.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-4 w-full pt-2">
+            {deputies.map(d => renderCard(d))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderGroup = (title: string, group: User[], icon: string) => {
     if (group.length === 0) return null;
     return (
@@ -1175,43 +1246,7 @@ export function Instructors({ onNavigate }: { onNavigate?: (s: import("./types")
           </h4>
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {group.map((inst) => (
-            <div key={inst.id} className="corner-mark bg-tactical-card border border-tactical-border p-4 card-glow hover:border-primary/45 transition-all group flex flex-col justify-between">
-              <div className="flex items-start gap-3">
-                <div className="w-12 h-12 bg-primary/10 border border-primary/25 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/20 transition-colors overflow-hidden rounded-full">
-                  <InstructorAvatar 
-                    avatarUrl={inst.avatar_url} 
-                    discordId={inst.discord_id} 
-                    role={inst.role} 
-                    size={48} 
-                    className="w-full h-full" 
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => onNavigate?.("profile", undefined, inst)}
-                      className="font-oswald text-base font-semibold tracking-wide text-foreground leading-tight hover:text-primary transition-colors text-left"
-                    >
-                      {inst.name}
-                    </button>
-                    <OnlineStatus lastSeen={inst.last_seen} />
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                    <span className="text-gold font-mono text-xs uppercase tracking-wider">{inst.rank || "Инструктор"}</span>
-                    <span className={`rank-badge px-1.5 py-0.2 text-[10px] border leading-none ${getRoleStyle(inst.role)}`}>
-                      {ROLE_LABELS[inst.role] || inst.role}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">{inst.unit || "Учебный центр"}</p>
-                </div>
-              </div>
-              <div className="mt-4 pt-3 border-t border-tactical-border flex justify-between items-center text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
-                <span>Static ID: <span className="text-primary">{fmtStaticId(inst.static_id)}</span></span>
-                <span>В штате с: {inst.created_at ? new Date(inst.created_at).toLocaleDateString("ru-RU") : "—"}</span>
-              </div>
-            </div>
-          ))}
+          {group.map((inst) => renderCard(inst, "w-full"))}
         </div>
       </div>
     );
@@ -1228,7 +1263,7 @@ export function Instructors({ onNavigate }: { onNavigate?: (s: import("./types")
         <Empty text="Инструкторы не найдены" />
       ) : (
         <div className="space-y-8">
-          {renderGroup("Руководство академии", commandStaff, "Shield")}
+          {renderCommandGroup()}
           {renderGroup("Старший преподавательский состав", seniorStaff, "Award")}
           {renderGroup("Преподавательский состав", instructorStaff, "Users")}
         </div>
