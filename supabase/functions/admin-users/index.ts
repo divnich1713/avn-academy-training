@@ -14,6 +14,27 @@ async function getDbClient() {
   }
   const client = new Client(databaseUrl);
   await client.connect();
+
+  // Dynamic DDL update to support 'dismissed' (уволен) role in remote DB constraint
+  try {
+    const checkRes = await client.queryObject<{ def: string }>(
+      `SELECT pg_get_constraintdef(c.oid) as def 
+       FROM pg_constraint c 
+       JOIN pg_class t ON t.oid = c.conrelid
+       JOIN pg_namespace n ON n.oid = t.relnamespace
+       WHERE c.conname = 'users_role_check' AND n.nspname = '${SCHEMA}'`
+    );
+    if (checkRes.rows.length > 0 && !checkRes.rows[0].def.includes("dismissed")) {
+      await client.queryObject(`
+        ALTER TABLE ${SCHEMA}.users DROP CONSTRAINT IF EXISTS users_role_check;
+        ALTER TABLE ${SCHEMA}.users ADD CONSTRAINT users_role_check CHECK (role IN ('cadet', 'instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head', 'dismissed'));
+      `);
+      console.log("Database constraint updated to include 'dismissed' role.");
+    }
+  } catch (e) {
+    console.error("Failed to check/update database constraint:", e);
+  }
+
   return client;
 }
 
@@ -120,7 +141,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      if (role !== "cadet" && role !== "instructor" && role !== "head_avng" && role !== "chief_instructor" && role !== "senior_instructor" && role !== "junior_instructor" && role !== "deputy_head") {
+      if (role !== "cadet" && role !== "instructor" && role !== "head_avng" && role !== "chief_instructor" && role !== "senior_instructor" && role !== "junior_instructor" && role !== "deputy_head" && role !== "dismissed") {
         return new Response(JSON.stringify({ error: "Неверная роль" }), {
           status: 400,
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
@@ -185,7 +206,7 @@ Deno.serve(async (req) => {
         fields.push(`is_whitelisted = $${idx++}`);
         values.push(Boolean(body.is_whitelisted));
       }
-      if (body.role && (body.role === "cadet" || body.role === "instructor" || body.role === "head_avng" || body.role === "chief_instructor" || body.role === "senior_instructor" || body.role === "junior_instructor" || body.role === "deputy_head")) {
+      if (body.role && (body.role === "cadet" || body.role === "instructor" || body.role === "head_avng" || body.role === "chief_instructor" || body.role === "senior_instructor" || body.role === "junior_instructor" || body.role === "deputy_head" || body.role === "dismissed")) {
         if (requester.role !== "head_avng" && requester.role !== "deputy_head") {
           const curUserRes = await client.queryObject<{ role: string }>(
             `SELECT role FROM ${SCHEMA}.users WHERE id = $1`,
