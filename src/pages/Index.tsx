@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Section, UserRole } from "@/components/academy/types";
+import { Section, UserRole, NAV_ITEMS } from "@/components/academy/types";
 import { AppHeader, AppSidebar } from "@/components/academy/Layout";
 import Icon from "@/components/ui/icon";
 import {
@@ -29,13 +29,21 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get("tab");
     const isInstr = authUser.role !== "cadet";
+    let initialSection: Section = isInstr ? "instructor" : "dashboard";
     if (tabParam) {
-      if ((tabParam === "promotions" || tabParam === "dashboard") && isInstr) {
-        return "instructor";
+      const candidateSection = tabParam as Section;
+      if ((candidateSection === "promotions" || candidateSection === "dashboard") && isInstr) {
+        initialSection = "instructor";
+      } else {
+        initialSection = candidateSection;
       }
-      return tabParam as Section;
     }
-    return isInstr ? "instructor" : "dashboard";
+    // Authorization check
+    const navItem = NAV_ITEMS.find((item) => item.id === initialSection);
+    if (navItem && !navItem.roles.includes(authUser.role as UserRole)) {
+      initialSection = authUser.role === "cadet" ? "dashboard" : "instructor";
+    }
+    return initialSection;
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [highlightRequestId, setHighlightRequestId] = useState<number | undefined>();
@@ -69,6 +77,11 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
     let targetSection = s;
     if (isInstr && (s === "dashboard" || s === "promotions")) {
       targetSection = "instructor";
+    }
+    // Authorization check
+    const navItem = NAV_ITEMS.find((item) => item.id === targetSection);
+    if (navItem && !navItem.roles.includes(authUser.role as UserRole)) {
+      targetSection = authUser.role === "cadet" ? "dashboard" : "instructor";
     }
     setSection(targetSection);
     setHighlightRequestId(requestId);
