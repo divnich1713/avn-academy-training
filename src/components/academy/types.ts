@@ -12,7 +12,7 @@ export type Section =
   | "ratings"
   | "instructors";
 
-export type UserRole = "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head";
+export type UserRole = "head_avng" | "deputy_head" | "chief_instructor" | "senior_instructor" | "instructor" | "junior_instructor" | "cadet";
 
 export const NAV_ITEMS: {
   id: Section;

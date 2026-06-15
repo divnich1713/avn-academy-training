@@ -9,13 +9,13 @@ import { PromotionInstructorTab } from "./Promotions";
 type EditForm = { static_id: string; name: string; rank: string; unit: string; role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor"; password: string; created_at: string; discord_id: string; avatar_url: string };
 
 const ROLE_LABELS: Record<string, string> = {
-  cadet: "Курсант",
+  head_avng: "Нач.АВНГ",
+  deputy_head: "Зам.Нач.АВНГ",
+  chief_instructor: "Гл.Инст.АВНГ",
+  senior_instructor: "Ст.Инст.АВНГ",
   instructor: "Инст.АВНГ",
   junior_instructor: "Мл.Инст.АВНГ",
-  senior_instructor: "Ст.Инст.АВНГ",
-  chief_instructor: "Гл.Инст.АВНГ",
-  head_avng: "Нач.АВНГ",
-  deputy_head: "Зам.Нач.АВНГ"
+  cadet: "Курсант"
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1128,17 +1128,17 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                     onChange={(e) => setForm({ ...form, role: e.target.value as any })}
                     disabled={authUser.role !== "head_avng" && authUser.role !== "deputy_head"}
                   >
-                    <option value="cadet">Курсант</option>
                     {(authUser.role === "head_avng" || authUser.role === "deputy_head") && (
                       <>
+                        <option value="head_avng">Нач.АВНГ</option>
+                        <option value="deputy_head">Зам.Нач.АВНГ</option>
+                        <option value="chief_instructor">Гл.Инст.АВНГ</option>
+                        <option value="senior_instructor">Ст.Инст.АВНГ</option>
                         <option value="instructor">Инст.АВНГ</option>
                         <option value="junior_instructor">Мл.Инст.АВНГ</option>
-                        <option value="senior_instructor">Ст.Инст.АВНГ</option>
-                        <option value="chief_instructor">Гл.Инст.АВНГ</option>
-                        <option value="deputy_head">Зам.Нач.АВНГ</option>
-                        <option value="head_avng">Нач.АВНГ</option>
                       </>
                     )}
+                    <option value="cadet">Курсант</option>
                   </select>
                 </div>
                 <div>
@@ -1204,13 +1204,13 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                     onChange={(e) => setEditForm({ ...editForm, role: e.target.value as any })}
                     disabled={authUser.role !== "head_avng" && authUser.role !== "deputy_head"}
                   >
-                    <option value="cadet">Курсант</option>
+                    <option value="head_avng">Нач.АВНГ</option>
+                    <option value="deputy_head">Зам.Нач.АВНГ</option>
+                    <option value="chief_instructor">Гл.Инст.АВНГ</option>
+                    <option value="senior_instructor">Ст.Инст.АВНГ</option>
                     <option value="instructor">Инст.АВНГ</option>
                     <option value="junior_instructor">Мл.Инст.АВНГ</option>
-                    <option value="senior_instructor">Ст.Инст.АВНГ</option>
-                    <option value="chief_instructor">Гл.Инст.АВНГ</option>
-                    <option value="deputy_head">Зам.Нач.АВНГ</option>
-                    <option value="head_avng">Нач.АВНГ</option>
+                    <option value="cadet">Курсант</option>
                   </select>
                 </div>
                 <div>
