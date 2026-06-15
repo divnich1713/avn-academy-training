@@ -1148,16 +1148,34 @@ export function Instructors({ onNavigate }: { onNavigate?: (s: import("./types")
       .finally(() => setLoading(false));
   }, []);
 
-  return (
-    <div className="animate-fade-in space-y-6">
-      <SectionHeader title="Список инструкторов" sub="Действующий командный и преподавательский состав академии АВНГ" />
-      {loading ? (
-        <Spinner />
-      ) : instructors.length === 0 ? (
-        <Empty text="Инструкторы не найдены" />
-      ) : (
+  const commandStaff = instructors.filter(i => i.role === "head_avng" || i.role === "deputy_head");
+  const seniorStaff = instructors.filter(i => i.role === "chief_instructor" || i.role === "senior_instructor");
+  const instructorStaff = instructors.filter(i => i.role === "instructor" || i.role === "junior_instructor");
+
+  const getRoleStyle = (role: string) => {
+    if (role === "head_avng" || role === "deputy_head") {
+      return "text-red-400 border-red-800 bg-red-900/20";
+    }
+    if (["instructor", "chief_instructor", "senior_instructor", "junior_instructor"].includes(role)) {
+      return "text-yellow-400 border-yellow-800 bg-yellow-900/20";
+    }
+    return "text-primary border-primary/30 bg-primary/10";
+  };
+
+  const renderGroup = (title: string, group: User[], icon: string) => {
+    if (group.length === 0) return null;
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 border-b border-tactical-border/40 pb-1.5">
+          <div className="w-5 h-5 flex items-center justify-center text-primary">
+            <Icon name={icon} size={15} />
+          </div>
+          <h4 className="font-oswald text-xs font-bold tracking-widest uppercase text-muted-foreground">
+            {title} ({group.length})
+          </h4>
+        </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {instructors.map((inst) => (
+          {group.map((inst) => (
             <div key={inst.id} className="corner-mark bg-tactical-card border border-tactical-border p-4 card-glow hover:border-primary/45 transition-all group flex flex-col justify-between">
               <div className="flex items-start gap-3">
                 <div className="w-12 h-12 bg-primary/10 border border-primary/25 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/20 transition-colors overflow-hidden rounded-full">
@@ -1181,13 +1199,7 @@ export function Instructors({ onNavigate }: { onNavigate?: (s: import("./types")
                   </div>
                   <div className="flex items-center gap-2 flex-wrap mt-0.5">
                     <span className="text-gold font-mono text-xs uppercase tracking-wider">{inst.rank || "Инструктор"}</span>
-                    <span className={`rank-badge px-1.5 py-0.2 text-[10px] border leading-none ${
-                      inst.role === "head_avng" || inst.role === "deputy_head"
-                        ? "text-red-400 border-red-800 bg-red-900/20"
-                        : ["instructor", "chief_instructor", "senior_instructor", "junior_instructor"].includes(inst.role)
-                        ? "text-yellow-400 border-yellow-800 bg-yellow-900/20"
-                        : "text-primary border-primary/30 bg-primary/10"
-                    }`}>
+                    <span className={`rank-badge px-1.5 py-0.2 text-[10px] border leading-none ${getRoleStyle(inst.role)}`}>
                       {ROLE_LABELS[inst.role] || inst.role}
                     </span>
                   </div>
@@ -1200,6 +1212,25 @@ export function Instructors({ onNavigate }: { onNavigate?: (s: import("./types")
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="animate-fade-in space-y-8">
+      <div className="flex flex-col gap-1">
+        <SectionHeader title="Список инструкторов" sub="Действующий командный и преподавательский состав академии АВНГ" />
+      </div>
+      {loading ? (
+        <Spinner />
+      ) : instructors.length === 0 ? (
+        <Empty text="Инструкторы не найдены" />
+      ) : (
+        <div className="space-y-8">
+          {renderGroup("Руководство академии", commandStaff, "Shield")}
+          {renderGroup("Старший преподавательский состав", seniorStaff, "Award")}
+          {renderGroup("Преподавательский состав", instructorStaff, "Users")}
         </div>
       )}
     </div>
