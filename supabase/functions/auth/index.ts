@@ -18,7 +18,7 @@ async function getDbClient() {
   await client.queryArray(`ALTER TABLE ${SCHEMA}.users ADD COLUMN IF NOT EXISTS discord_id VARCHAR(255) DEFAULT NULL`).catch(console.error);
   await client.queryArray(`ALTER TABLE ${SCHEMA}.users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(1024) DEFAULT NULL`).catch(console.error);
   await client.queryArray(`ALTER TABLE ${SCHEMA}.users DROP CONSTRAINT IF EXISTS users_role_check`).catch(console.error);
-  await client.queryArray(`ALTER TABLE ${SCHEMA}.users ADD CONSTRAINT users_role_check CHECK (role IN ('cadet', 'instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor'))`).catch(console.error);
+  await client.queryArray(`ALTER TABLE ${SCHEMA}.users ADD CONSTRAINT users_role_check CHECK (role IN ('cadet', 'instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head'))`).catch(console.error);
   return client;
 }
 
@@ -288,7 +288,7 @@ Deno.serve(async (req) => {
         discord_id: string | null;
         avatar_url: string | null;
       }>(
-        `SELECT id, static_id, name, rank, unit, role, created_at, last_seen, discord_id, avatar_url FROM ${SCHEMA}.users WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor') AND is_whitelisted = true ORDER BY name ASC`
+        `SELECT id, static_id, name, rank, unit, role, created_at, last_seen, discord_id, avatar_url FROM ${SCHEMA}.users WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head') AND is_whitelisted = true ORDER BY name ASC`
       );
 
       const instructors = instructorsRes.rows.map(r => ({

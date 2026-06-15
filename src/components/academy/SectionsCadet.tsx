@@ -26,7 +26,8 @@ const ROLE_LABELS: Record<string, string> = {
   junior_instructor: "Мл.Инст.АВНГ",
   senior_instructor: "Ст.Инст.АВНГ",
   chief_instructor: "Гл.Инст.АВНГ",
-  head_avng: "Нач.АВНГ"
+  head_avng: "Нач.АВНГ",
+  deputy_head: "Зам.Нач.АВНГ"
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════

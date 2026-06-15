@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
       let targetUserId = user.id;
       const cadetIdParam = url.searchParams.get("cadet_id");
       if (cadetIdParam) {
-        const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+        const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(r);
         if (!isInstructor(user.role)) {
           return new Response(JSON.stringify({ error: "Только для инструкторов" }), {
             status: 403,
@@ -197,7 +197,7 @@ Deno.serve(async (req) => {
     if (method === "GET" && !action) {
       let query = "";
       const params: any[] = [];
-      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(r);
       if (isInstructor(user.role)) {
         query = `
           SELECT pr.id, pr.promotion_type, pr.status, pr.instructor_comment,
@@ -304,7 +304,7 @@ Deno.serve(async (req) => {
       // Уведомление всем инструкторам
       const reqs = PROMOTION_REQUIREMENTS[promotionType];
       const instructors = await client.queryObject<{ id: number }>(
-        `SELECT id FROM ${SCHEMA}.users WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor')`
+        `SELECT id FROM ${SCHEMA}.users WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head')`
       );
 
       for (const inst of instructors.rows) {
@@ -328,7 +328,7 @@ Deno.serve(async (req) => {
 
     // ===== PUT /promotions?action=review&id=N — инструктор рассматривает рапорт =====
     if (method === "PUT" && action === "review") {
-        const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+        const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(r);
         if (!isInstructor(user.role)) {
           return new Response(JSON.stringify({ error: "Только для инструкторов" }), {
             status: 403,

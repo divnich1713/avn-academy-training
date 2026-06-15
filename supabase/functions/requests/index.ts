@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
     if (method === "GET" && !action) {
       let query = "";
       const params: any[] = [];
-      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(r);
       if (isInstructor(user.role)) {
         query = `
           SELECT r.id, r.type, r.subject, r.description, r.preferred_date,
@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
       const typeText = typeMap[req_type] || req_type;
 
       const instructors = await client.queryObject<{ id: number }>(
-        `SELECT id FROM ${SCHEMA}.users WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor')`
+        `SELECT id FROM ${SCHEMA}.users WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head')`
       );
 
       for (const inst of instructors.rows) {
@@ -164,7 +164,7 @@ Deno.serve(async (req) => {
 
     // ===== PUT /requests?action=review — инструктор одобряет/отклоняет =====
     if (method === "PUT" && action === "review") {
-      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(r);
       if (!isInstructor(user.role)) {
         return new Response(JSON.stringify({ error: "Только для инструкторов" }), {
           status: 403,
@@ -256,7 +256,7 @@ Deno.serve(async (req) => {
       let query = "";
       const params: any[] = [];
 
-      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(r);
       if (isInstructor(user.role)) {
         query = `
           SELECT g.id, g.subject, g.type, g.grade, g.comment, g.graded_at,
@@ -296,7 +296,7 @@ Deno.serve(async (req) => {
 
     // ===== POST /requests?action=grade — инструктор ставит оценку =====
     if (method === "POST" && action === "grade") {
-      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(r);
       if (!isInstructor(user.role)) {
         return new Response(JSON.stringify({ error: "Только для инструкторов" }), {
           status: 403,

@@ -61,7 +61,7 @@ def handler(event: dict, context) -> dict:
         # ===== GET /requests — список запросов =====
         if method == "GET" and not action:
             with conn.cursor() as cur:
-                if user["role"] in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"):
+                if user["role"] in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"):
                     # Инструктор видит все запросы
                     cur.execute(
                         f"""SELECT r.id, r.type, r.subject, r.description, r.preferred_date,
@@ -125,7 +125,7 @@ def handler(event: dict, context) -> dict:
                 # Уведомление всем инструкторам о новом запросе
                 type_map = {"lecture": "лекция", "practice": "практика", "exam": "экзамен", "report": "рапорт"}
                 type_text = type_map.get(req_type, req_type)
-                cur.execute(f"SELECT id FROM {SCHEMA}.users WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor')")
+                cur.execute(f"SELECT id FROM {SCHEMA}.users WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head')")
                 instructor_ids = [row[0] for row in cur.fetchall()]
                 for inst_id in instructor_ids:
                     cur.execute(
@@ -140,7 +140,7 @@ def handler(event: dict, context) -> dict:
 
         # ===== PUT /requests?action=review — инструктор одобряет/отклоняет =====
         if method == "PUT" and action == "review":
-            if user["role"] not in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"):
+            if user["role"] not in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"):
                 return {"statusCode": 403, "headers": cors_headers(), "body": json.dumps({"error": "Только для инструкторов"})}
             request_id = int(params.get("id", 0))
             status = body.get("status")
@@ -181,7 +181,7 @@ def handler(event: dict, context) -> dict:
         # ===== GET /requests?action=grades — оценки =====
         if method == "GET" and action == "grades":
             with conn.cursor() as cur:
-                if user["role"] in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"):
+                if user["role"] in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"):
                     cur.execute(
                         f"""SELECT g.id, g.subject, g.type, g.grade, g.comment, g.graded_at,
                             u.name as cadet_name, u.rank as cadet_rank, u.id as cadet_id,
@@ -215,7 +215,7 @@ def handler(event: dict, context) -> dict:
 
         # ===== POST /requests?action=grade — инструктор ставит оценку =====
         if method == "POST" and action == "grade":
-            if user["role"] not in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"):
+            if user["role"] not in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"):
                 return {"statusCode": 403, "headers": cors_headers(), "body": json.dumps({"error": "Только для инструкторов"})}
 
             cadet_id = int(body.get("cadet_id", 0))

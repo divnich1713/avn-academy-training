@@ -12,7 +12,7 @@ export type Section =
   | "ratings"
   | "instructors";
 
-export type UserRole = "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor";
+export type UserRole = "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head";
 
 export const NAV_ITEMS: {
   id: Section;
@@ -63,18 +63,18 @@ export const NAV_ITEMS: {
     roles: ["cadet"],
   },
   { id: "profile", label: "Профиль курсанта", icon: "User", roles: ["cadet"] },
-  { id: "ratings", label: "Рейтинг инструкторов", icon: "Star", roles: ["head_avng"] },
+  { id: "ratings", label: "Рейтинг инструкторов", icon: "Star", roles: ["head_avng", "deputy_head"] },
   {
     id: "instructors",
     label: "Инструкторы",
     icon: "ShieldAlert",
-    roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"],
+    roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"],
   },
   {
     id: "instructor",
     label: "Панель инструктора",
     icon: "Shield",
-    roles: ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"],
+    roles: ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"],
   },
 ];
 

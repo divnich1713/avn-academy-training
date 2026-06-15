@@ -259,7 +259,7 @@ export async function adminCreateUser(payload: {
   name: string;
   rank: string;
   unit: string;
-  role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor";
+  role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head";
   is_whitelisted: boolean;
   discord_id?: string | null;
   avatar_url?: string | null;
@@ -322,7 +322,7 @@ export async function adminRemoveUser(id: number) {
 
 export async function fetchInstructors(): Promise<User[]> {
   await delay();
-  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(r);
   return USERS.filter((u) => isInstructor(u.role) && u.is_whitelisted).map(({ password: _, ...u }) => u);
 }
 
@@ -332,7 +332,7 @@ export async function fetchRequests(): Promise<TrainingRequest[]> {
   await delay();
   const user = getUser();
   if (!user) return [];
-  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(r);
   if (isInstructor(user.role)) return [...REQUESTS].reverse();
   return REQUESTS.filter((r) => r.cadet_id === user.id).reverse();
 }
@@ -561,7 +561,7 @@ export async function checkPromotionRequirements(type: import("./api").Promotion
 export async function fetchPromotionReports(): Promise<import("./api").PromotionReport[]> {
   await delay(200);
   const user = USERS.find(u => u.id === (currentUserId || 1));
-  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(r);
   if (user && isInstructor(user.role)) {
     return [...PROMOTION_REPORTS];
   }
@@ -599,7 +599,7 @@ export async function createPromotionReport(promotion_type: import("./api").Prom
   PROMOTION_REPORTS.unshift(newReport);
 
   // Add notifications to instructors
-  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(r);
   USERS.filter(u => isInstructor(u.role)).forEach(inst => {
     NOTIFICATIONS.unshift({
       id: nextNotifId++,
