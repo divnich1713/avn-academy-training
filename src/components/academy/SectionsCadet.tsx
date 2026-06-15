@@ -1169,7 +1169,7 @@ export function Instructors({ onNavigate }: { onNavigate?: (s: import("./types")
                   <InstructorAvatar 
                     avatarUrl={inst.avatar_url} 
                     discordId={inst.discord_id} 
-                    role="instructor" 
+                    role={inst.role} 
                     size={48} 
                     className="w-full h-full" 
                   />
@@ -1184,7 +1184,18 @@ export function Instructors({ onNavigate }: { onNavigate?: (s: import("./types")
                     </button>
                     <OnlineStatus lastSeen={inst.last_seen} />
                   </div>
-                  <p className="text-gold font-mono text-xs mt-0.5 uppercase tracking-wider">{inst.rank || "Инструктор"}</p>
+                  <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                    <span className="text-gold font-mono text-xs uppercase tracking-wider">{inst.rank || "Инструктор"}</span>
+                    <span className={`rank-badge px-1.5 py-0.2 text-[10px] border leading-none ${
+                      inst.role === "head_avng" || inst.role === "deputy_head"
+                        ? "text-red-400 border-red-800 bg-red-900/20"
+                        : ["instructor", "chief_instructor", "senior_instructor", "junior_instructor"].includes(inst.role)
+                        ? "text-yellow-400 border-yellow-800 bg-yellow-900/20"
+                        : "text-primary border-primary/30 bg-primary/10"
+                    }`}>
+                      {ROLE_LABELS[inst.role] || inst.role}
+                    </span>
+                  </div>
                   <p className="text-xs text-muted-foreground mt-0.5">{inst.unit || "Учебный центр"}</p>
                 </div>
               </div>
