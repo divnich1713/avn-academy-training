@@ -24,7 +24,7 @@ export const NAV_ITEMS: {
     id: "dashboard",
     label: "Главная",
     icon: "LayoutDashboard",
-    roles: ["cadet", "instructor", "head_avng"],
+    roles: ["cadet"],
   },
   {
     id: "materials",
@@ -63,7 +63,12 @@ export const NAV_ITEMS: {
     roles: ["cadet"],
   },
   { id: "profile", label: "Профиль курсанта", icon: "User", roles: ["cadet"] },
-  { id: "ratings", label: "Рейтинг инструкторов", icon: "Star", roles: ["head_avng", "deputy_head"] },
+  {
+    id: "ratings",
+    label: "Рейтинг инструкторов",
+    icon: "Star",
+    roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"],
+  },
   {
     id: "instructors",
     label: "Инструкторы",

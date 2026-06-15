@@ -1,15 +1,46 @@
 import { useState, useEffect } from "react";
-import { apiMe, apiLogout, User } from "./api";
+import { apiMe, apiLogout, User, getToken } from "./api";
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiMe().then((u) => {
-      setUser(u);
+    const token = getToken();
+    if (!token) {
       setLoading(false);
-    });
+      return;
+    }
+
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      if (!cancelled) {
+        console.warn("Auth check timed out after 10s");
+        setLoading(false);
+      }
+    }, 10_000);
+
+    apiMe()
+      .then((u) => {
+        if (!cancelled) {
+          setUser(u);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error("Auth check failed:", err);
+        if (!cancelled) {
+          setLoading(false);
+        }
+      })
+      .finally(() => {
+        clearTimeout(timeout);
+      });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, []);
 
   const login = (u: User) => setUser(u);

@@ -323,7 +323,6 @@ export function PromotionSection({ authUser }: { authUser: User }) {
                           </p>
                           <p className="text-xs text-muted-foreground font-mono mt-0.5">
                             {item.type === "lecture" ? "Лекция" : item.type === "practice" ? "Практика" : "Экзамен"}
-                            {item.completed && item.grade && ` · Оценка: ${item.grade}`}
                             {item.completed && item.graded_at && ` · ${fmt(item.graded_at)}`}
                           </p>
                         </div>
@@ -769,8 +768,8 @@ export function PromotionInstructorTab({
                                     {item.label}
                                   </span>
                                   {item.completed && item.grade && (
-                                    <span className="text-xs font-mono text-green-400 ml-auto">
-                                      {item.grade}
+                                    <span className="text-[10px] rank-badge text-green-400 border border-green-800 px-1.5 py-0.5 ml-auto">
+                                      {item.grade >= 3 ? "Зачтено" : "Не зачтено"}
                                     </span>
                                   )}
                                 </div>

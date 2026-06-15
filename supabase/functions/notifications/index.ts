@@ -26,7 +26,7 @@ async function getUserByToken(client: Client, token: string | null) {
   }>(
     `SELECT u.id, u.name, u.role FROM ${SCHEMA}.sessions s
      JOIN ${SCHEMA}.users u ON s.user_id = u.id
-     WHERE s.token = $1 AND s.expires_at > NOW()`,
+     WHERE s.token = $1 AND s.expires_at > NOW() AND u.is_whitelisted = true`,
     [token]
   );
   if (res.rows.length > 0) {
@@ -65,8 +65,10 @@ Deno.serve(async (req) => {
         message: string;
         is_read: boolean;
         created_at: Date;
+        unread_count: number;
       }>(
-        `SELECT id, type, title, message, is_read, created_at
+        `SELECT id, type, title, message, is_read, created_at,
+                (SELECT COUNT(*)::int FROM ${SCHEMA}.notifications WHERE user_id = $1 AND is_read = FALSE) as unread_count
          FROM ${SCHEMA}.notifications
          WHERE user_id = $1
          ORDER BY created_at DESC
@@ -74,16 +76,11 @@ Deno.serve(async (req) => {
         [user.id]
       );
 
-      const notifications = res.rows.map(row => ({
+      const unread_count = res.rows.length > 0 ? Number(res.rows[0].unread_count) : 0;
+      const notifications = res.rows.map(({ unread_count: _, ...row }) => ({
         ...row,
         created_at: row.created_at.toISOString()
       }));
-
-      const countRes = await client.queryObject<{ count: string }>(
-        `SELECT COUNT(*) FROM ${SCHEMA}.notifications WHERE user_id = $1 AND is_read = FALSE`,
-        [user.id]
-      );
-      const unread_count = Number(countRes.rows[0].count);
 
       return new Response(JSON.stringify({ notifications, unread_count }), {
         status: 200,

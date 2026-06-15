@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { SectionHeader, InstructorAvatar } from "./UIComponents";
-import { fetchRatings, InstructorRating } from "@/lib/api";
+import { fetchRatings, InstructorRating, User } from "@/lib/api";
 import { Spinner, Empty } from "./SectionsShared";
 
 type Timeframe = "daily" | "weekly" | "monthly" | "yearly";
@@ -16,7 +16,7 @@ const TIMEFRAME_LABELS: Record<Timeframe, string> = {
 // ═══════════════════════════════════════════════════════════════════════════════
 // INSTRUCTOR RATING VIEW (для вкладки инструктора)
 // ═══════════════════════════════════════════════════════════════════════════════
-export function InstructorRatingView({ instructorId }: { instructorId: number }) {
+export function InstructorRatingView({ instructorId }: { instructorId?: number }) {
   const [timeframe, setTimeframe] = useState<Timeframe>("weekly");
   const [instructors, setInstructors] = useState<InstructorRating[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,11 +151,35 @@ export function InstructorRatingView({ instructorId }: { instructorId: number })
 // ═══════════════════════════════════════════════════════════════════════════════
 // INSTRUCTOR RATINGS (Заглушка, так как курсанты больше не ставят оценки)
 // ═══════════════════════════════════════════════════════════════════════════════
-export function InstructorRatings() {
+export function InstructorRatings({ authUser }: { authUser?: User }) {
+  const isInstructor = authUser && ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(authUser.role);
+  const instructorId = isInstructor ? authUser.id : undefined;
+
   return (
     <div className="animate-fade-in space-y-6">
       <SectionHeader title="Рейтинг инструкторов" sub="Система баллов за академическую активность" />
-      <Empty text="Оценка инструкторов курсантам недоступна. Рейтинг формируется автоматически на основе проведенных занятий." />
+      
+      {/* Information Banner */}
+      <div className="bg-tactical-card border border-tactical-border/60 p-4 flex gap-3 items-start text-xs md:text-sm text-muted-foreground relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500/80" />
+        <div className="w-5 h-5 text-yellow-500/80 flex-shrink-0 flex items-center justify-center">
+          <Icon name="Info" size={18} />
+        </div>
+        <div className="space-y-1">
+          <p className="font-semibold text-foreground text-xs font-mono uppercase tracking-wide">Автоматический расчет активности</p>
+          <p className="leading-relaxed text-muted-foreground">
+            Ручная оценка инструкторов курсантами отключена. Рейтинг строится автоматически на основе учебных мероприятий:
+          </p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2 pt-2 border-t border-tactical-border/40 font-mono text-[10px] text-yellow-500/80">
+            <span>• Лекция: <strong className="text-foreground">5б</strong></span>
+            <span>• Практика: <strong className="text-foreground">5б</strong></span>
+            <span>• Экзамен: <strong className="text-foreground">10б</strong></span>
+            <span>• Проверка рапорта: <strong className="text-foreground">2б</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <InstructorRatingView instructorId={instructorId} />
     </div>
   );
 }

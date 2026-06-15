@@ -66,7 +66,7 @@ async function getUserByToken(client: Client, token: string | null) {
   }>(
     `SELECT u.id, u.name, u.rank, u.unit, u.role FROM ${SCHEMA}.sessions s
      JOIN ${SCHEMA}.users u ON s.user_id = u.id
-     WHERE s.token = $1 AND s.expires_at > NOW()`,
+     WHERE s.token = $1 AND s.expires_at > NOW() AND u.is_whitelisted = true`,
     [token]
   );
   if (res.rows.length > 0) {
@@ -303,22 +303,16 @@ Deno.serve(async (req) => {
 
       // Уведомление всем инструкторам
       const reqs = PROMOTION_REQUIREMENTS[promotionType];
-      const instructors = await client.queryObject<{ id: number }>(
-        `SELECT id FROM ${SCHEMA}.users WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head')`
+      await client.queryArray(
+        `INSERT INTO ${SCHEMA}.notifications (user_id, type, title, message)
+         SELECT id, 'promotion_request', $1, $2
+         FROM ${SCHEMA}.users
+         WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head')`,
+        [
+          `Рапорт на повышение: ${reqs.label}`,
+          `${user.rank} ${user.name} подал рапорт на повышение до ${reqs.label}.`
+        ]
       );
-
-      for (const inst of instructors.rows) {
-        await client.queryArray(
-          `INSERT INTO ${SCHEMA}.notifications (user_id, type, title, message)
-           VALUES ($1, $2, $3, $4)`,
-          [
-            inst.id,
-            "promotion_request",
-            `Рапорт на повышение: ${reqs.label}`,
-            `${user.rank} ${user.name} подал рапорт на повышение до ${reqs.label}.`
-          ]
-        );
-      }
 
       return new Response(JSON.stringify({ success: true, id: newId }), {
         status: 200,

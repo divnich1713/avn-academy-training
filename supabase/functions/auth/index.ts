@@ -14,11 +14,6 @@ async function getDbClient() {
   }
   const client = new Client(databaseUrl);
   await client.connect();
-  await client.queryArray(`ALTER TABLE ${SCHEMA}.users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP WITH TIME ZONE`).catch(console.error);
-  await client.queryArray(`ALTER TABLE ${SCHEMA}.users ADD COLUMN IF NOT EXISTS discord_id VARCHAR(255) DEFAULT NULL`).catch(console.error);
-  await client.queryArray(`ALTER TABLE ${SCHEMA}.users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(1024) DEFAULT NULL`).catch(console.error);
-  await client.queryArray(`ALTER TABLE ${SCHEMA}.users DROP CONSTRAINT IF EXISTS users_role_check`).catch(console.error);
-  await client.queryArray(`ALTER TABLE ${SCHEMA}.users ADD CONSTRAINT users_role_check CHECK (role IN ('cadet', 'instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head'))`).catch(console.error);
   return client;
 }
 
@@ -222,7 +217,7 @@ Deno.serve(async (req) => {
         `SELECT u.id, u.static_id, u.name, u.rank, u.unit, u.role, u.created_at, u.discord_id, u.avatar_url
          FROM ${SCHEMA}.sessions s
          JOIN ${SCHEMA}.users u ON u.id = s.user_id
-         WHERE s.token = $1 AND s.expires_at > NOW()`,
+         WHERE s.token = $1 AND s.expires_at > NOW() AND u.is_whitelisted = true`,
         [token]
       );
 

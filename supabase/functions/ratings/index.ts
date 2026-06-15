@@ -27,7 +27,7 @@ async function getUserByToken(client: Client, token: string | null) {
   }>(
     `SELECT u.id, u.name, u.rank, u.role FROM ${SCHEMA}.sessions s
      JOIN ${SCHEMA}.users u ON s.user_id = u.id
-     WHERE s.token = $1 AND s.expires_at > NOW()`,
+     WHERE s.token = $1 AND s.expires_at > NOW() AND u.is_whitelisted = true`,
     [token]
   );
   if (res.rows.length > 0) {

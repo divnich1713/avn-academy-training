@@ -28,13 +28,13 @@ def get_instructor(token: str):
     cur.execute(
         f"""SELECT u.id, u.role FROM {SCHEMA}.sessions s
             JOIN {SCHEMA}.users u ON u.id = s.user_id
-            WHERE s.token = %s AND s.expires_at > NOW()""",
+            WHERE s.token = %s AND s.expires_at > NOW() AND u.is_whitelisted = TRUE""",
         (token,)
     )
     row = cur.fetchone()
     cur.close(); conn.close()
     if row and row[1] in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"):
-        return row[0]
+        return {"id": row[0], "role": row[1]}
     return None
 
 
@@ -43,8 +43,8 @@ def handler(event: dict, context) -> dict:
         return {"statusCode": 200, "headers": CORS, "body": ""}
 
     token = event.get("headers", {}).get("X-Session-Token") or event.get("headers", {}).get("x-session-token")
-    instructor_id = get_instructor(token)
-    if not instructor_id:
+    instructor = get_instructor(token)
+    if not instructor:
         return {"statusCode": 403, "headers": CORS, "body": json.dumps({"error": "Доступ запрещён"})}
 
     method = event.get("httpMethod", "GET")
@@ -53,10 +53,19 @@ def handler(event: dict, context) -> dict:
     if method == "GET":
         return list_users()
     if method == "POST":
+        if instructor["role"] not in ("head_avng", "deputy_head"):
+            return {"statusCode": 403, "headers": CORS, "body": json.dumps({"error": "Доступ запрещён"})}
         return create_user(event)
     if method == "PUT":
+        if instructor["role"] not in ("head_avng", "deputy_head"):
+            body = json.loads(event.get("body") or "{}")
+            disallowed = [k for k in body.keys() if k != "is_whitelisted"]
+            if disallowed:
+                return {"statusCode": 403, "headers": CORS, "body": json.dumps({"error": "Недостаточно прав для изменения этих полей"})}
         return update_user(event, path)
     if method == "DELETE":
+        if instructor["role"] not in ("head_avng", "deputy_head"):
+            return {"statusCode": 403, "headers": CORS, "body": json.dumps({"error": "Доступ запрещён"})}
         return remove_user(event, path)
 
     return {"statusCode": 404, "headers": CORS, "body": json.dumps({"error": "Not found"})}

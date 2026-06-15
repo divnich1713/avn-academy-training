@@ -22,7 +22,7 @@ def get_user_by_token(conn, token):
         cur.execute(
             f"SELECT u.id, u.name, u.rank, u.role FROM {SCHEMA}.sessions s "
             f"JOIN {SCHEMA}.users u ON s.user_id = u.id "
-            f"WHERE s.token = %s AND s.expires_at > NOW()",
+            f"WHERE s.token = %s AND s.expires_at > NOW() AND u.is_whitelisted = TRUE",
             (token,),
         )
         row = cur.fetchone()

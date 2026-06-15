@@ -97,17 +97,12 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
     }
   };
 
-  const fives = myGrades.filter((g) => g.grade === 5).length;
-  const fours = myGrades.filter((g) => g.grade === 4).length;
-  const threes = myGrades.filter((g) => g.grade === 3).length;
-  const twos = myGrades.filter((g) => g.grade === 2).length;
+  const rejectedCount = myGrades.filter((g) => g.grade < 3).length;
   const totalGrades = myGrades.length;
 
   const barData = [
-    { grade: "Пятёрки (5)", count: fives, color: "bg-green-500", text: "text-green-400" },
-    { grade: "Четвёрки (4)", count: fours, color: "bg-yellow-500", text: "text-yellow-400" },
-    { grade: "Тройки (3)", count: threes, color: "bg-orange-500", text: "text-orange-400" },
-    { grade: "Двойки (2)", count: twos, color: "bg-red-500", text: "text-red-400" },
+    { grade: "Зачтено", count: approvedCount, color: "bg-green-500", text: "text-green-400" },
+    { grade: "Не зачтено", count: rejectedCount, color: "bg-red-500", text: "text-red-400" },
   ];
 
   return (
@@ -259,7 +254,7 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
             style={{ backgroundImage: 'url("/rosgvardia_always_on_guard.png")' }}
           />
           <div className="relative z-10 w-full">
-            <h3 className="font-oswald text-xs tracking-widest uppercase text-muted-foreground mb-3 pb-1 border-b border-tactical-border/30">РАСПРЕДЕЛЕНИЕ ОЦЕНОК</h3>
+            <h3 className="font-oswald text-xs tracking-widest uppercase text-muted-foreground mb-3 pb-1 border-b border-tactical-border/30">РЕЗУЛЬТАТЫ СДАЧИ</h3>
             <div className="space-y-2">
               {barData.map((item) => {
                 return (
@@ -573,7 +568,7 @@ export function Grades({ authUser }: { authUser: User }) {
                 <th className="text-left px-4 py-3 rank-badge text-muted-foreground hidden md:table-cell">Тип</th>
                 <th className="text-left px-4 py-3 rank-badge text-muted-foreground hidden md:table-cell">Инструктор</th>
                 <th className="text-left px-4 py-3 rank-badge text-muted-foreground hidden md:table-cell">Дата</th>
-                <th className="text-center px-4 py-3 rank-badge text-muted-foreground">Оценка</th>
+                <th className="text-center px-4 py-3 rank-badge text-muted-foreground">Результат</th>
               </tr>
             </thead>
             <tbody>

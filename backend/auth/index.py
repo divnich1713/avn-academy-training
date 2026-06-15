@@ -112,7 +112,7 @@ def me(event: dict) -> dict:
         f"""SELECT u.id, u.static_id, u.name, u.rank, u.unit, u.role
             FROM {SCHEMA}.sessions s
             JOIN {SCHEMA}.users u ON u.id = s.user_id
-            WHERE s.token = %s AND s.expires_at > NOW()""",
+            WHERE s.token = %s AND s.expires_at > NOW() AND u.is_whitelisted = TRUE""",
         (token,)
     )
     row = cur.fetchone()

@@ -28,7 +28,7 @@ async function getUserByToken(client: Client, token: string | null) {
   }>(
     `SELECT u.id, u.name, u.rank, u.unit, u.role FROM ${SCHEMA}.sessions s
      JOIN ${SCHEMA}.users u ON s.user_id = u.id
-     WHERE s.token = $1 AND s.expires_at > NOW()`,
+     WHERE s.token = $1 AND s.expires_at > NOW() AND u.is_whitelisted = true`,
     [token]
   );
   if (res.rows.length > 0) {
@@ -139,22 +139,16 @@ Deno.serve(async (req) => {
       const typeMap: Record<string, string> = { lecture: "лекция", practice: "практика", exam: "экзамен", report: "рапорт" };
       const typeText = typeMap[req_type] || req_type;
 
-      const instructors = await client.queryObject<{ id: number }>(
-        `SELECT id FROM ${SCHEMA}.users WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head')`
+      await client.queryArray(
+        `INSERT INTO ${SCHEMA}.notifications (user_id, type, title, message)
+         SELECT id, 'new_request', $1, $2
+         FROM ${SCHEMA}.users
+         WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head')`,
+        [
+          `Новый запрос: ${typeText}`,
+          `${user.rank} ${user.name} подал запрос на тему "${subject}" (${typeText}).`
+        ]
       );
-
-      for (const inst of instructors.rows) {
-        await client.queryArray(
-          `INSERT INTO ${SCHEMA}.notifications (user_id, type, title, message)
-           VALUES ($1, $2, $3, $4)`,
-          [
-            inst.id,
-            "new_request",
-            `Новый запрос: ${typeText}`,
-            `${user.rank} ${user.name} подал запрос на тему "${subject}" (${typeText}).`
-          ]
-        );
-      }
 
       return new Response(JSON.stringify({ success: true, id: newId }), {
         status: 200,
@@ -220,26 +214,27 @@ Deno.serve(async (req) => {
           [cadetId, "request_reviewed", `Запрос ${statusText}`, notifMessage]
         );
 
-        // Auto-grade with 5 if approved and matches screenshot-based criteria
-        if (status === "approved" && reqType === "practice" && [
-          "Вышка — 30 мин",
-          "Патруль по территории — 30 мин",
-          "Заполнение личного дела",
-          "Наряд на КПП-1 — 30 мин",
-          "Наряд на КПП-2 — 1 час",
-          "Участие в государственной поставке",
-          "Участие в досмотровых мероприятиях"
-        ].some(prefix => subject.startsWith(prefix))) {
-          // Check if grade already exists for this subject to prevent duplicates
+        // Auto-grade if type is lecture, practice, or exam
+        if (reqType === "lecture" || reqType === "practice" || reqType === "exam") {
+          // Check if grade already exists for this request to prevent duplicates
           const existingGrade = await client.queryObject<{ id: number }>(
-            `SELECT id FROM ${SCHEMA}.grades WHERE user_id = $1 AND subject = $2 AND type = 'practice'`,
-            [cadetId, subject]
+            `SELECT id FROM ${SCHEMA}.grades WHERE request_id = $1`,
+            [Number(requestId)]
           );
+          const gradeVal = status === "approved" ? 5 : 1;
+          const gradeComment = comment || (status === "approved" ? "Автоматический зачет по запросу" : "Автоматический незачет по запросу");
           if (existingGrade.rows.length === 0) {
             await client.queryArray(
-              `INSERT INTO ${SCHEMA}.grades (user_id, instructor_id, subject, type, grade, comment)
-               VALUES ($1, $2, $3, 'practice', 5, 'Автоматический зачет по рапорту (скриншоты)')`,
-              [cadetId, user.id, subject]
+              `INSERT INTO ${SCHEMA}.grades (user_id, instructor_id, request_id, subject, type, grade, comment)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+              [cadetId, user.id, Number(requestId), subject, reqType, gradeVal, gradeComment]
+            );
+          } else {
+            await client.queryArray(
+              `UPDATE ${SCHEMA}.grades 
+               SET grade = $1, comment = $2, instructor_id = $3
+               WHERE request_id = $4`,
+              [gradeVal, gradeComment, user.id, Number(requestId)]
             );
           }
         }

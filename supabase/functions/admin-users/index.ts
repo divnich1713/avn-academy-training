@@ -14,11 +14,6 @@ async function getDbClient() {
   }
   const client = new Client(databaseUrl);
   await client.connect();
-  await client.queryArray(`ALTER TABLE ${SCHEMA}.users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP WITH TIME ZONE`).catch(console.error);
-  await client.queryArray(`ALTER TABLE ${SCHEMA}.users ADD COLUMN IF NOT EXISTS discord_id VARCHAR(255) DEFAULT NULL`).catch(console.error);
-  await client.queryArray(`ALTER TABLE ${SCHEMA}.users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(1024) DEFAULT NULL`).catch(console.error);
-  await client.queryArray(`ALTER TABLE ${SCHEMA}.users DROP CONSTRAINT IF EXISTS users_role_check`).catch(console.error);
-  await client.queryArray(`ALTER TABLE ${SCHEMA}.users ADD CONSTRAINT users_role_check CHECK (role IN ('cadet', 'instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head'))`).catch(console.error);
   return client;
 }
 
@@ -34,7 +29,7 @@ async function getRequester(client: Client, token: string | null): Promise<{ id:
   const res = await client.queryObject<{ id: number; role: string }>(
     `SELECT u.id, u.role FROM ${SCHEMA}.sessions s
      JOIN ${SCHEMA}.users u ON u.id = s.user_id
-     WHERE s.token = $1 AND s.expires_at > NOW()`,
+     WHERE s.token = $1 AND s.expires_at > NOW() AND u.is_whitelisted = true`,
     [token]
   );
   if (res.rows.length > 0 && (res.rows[0].role === "instructor" || res.rows[0].role === "head_avng" || res.rows[0].role === "chief_instructor" || res.rows[0].role === "senior_instructor" || res.rows[0].role === "junior_instructor" || res.rows[0].role === "deputy_head")) {
@@ -94,6 +89,12 @@ Deno.serve(async (req) => {
     }
 
     if (method === "POST") {
+      if (requester.role !== "head_avng" && requester.role !== "deputy_head") {
+        return new Response(JSON.stringify({ error: "Доступ запрещён" }), {
+          status: 403,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
       const body = await req.json().catch(() => ({}));
       const static_id = String(body.static_id || "").trim();
       const password = String(body.password || "").trim();
@@ -166,6 +167,16 @@ Deno.serve(async (req) => {
       }
 
       const body = await req.json().catch(() => ({}));
+      if (requester.role !== "head_avng" && requester.role !== "deputy_head") {
+        const keys = Object.keys(body);
+        const disallowed = keys.filter(k => k !== "is_whitelisted");
+        if (disallowed.length > 0) {
+          return new Response(JSON.stringify({ error: "Недостаточно прав для изменения этих полей" }), {
+            status: 403,
+            headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+          });
+        }
+      }
       const fields: string[] = [];
       const values: any[] = [];
       let idx = 1;
@@ -246,6 +257,12 @@ Deno.serve(async (req) => {
     }
 
     if (method === "DELETE") {
+      if (requester.role !== "head_avng" && requester.role !== "deputy_head") {
+        return new Response(JSON.stringify({ error: "Доступ запрещён" }), {
+          status: 403,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
       const userId = url.searchParams.get("id");
       if (!userId || !/^\d+$/.test(userId)) {
         return new Response(JSON.stringify({ error: "Не указан ID пользователя" }), {

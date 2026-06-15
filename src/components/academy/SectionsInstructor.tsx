@@ -74,10 +74,6 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   const [allGrades, setAllGrades] = useState<Grade[]>([]);
   const [gradesLoading, setGradesLoading] = useState(false);
   const [gradesLoaded, setGradesLoaded] = useState(false);
-  const [showGradeForm, setShowGradeForm] = useState(false);
-  const [gradeForm, setGradeForm] = useState({ cadet_id: 0, subject: "Экзамен теоретические тесты — Устав ФСВНГ — ФЗ о ФСВНГ", type: "exam" as "lecture" | "practice" | "exam", grade: 5, comment: "", request_id: undefined as number | undefined });
-  const [gradeError, setGradeError] = useState("");
-  const [gradeLoading, setGradeLoading] = useState(false);
 
   // --- Whitelist tab ---
   const [wlUsers, setWlUsers] = useState<import("@/lib/api").AdminUser[]>([]);
@@ -201,27 +197,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
     }
   };
 
-  const handleGradeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setGradeError("");
-    setGradeLoading(true);
-    try {
-      await createGrade(gradeForm);
-      setShowGradeForm(false);
-      setGradeForm({ cadet_id: 0, subject: "", type: "exam", grade: 5, comment: "", request_id: undefined });
-      await loadGrades(true);
-      await loadRequests();
-    } catch (err: unknown) {
-      setGradeError(err instanceof Error ? err.message : "Ошибка");
-    }
-    setGradeLoading(false);
-  };
 
-  const openGradeFromRequest = (r: TrainingRequest) => {
-    setGradeForm({ cadet_id: r.cadet_id, subject: r.subject, type: r.type as "lecture" | "practice" | "exam", grade: 5, comment: "", request_id: r.id });
-    setShowGradeForm(true);
-    setActiveTab("grades");
-  };
 
   const toggleWhitelist = async (id: number, current: boolean) => {
     const { adminUpdateUser } = await import("@/lib/api");
@@ -595,24 +571,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
             >
               <Icon name="X" size={12} />Отклонить
             </button>
-            {r.type !== "report" && !([
-              "Вышка — 30 мин",
-              "Патруль по территории — 30 мин",
-              "Заполнение личного дела",
-              "Наряд на КПП-1 — 30 мин",
-              "Наряд на КПП-2 — 1 час",
-              "Участие в государственной поставке",
-              "Участие в досмотровых мероприятиях"
-            ].some(subject => r.subject.startsWith(subject))) && (
-              <button
-                type="button"
-                onClick={() => openGradeFromRequest(r)}
-                className="rank-badge text-primary border border-primary/40 px-3 py-1 hover:bg-primary/10 transition-colors flex items-center gap-1"
-              >
-                <Icon name="Star" size={12} />Поставить оценку
-              </button>
-            )}
-            {reviewLoading[r.id] && <Icon name="Loader2" size={14} className="text-primary animate-spin" />}
+             {reviewLoading[r.id] && <Icon name="Loader2" size={14} className="text-primary animate-spin" />}
           </div>
         </div>
       )}
@@ -645,7 +604,9 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
           { id: "expired", label: "Просроченные" },
           { id: "whitelist", label: "Вайтлист" },
           { id: "rating", label: "Мой рейтинг" },
-        ] as const).map((tab) => {
+        ] as const)
+          .filter((tab) => tab.id !== "whitelist" || authUser.role === "head_avng" || authUser.role === "deputy_head")
+          .map((tab) => {
           const expiredCount = wlUsers.filter((u) => {
             if (u.role !== "cadet" || !u.is_whitelisted || !u.created_at) return false;
             if (u.rank === "Сержант" || u.rank?.toLowerCase() === "сержант") return false;
@@ -817,153 +778,8 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                 ))}
               </select>
             </div>
-            <button
-              onClick={() => setShowGradeForm(!showGradeForm)}
-              className="bg-primary text-primary-foreground font-oswald text-sm tracking-widest uppercase py-2 px-4 hover:bg-primary/90 transition-colors flex items-center gap-2"
-            >
-              <Icon name="Plus" size={14} />Поставить оценку
-            </button>
           </div>
-          {showGradeForm && (
-            <form onSubmit={handleGradeSubmit} className="bg-tactical-card border border-primary/40 p-4 animate-fade-in space-y-3">
-              <h3 className="font-oswald text-sm tracking-widest uppercase text-primary">Выставить оценку</h3>
-              <div className="grid md:grid-cols-2 gap-3">
-                <div>
-                  <label className="rank-badge text-muted-foreground block mb-1">Курсант</label>
-                  <select
-                    className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary"
-                    value={gradeForm.cadet_id}
-                    onChange={(e) => setGradeForm({ ...gradeForm, cadet_id: Number(e.target.value) })}
-                    required
-                  >
-                    <option value={0}>— выберите курсанта —</option>
-                    {cadets.map((c) => <option key={c.id} value={c.id}>{c.rank} {c.name}</option>)}
-                    {cadets.length === 0 && <option disabled>Загрузите вайтлист</option>}
-                  </select>
-                </div>
-                <div>
-                  <label className="rank-badge text-muted-foreground block mb-1">Тип</label>
-                  <select
-                    className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary"
-                    value={gradeForm.type}
-                    onChange={(e) => {
-                      const newType = e.target.value as typeof gradeForm.type;
-                      let defaultSubject = "";
-                      if (newType === "lecture") defaultSubject = "Прослушать вступительную лекцию";
-                      if (newType === "practice") defaultSubject = "Заполнение личного дела";
-                      if (newType === "exam") defaultSubject = "Экзамен теоретические тесты — Устав ФСВНГ — ФЗ о ФСВНГ";
-                      setGradeForm({ ...gradeForm, type: newType, subject: defaultSubject });
-                    }}
-                  >
-                    <option value="exam">Экзамен</option>
-                    <option value="practice">Практика</option>
-                    <option value="lecture">Лекция</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="rank-badge text-muted-foreground block mb-1">Дисциплина</label>
-                  <select
-                    className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary"
-                    value={gradeForm.subject}
-                    onChange={(e) => setGradeForm({ ...gradeForm, subject: e.target.value })}
-                    required
-                  >
-                    {(() => {
-                      const cadetGrades = allGrades.filter(g => g.cadet_id === gradeForm.cadet_id && g.grade >= 3);
-                      const completedSubjects = cadetGrades.map(g => g.subject);
-                      
-                      const renderOption = (sub: string) => {
-                        if (sub.startsWith("──")) {
-                          return <option key={sub} value={sub} disabled>{sub}</option>;
-                        }
-                        const isCompleted = completedSubjects.includes(sub);
-                        return (
-                          <option key={sub} value={sub} disabled={isCompleted}>
-                            {sub} {isCompleted ? " (Выполнено)" : ""}
-                          </option>
-                        );
-                      };
 
-                      if (gradeForm.type === "lecture") {
-                        return [
-                          "── Рядовой ──",
-                          "Прослушать вступительную лекцию",
-                          "Лекция ФЗ о ФСВНГ и Внутреннему Уставу",
-                          "── Младший сержант ──",
-                          "Лекция УК, ПК и КоАП",
-                          "Лекция: О ФЗ закрытых территорий"
-                        ].map(renderOption);
-                      }
-                      
-                      if (gradeForm.type === "practice") {
-                        return [
-                          "── Рядовой ──",
-                          "Заполнение личного дела",
-                          "Строевая подготовка",
-                          "Физическая подготовка",
-                          "Огневая подготовка",
-                          "Присяга",
-                          "Вышка — 30 мин",
-                          "Патруль по территории — 30 мин",
-                          "── Младший сержант ──",
-                          "Отработка Штраф Задержание Ареста на инструкторе",
-                          "Наряд на КПП-1 — 30 мин",
-                          "Наряд на КПП-2 — 1 час",
-                          "Участие в досмотровых мероприятиях",
-                          "Участие в государственной поставке"
-                        ].map(renderOption);
-                      }
-                      
-                      if (gradeForm.type === "exam") {
-                        return [
-                          "── Рядовой ──",
-                          "Экзамен теоретические тесты — Устав ФСВНГ — ФЗ о ФСВНГ",
-                          "── Младший сержант ──",
-                          "Экзамен (теоретические тесты): УК, ПК, КоАП.",
-                          "Экзамен процедуры практики — Штраф — Задержание — Арест"
-                        ].map(renderOption);
-                      }
-                      return null;
-                    })()}
-                  </select>
-                </div>
-                <div>
-                  <label className="rank-badge text-muted-foreground block mb-1">Решение</label>
-                  <select
-                    className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary"
-                    value={gradeForm.grade}
-                    onChange={(e) => setGradeForm({ ...gradeForm, grade: Number(e.target.value) })}
-                  >
-                    <option value={5}>Зачтено</option>
-                    <option value={1}>Не зачтено</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="rank-badge text-muted-foreground block mb-1">Комментарий (необязательно)</label>
-                <input
-                  className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary"
-                  placeholder="Замечания или пояснения..."
-                  value={gradeForm.comment}
-                  onChange={(e) => setGradeForm({ ...gradeForm, comment: e.target.value })}
-                />
-              </div>
-              {gradeError && (
-                <div className="flex items-center gap-2 bg-red-900/20 border border-red-800 px-3 py-2">
-                  <Icon name="AlertTriangle" size={13} className="text-red-400" />
-                  <p className="text-xs text-red-400">{gradeError}</p>
-                </div>
-              )}
-              <div className="flex gap-2">
-                <button type="submit" disabled={gradeLoading} className="bg-primary text-primary-foreground font-oswald text-sm tracking-widest uppercase py-2 px-6 hover:bg-primary/90 transition-colors disabled:opacity-50">
-                  {gradeLoading ? "Сохранение..." : "Выставить"}
-                </button>
-                <button type="button" onClick={() => setShowGradeForm(false)} className="border border-tactical-border text-muted-foreground font-oswald text-sm tracking-widest uppercase py-2 px-4 hover:border-primary/40 transition-colors">
-                  Отмена
-                </button>
-              </div>
-            </form>
-          )}
           {gradesLoading ? <Spinner /> : allGrades.length === 0 ? <Empty text="Оценок пока нет" /> : (
             filteredGrades.length === 0 ? (
               <Empty text={`Нет оценок, выставленных ${selectedGradeDate === new Date().toLocaleDateString("ru-RU") ? "сегодня" : `в день ${selectedGradeDate}`}`} />
@@ -976,7 +792,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                       <th className="text-left px-4 py-3 rank-badge text-muted-foreground">Дисциплина</th>
                       <th className="text-left px-4 py-3 rank-badge text-muted-foreground hidden md:table-cell">Тип</th>
                       <th className="text-left px-4 py-3 rank-badge text-muted-foreground hidden md:table-cell">Дата</th>
-                      <th className="text-center px-4 py-3 rank-badge text-muted-foreground">Оценка</th>
+                      <th className="text-center px-4 py-3 rank-badge text-muted-foreground">Результат</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1189,7 +1005,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       )}
 
       {/* ── WHITELIST TAB ── */}
-      {activeTab === "whitelist" && (
+      {activeTab === "whitelist" && (authUser.role === "head_avng" || authUser.role === "deputy_head") && (
         <div className="space-y-4 animate-fade-in">
           <div className="flex justify-between items-center flex-wrap gap-3">
             <div className="flex items-center gap-4 flex-wrap">

@@ -22,7 +22,7 @@ def get_user_by_token(conn, token):
         cur.execute(
             f"SELECT u.id, u.name, u.rank, u.unit, u.role FROM {SCHEMA}.sessions s "
             f"JOIN {SCHEMA}.users u ON s.user_id = u.id "
-            f"WHERE s.token = %s AND s.expires_at > NOW()",
+            f"WHERE s.token = %s AND s.expires_at > NOW() AND u.is_whitelisted = TRUE",
             (token,),
         )
         row = cur.fetchone()
@@ -157,14 +157,14 @@ def handler(event: dict, context) -> dict:
                         WHERE id = %s""",
                     (status, comment or None, user["id"], request_id),
                 )
-                # Получаем user_id курсанта и тему запроса
+                # Получаем user_id курсанта, тему и тип запроса
                 cur.execute(
-                    f"SELECT user_id, subject FROM {SCHEMA}.requests WHERE id = %s",
+                    f"SELECT user_id, subject, type FROM {SCHEMA}.requests WHERE id = %s",
                     (request_id,),
                 )
                 req_row = cur.fetchone()
                 if req_row:
-                    cadet_id, subject = req_row
+                    cadet_id, subject, req_type = req_row
                     status_text = "одобрен" if status == "approved" else "отклонён"
                     notif_message = f'Инструктор {user["name"]} {status_text} ваш запрос на тему "{subject}".'
                     if comment:
@@ -175,6 +175,29 @@ def handler(event: dict, context) -> dict:
                         (cadet_id, "request_reviewed",
                          f"Запрос {status_text}", notif_message),
                     )
+
+                    # Auto-grade if type is lecture, practice, or exam
+                    if req_type in ("lecture", "practice", "exam"):
+                        cur.execute(
+                            f"SELECT id FROM {SCHEMA}.grades WHERE request_id = %s",
+                            (request_id,),
+                        )
+                        existing_grade = cur.fetchone()
+                        grade_val = 5 if status == "approved" else 1
+                        grade_comment = comment or ("Автоматический зачет по запросу" if status == "approved" else "Автоматический незачет по запросу")
+                        if not existing_grade:
+                            cur.execute(
+                                f"""INSERT INTO {SCHEMA}.grades (user_id, instructor_id, request_id, subject, type, grade, comment)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                                (cadet_id, user["id"], request_id, subject, req_type, grade_val, grade_comment),
+                            )
+                        else:
+                            cur.execute(
+                                f"""UPDATE {SCHEMA}.grades 
+                                    SET grade = %s, comment = %s, instructor_id = %s 
+                                    WHERE request_id = %s""",
+                                (grade_val, grade_comment, user["id"], request_id),
+                            )
             conn.commit()
             return {"statusCode": 200, "headers": cors_headers(), "body": json.dumps({"success": True})}
 
