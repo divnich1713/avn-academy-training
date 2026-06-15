@@ -1,0 +1,7 @@
+{
+  "ratings": "https://nsybygrjwrzhrpvlzpyv.supabase.co/functions/v1/ratings",
+  "notifications": "https://nsybygrjwrzhrpvlzpyv.supabase.co/functions/v1/notifications",
+  "requests": "https://nsybygrjwrzhrpvlzpyv.supabase.co/functions/v1/requests",
+  "admin-users": "https://nsybygrjwrzhrpvlzpyv.supabase.co/functions/v1/admin-users",
+  "auth": "https://nsybygrjwrzhrpvlzpyv.supabase.co/functions/v1/auth"
+}

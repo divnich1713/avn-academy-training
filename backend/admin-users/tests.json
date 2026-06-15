@@ -1,0 +1,10 @@
+{
+  "tests": [
+    {
+      "name": "List users without token",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 403
+    }
+  ]
+}

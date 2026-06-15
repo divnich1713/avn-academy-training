@@ -1,0 +1,11 @@
+{
+  "tests": [
+    {
+      "name": "Login with invalid static_id format",
+      "method": "POST",
+      "path": "/?action=login",
+      "body": {"static_id": "abc", "password": "test"},
+      "expectedStatus": 400
+    }
+  ]
+}

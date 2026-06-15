@@ -1,0 +1,1 @@
+ALTER TABLE t_p29017774_avn_academy_training.users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(1024) DEFAULT NULL;
