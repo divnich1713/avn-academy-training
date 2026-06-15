@@ -6,7 +6,7 @@ import { TYPE_LABEL, fmt, Spinner, Empty, fmtStaticId } from "./SectionsShared";
 import { InstructorRatingView } from "./SectionsRatings";
 import { PromotionInstructorTab } from "./Promotions";
 
-type EditForm = { static_id: string; name: string; rank: string; unit: string; role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head"; password: string; created_at: string; discord_id: string; avatar_url: string };
+type EditForm = { static_id: string; name: string; rank: string; unit: string; role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed"; password: string; created_at: string; discord_id: string; avatar_url: string };
 
 const ROLE_LABELS: Record<string, string> = {
   head_avng: "Нач.АВНГ",
@@ -15,7 +15,8 @@ const ROLE_LABELS: Record<string, string> = {
   senior_instructor: "Ст.Инст.АВНГ",
   instructor: "Инст.АВНГ",
   junior_instructor: "Мл.Инст.АВНГ",
-  cadet: "Курсант"
+  cadet: "Курсант",
+  dismissed: "Уволен"
 };
 
 const MILITARY_RANKS = [
@@ -80,7 +81,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   const [wlLoading, setWlLoading] = useState(false);
   const [wlLoaded, setWlLoaded] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [form, setForm] = useState({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "АВНГ", role: "cadet" as "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head", discord_id: "", avatar_url: "" });
+  const [form, setForm] = useState({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "АВНГ", role: "cadet" as "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed", discord_id: "", avatar_url: "" });
   const [formError, setFormError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
   const [editUser, setEditUser] = useState<import("@/lib/api").AdminUser | null>(null);
@@ -1121,6 +1122,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                       </>
                     )}
                     <option value="cadet">Курсант</option>
+                    <option value="dismissed">Уволен</option>
                   </select>
                 </div>
                 <div>
@@ -1215,6 +1217,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                     <option value="instructor">Инст.АВНГ</option>
                     <option value="junior_instructor">Мл.Инст.АВНГ</option>
                     <option value="cadet">Курсант</option>
+                    <option value="dismissed">Уволен</option>
                   </select>
                 </div>
                 <div>

@@ -159,6 +159,33 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
       );
     }
 
+    if (authUser.role === "dismissed") {
+      return (
+        <div className="animate-fade-in space-y-6">
+          <div className="bg-tactical-card border-2 border-red-600 p-6 text-center max-w-lg mx-auto mt-12 corner-mark shadow-[0_0_24px_rgba(220,38,38,0.25)]">
+            <div className="w-16 h-16 bg-red-950 border border-red-600/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Icon name="XCircle" size={32} className="text-red-500" />
+            </div>
+            <h3 className="font-oswald text-lg uppercase tracking-wider text-red-500">Доступ заблокирован</h3>
+            <p className="text-muted-foreground font-mono text-sm mt-1">{authUser.rank ? `${authUser.rank} ` : ""}{authUser.name}</p>
+            <div className="my-4 border-y border-tactical-border py-4 font-ibm text-sm text-red-500 font-bold">
+              <span className="text-muted-foreground font-semibold">Статус: </span>
+              Уволен из Академии АВНГ
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Вы были уволены из состава Академии Войск Национальной Гвардии. Доступ к личному кабинету, учебным материалам и панели управления полностью закрыт.
+            </p>
+            <button
+              onClick={onLogout}
+              className="mt-6 bg-red-600 hover:bg-red-700 text-white font-oswald text-sm tracking-widest uppercase py-2 px-6 transition-colors border border-red-800"
+            >
+              Выйти из системы
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     switch (section) {
       case "dashboard": return <Dashboard authUser={authUser} onNavigate={navigateTo} />;
       case "materials": return <Materials />;
@@ -205,7 +232,7 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
             section={section}
             role={role}
             sidebarOpen={sidebarOpen}
-            onNavigate={(isSergeantCadet || isExpiredCadet) ? () => {} : navigateTo}
+            onNavigate={(isSergeantCadet || isExpiredCadet || authUser.role === "dismissed") ? () => {} : navigateTo}
             onClose={() => setSidebarOpen(false)}
           />
 

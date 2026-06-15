@@ -27,7 +27,8 @@ const ROLE_LABELS: Record<string, string> = {
   senior_instructor: "Ст.Инст.АВНГ",
   instructor: "Инст.АВНГ",
   junior_instructor: "Мл.Инст.АВНГ",
-  cadet: "Курсант"
+  cadet: "Курсант",
+  dismissed: "Уволен"
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1069,7 +1070,8 @@ const ROLE_SENIORITY: Record<string, number> = {
   senior_instructor: 4,
   instructor: 5,
   junior_instructor: 6,
-  cadet: 7
+  cadet: 7,
+  dismissed: 8
 };
 
 function getRolePriority(role: string | null | undefined): number {

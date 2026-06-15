@@ -83,7 +83,7 @@ export async function adminCreateUser(payload: {
   name: string;
   rank: string;
   unit: string;
-  role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head";
+  role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed";
   is_whitelisted: boolean;
   discord_id?: string | null;
   avatar_url?: string | null;
@@ -139,7 +139,7 @@ export interface User {
   name: string;
   rank: string;
   unit: string;
-  role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head";
+  role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed";
   created_at: string;
   last_seen?: string;
   discord_id?: string | null;
