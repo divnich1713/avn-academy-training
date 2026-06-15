@@ -247,9 +247,11 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
                   </div>
 
                   {/* Right HUD Column matching layout */}
-                  <div className="lg:col-span-3 space-y-4">
+                  <div className="lg:col-span-3 space-y-4 relative overflow-hidden min-h-[450px]">
+                    <HUDParticles />
+
                     {/* Eagle Emblem transparent card */}
-                    <div className="relative border border-red-950/60 bg-tactical-card/25 p-3.5 h-36 overflow-hidden flex flex-col justify-between corner-mark card-glow">
+                    <div className="relative border border-red-950/60 bg-tactical-card/25 p-3.5 h-36 overflow-hidden flex flex-col justify-between corner-mark card-glow z-10">
                       <div 
                         className="absolute right-0 top-0 bottom-0 w-full bg-contain bg-right bg-no-repeat opacity-25 pointer-events-none" 
                         style={{ backgroundImage: 'url("/rosgvardia_emblem.png")' }} 
@@ -265,7 +267,7 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
                     </div>
 
                     {/* Telemetry hollow frame (Yellow/Gold corner styles) */}
-                    <div className="border border-yellow-600/40 bg-tactical-card/10 p-3 h-32 relative flex flex-col justify-between overflow-hidden">
+                    <div className="border border-yellow-600/40 bg-tactical-card/10 p-3 h-32 relative flex flex-col justify-between overflow-hidden z-10">
                       {/* Technical corner ticks */}
                       <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t border-l border-yellow-500/60" />
                       <div className="absolute top-0 right-0 w-2.5 h-2.5 border-t border-r border-yellow-500/60" />
@@ -303,7 +305,7 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
                     </div>
 
                     {/* Empty hollow frame with red corners */}
-                    <div className="border border-red-900/40 bg-tactical-card/5 p-3.5 h-24 relative flex flex-col justify-between hud-tech-border">
+                    <div className="border border-red-900/40 bg-tactical-card/5 p-3.5 h-24 relative flex flex-col justify-between hud-tech-border z-10">
                       <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500/60" />
                       <span className="text-[8px] font-mono text-muted-foreground/60 tracking-wider uppercase block">ОПЕРАТИВНЫЙ СТАТУС</span>
                       <div className="space-y-1">
@@ -319,7 +321,7 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
                     </div>
 
                     {/* Telemetry lines SVG graph */}
-                    <div className="border border-tactical-border/50 h-20 bg-tactical-panel/20 p-2 relative flex flex-col justify-between hud-grid-texture">
+                    <div className="border border-tactical-border/50 h-20 bg-tactical-panel/20 p-2 relative flex flex-col justify-between hud-grid-texture z-10">
                       <span className="text-[7px] font-mono text-muted-foreground/40 uppercase">АКТИВНОСТЬ КАНАЛОВ (ГГц)</span>
                       <svg viewBox="0 0 100 20" className="w-full h-8 text-red-500/50 stroke-current fill-none">
                         <path d="M 0,10 L 10,8 L 20,15 L 30,5 L 40,12 L 50,2 L 60,16 L 70,8 L 80,12 L 90,4 L 100,10" strokeWidth="1" />
@@ -332,7 +334,7 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
                     </div>
 
                     {/* Red warnings block with striping */}
-                    <div className="border border-red-950/60 bg-red-950/5 p-3 relative">
+                    <div className="border border-red-950/60 bg-red-950/5 p-3 relative z-10">
                       <span className="text-[8px] font-mono text-red-500 uppercase tracking-widest block mb-2 text-center">СИСТЕМА БЕЗОПАСНОСТИ</span>
                       <div className="h-5 hud-warning-stripes border border-red-950/40 relative">
                         <div className="absolute inset-0 flex items-center justify-center">
@@ -392,6 +394,97 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
           </main>
         </div>
       </div>
+    </div>
+  );
+}
+
+interface Particle {
+  id: number;
+  type: "ash" | "star";
+  left: number; // percentage
+  size: number; // px
+  duration: number; // seconds
+  delay: number; // seconds
+  opacity: number;
+}
+
+function HUDParticles() {
+  const [particles, setParticles] = useState<Particle[]>([]);
+
+  useEffect(() => {
+    const generated: Particle[] = [];
+    // Generate ash particles (15 items)
+    for (let i = 0; i < 15; i++) {
+      generated.push({
+        id: i,
+        type: "ash",
+        left: Math.random() * 100,
+        size: Math.random() * 3 + 2, // 2px to 5px
+        duration: Math.random() * 6 + 6, // 6s to 12s
+        delay: Math.random() * -12, // negative delay to start scattered
+        opacity: Math.random() * 0.4 + 0.2, // 0.2 to 0.6
+      });
+    }
+    // Generate gold star particles (10 items)
+    for (let i = 0; i < 10; i++) {
+      generated.push({
+        id: i + 15,
+        type: "star",
+        left: Math.random() * 100,
+        size: Math.random() * 6 + 6, // 6px to 12px
+        duration: Math.random() * 8 + 7, // 7s to 15s
+        delay: Math.random() * -15, // negative delay to start scattered
+        opacity: Math.random() * 0.5 + 0.4, // 0.4 to 0.9
+      });
+    }
+    setParticles(generated);
+  }, []);
+
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+      {particles.map((p) => {
+        if (p.type === "ash") {
+          return (
+            <div
+              key={p.id}
+              className="absolute bg-neutral-400 rounded-full animate-fall-ash"
+              style={{
+                left: `${p.left}%`,
+                top: `-20px`,
+                width: `${p.size}px`,
+                height: `${p.size}px`,
+                animationDuration: `${p.duration}s`,
+                animationDelay: `${p.delay}s`,
+                opacity: p.opacity,
+              }}
+            />
+          );
+        } else {
+          return (
+            <div
+              key={p.id}
+              className="absolute text-yellow-500 animate-fall-star flex items-center justify-center"
+              style={{
+                left: `${p.left}%`,
+                top: `-20px`,
+                width: `${p.size}px`,
+                height: `${p.size}px`,
+                animationDuration: `${p.duration}s`,
+                animationDelay: `${p.delay}s`,
+                opacity: p.opacity,
+              }}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="w-full h-full fill-yellow-400 stroke-yellow-500"
+                strokeWidth="1"
+              >
+                <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+              </svg>
+            </div>
+          );
+        }
+      })}
     </div>
   );
 }
