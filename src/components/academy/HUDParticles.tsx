@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 interface Particle {
   id: number;
@@ -11,9 +11,7 @@ interface Particle {
 }
 
 export function HUDParticles() {
-  const [particles, setParticles] = useState<Particle[]>([]);
-
-  useEffect(() => {
+  const [particles] = useState<Particle[]>(() => {
     const generated: Particle[] = [];
     // Generate ash particles (15 items)
     for (let i = 0; i < 15; i++) {
@@ -39,8 +37,8 @@ export function HUDParticles() {
         opacity: Math.random() * 0.5 + 0.4, // 0.4 to 0.9
       });
     }
-    setParticles(generated);
-  }, []);
+    return generated;
+  });
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden z-20">
@@ -49,12 +47,13 @@ export function HUDParticles() {
           return (
             <div
               key={p.id}
-              className="absolute bg-neutral-400 rounded-full animate-fall-ash"
+              className="absolute rounded-full animate-fall-ash"
               style={{
                 left: `${p.left}%`,
                 top: `-20px`,
                 width: `${p.size}px`,
                 height: `${p.size}px`,
+                backgroundColor: "#d4d4d4",
                 animationDuration: `${p.duration}s`,
                 animationDelay: `${p.delay}s`,
                 opacity: p.opacity,
@@ -65,7 +64,7 @@ export function HUDParticles() {
           return (
             <div
               key={p.id}
-              className="absolute text-yellow-500 animate-fall-star flex items-center justify-center"
+              className="absolute animate-fall-star flex items-center justify-center"
               style={{
                 left: `${p.left}%`,
                 top: `-20px`,
@@ -78,8 +77,9 @@ export function HUDParticles() {
             >
               <svg
                 viewBox="0 0 24 24"
-                className="w-full h-full fill-yellow-400 stroke-yellow-500"
+                style={{ fill: "#facc15", stroke: "#eab308" }}
                 strokeWidth="1"
+                className="w-full h-full"
               >
                 <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
               </svg>
