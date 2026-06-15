@@ -40,9 +40,6 @@ const MILITARY_RANKS = [
 ];
 
 const ACADEMY_UNITS = [
-  "1-й учебный взвод",
-  "2-й учебный взвод",
-  "Учебный центр",
   "АВНГ",
   "УВО"
 ];
@@ -87,7 +84,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   const [wlLoading, setWlLoading] = useState(false);
   const [wlLoaded, setWlLoaded] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [form, setForm] = useState({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "1-й учебный взвод", role: "cadet" as "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head", discord_id: "", avatar_url: "" });
+  const [form, setForm] = useState({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "АВНГ", role: "cadet" as "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head", discord_id: "", avatar_url: "" });
   const [formError, setFormError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
   const [editUser, setEditUser] = useState<import("@/lib/api").AdminUser | null>(null);
@@ -275,7 +272,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       const { adminCreateUser } = await import("@/lib/api");
       await adminCreateUser({ ...form, discord_id: form.discord_id ? form.discord_id.trim() : null, avatar_url: form.avatar_url ? form.avatar_url.trim() : null, is_whitelisted: true });
       setShowAddForm(false);
-      setForm({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "1-й учебный взвод", role: "cadet", discord_id: "", avatar_url: "" });
+      setForm({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "АВНГ", role: "cadet", discord_id: "", avatar_url: "" });
       loadWhitelist();
     } catch (err: unknown) {
       setFormError(err instanceof Error ? err.message : "Ошибка");

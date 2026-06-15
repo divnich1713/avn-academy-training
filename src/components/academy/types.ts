@@ -81,7 +81,7 @@ export const NAV_ITEMS: {
 export const MOCK_CADET = {
   name: "Курсант Алексеев А.В.",
   rank: "Рядовой",
-  unit: "1-й учебный взвод",
+  unit: "АВНГ",
   id: "КУР-2024-0147",
   grade_avg: 4.3,
   completed: 12,
