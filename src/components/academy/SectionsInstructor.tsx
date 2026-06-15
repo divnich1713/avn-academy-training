@@ -6,7 +6,7 @@ import { TYPE_LABEL, fmt, Spinner, Empty, fmtStaticId } from "./SectionsShared";
 import { InstructorRatingView } from "./SectionsRatings";
 import { PromotionInstructorTab } from "./Promotions";
 
-type EditForm = { static_id: string; name: string; rank: string; unit: string; role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor"; password: string; created_at: string; discord_id: string; avatar_url: string };
+type EditForm = { static_id: string; name: string; rank: string; unit: string; role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head"; password: string; created_at: string; discord_id: string; avatar_url: string };
 
 const ROLE_LABELS: Record<string, string> = {
   head_avng: "Нач.АВНГ",
