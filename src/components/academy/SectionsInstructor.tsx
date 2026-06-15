@@ -438,14 +438,36 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
     // Filter by search query first if provided
     let filtered = wlUsers;
     if (wlSearchQuery.trim()) {
+      const normalizeStr = (str: string) => str.toLowerCase().replace(/ё/g, "е");
       const q = wlSearchQuery.toLowerCase().trim();
+      const qNorm = normalizeStr(wlSearchQuery).trim();
+      const cleanQ = q.replace(/\D/g, ""); // extract digits only
+
       filtered = wlUsers.filter((u) => {
-        return (
-          (u.name || "").toLowerCase().includes(q) ||
-          (u.static_id || "").toLowerCase().includes(q) ||
-          (u.rank || "").toLowerCase().includes(q) ||
-          (u.unit || "").toLowerCase().includes(q)
-        );
+        const nameMatch = normalizeStr(u.name || "").includes(qNorm);
+        const rankMatch = normalizeStr(u.rank || "").includes(qNorm);
+        const unitMatch = normalizeStr(u.unit || "").includes(qNorm);
+        
+        // Static ID match: supports raw string, formatted string (e.g. "123-456"), or digit-only matching
+        const staticIdRaw = (u.static_id || "").toLowerCase();
+        const staticIdFormatted = fmtStaticId(u.static_id).toLowerCase();
+        const staticIdMatch = 
+          staticIdRaw.includes(q) || 
+          staticIdFormatted.includes(q) || 
+          (cleanQ.length > 0 && staticIdRaw.includes(cleanQ));
+          
+        // Role match: supports display labels like "нач.авнг" or role keys like "head_avng"
+        const displayRole = (ROLE_LABELS[u.role] || "").toLowerCase();
+        const roleMatch = displayRole.includes(q) || u.role.toLowerCase().includes(q);
+        
+        // Discord ID match
+        const discordMatch = (u.discord_id || "").toLowerCase().includes(q);
+        
+        // Date match (e.g. searching "15.06" or "2026")
+        const dateStr = u.created_at ? new Date(u.created_at).toLocaleDateString("ru-RU") : "";
+        const dateMatch = dateStr.includes(q);
+
+        return nameMatch || rankMatch || unitMatch || staticIdMatch || roleMatch || discordMatch || dateMatch;
       });
     }
 
@@ -469,7 +491,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       group.users.push(u);
     });
     return groups;
-  }, [wlUsers]);
+  }, [wlUsers, wlSearchQuery]);
 
   const wlDates = useMemo(() => {
     const dates = new Set<string>();
@@ -491,11 +513,12 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   }, [wlUsers]);
 
   const filteredGroupedWlUsers = useMemo(() => {
-    if (selectedWlDate === "all") {
+    // If searching, show all matching users across all dates
+    if (selectedWlDate === "all" || wlSearchQuery.trim()) {
       return groupedWlUsers;
     }
     return groupedWlUsers.filter((g) => g.dateStr === selectedWlDate);
-  }, [groupedWlUsers, selectedWlDate]);
+  }, [groupedWlUsers, selectedWlDate, wlSearchQuery]);
 
   const renderRequestCard = (r: import("@/lib/api").TrainingRequest) => (
     <div key={r.id} className={`border p-4 space-y-3 transition-colors ${r.type === "dismissal" ? "bg-red-950/20 border-red-500/80 shadow-[0_0_10px_rgba(220,38,38,0.15)]" : "bg-tactical-card border-tactical-border hover:border-primary/30"} ${r.id === highlightRequestId ? "border-primary" : ""}`}>
