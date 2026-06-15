@@ -42,12 +42,65 @@ export function HUDParticles() {
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden z-20">
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes fall-ash-internal {
+          0% {
+            transform: translateY(-20px) translateX(0) rotate(0deg);
+            opacity: 0;
+          }
+          10% {
+            opacity: 0.5;
+          }
+          90% {
+            opacity: 0.5;
+          }
+          100% {
+            transform: translateY(1000px) translateX(30px) rotate(360deg);
+            opacity: 0;
+          }
+        }
+
+        @keyframes fall-star-internal {
+          0% {
+            transform: translateY(-20px) translateX(0) rotate(0deg) scale(0.6);
+            opacity: 0;
+            filter: drop-shadow(0 0 0px #eab308);
+          }
+          10% {
+            opacity: 0.8;
+            filter: drop-shadow(0 0 2px #eab308);
+          }
+          50% {
+            filter: drop-shadow(0 0 5px #facc15);
+          }
+          90% {
+            opacity: 0.7;
+          }
+          100% {
+            transform: translateY(1000px) translateX(-25px) rotate(-180deg) scale(1.1);
+            opacity: 0;
+            filter: drop-shadow(0 0 0px #eab308);
+          }
+        }
+
+        .animate-fall-ash-internal {
+          animation-name: fall-ash-internal;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
+        }
+
+        .animate-fall-star-internal {
+          animation-name: fall-star-internal;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
+        }
+      `}} />
       {particles.map((p) => {
         if (p.type === "ash") {
           return (
             <div
               key={p.id}
-              className="absolute rounded-full animate-fall-ash"
+              className="absolute rounded-full animate-fall-ash-internal"
               style={{
                 left: `${p.left}%`,
                 top: `-20px`,
@@ -64,7 +117,7 @@ export function HUDParticles() {
           return (
             <div
               key={p.id}
-              className="absolute animate-fall-star flex items-center justify-center"
+              className="absolute animate-fall-star-internal flex items-center justify-center"
               style={{
                 left: `${p.left}%`,
                 top: `-20px`,
