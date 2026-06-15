@@ -4,6 +4,7 @@ import { User } from "@/lib/api";
 import { NotificationBell } from "./NotificationBell";
 import { InstructorAvatar } from "./UIComponents";
 import { fmtStaticId } from "./SectionsShared";
+import { HUDParticles } from "./HUDParticles";
 
 interface AppHeaderProps {
   role: UserRole;
@@ -164,11 +165,12 @@ export function AppSidebar({
         fixed md:relative inset-y-0 left-0 z-30 md:z-auto
         w-60 bg-tactical-dark border-r border-tactical-border/60 flex-shrink-0
         transform transition-transform duration-300 md:translate-x-0
-        top-14 md:top-auto bottom-0 flex flex-col justify-between
+        top-14 md:top-auto bottom-0 flex flex-col justify-between relative overflow-hidden
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
       `}
       >
-        <div className="p-3 space-y-4">
+        <HUDParticles />
+        <div className="p-3 space-y-4 relative z-10">
 
           {/* Sidebar Menu matching screenshot */}
           <nav className="space-y-1">
@@ -204,7 +206,7 @@ export function AppSidebar({
         </div>
 
         {/* Sidebar Footer Info */}
-        <div className="p-3 border-t border-tactical-border/50 space-y-3">
+        <div className="p-3 border-t border-tactical-border/50 space-y-3 relative z-10">
           {/* Active status */}
           <div className="border border-tactical-border bg-tactical-panel p-2">
             <div className="flex items-center gap-2 mb-1">
