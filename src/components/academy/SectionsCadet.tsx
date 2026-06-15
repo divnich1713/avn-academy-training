@@ -1067,6 +1067,21 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INSTRUCTORS LIST
 // ═══════════════════════════════════════════════════════════════════════════════
+const ROLE_SENIORITY: Record<string, number> = {
+  head_avng: 1,
+  deputy_head: 2,
+  chief_instructor: 3,
+  senior_instructor: 4,
+  instructor: 5,
+  junior_instructor: 6,
+  cadet: 7
+};
+
+function getRolePriority(role: string | null | undefined): number {
+  if (!role) return 999;
+  return ROLE_SENIORITY[role] || 999;
+}
+
 const RANK_SENIORITY: { key: string; value: number }[] = [
   { key: "генерал-полковник", value: 1 },
   { key: "генерал-лейтенант", value: 2 },
@@ -1120,10 +1135,15 @@ export function Instructors({ onNavigate }: { onNavigate?: (s: import("./types")
     fetchInstructors()
       .then((res) => {
         const sorted = [...res].sort((a, b) => {
-          const priorityA = getRankPriority(a.rank);
-          const priorityB = getRankPriority(b.rank);
-          if (priorityA !== priorityB) {
-            return priorityA - priorityB;
+          const rolePriorityA = getRolePriority(a.role);
+          const rolePriorityB = getRolePriority(b.role);
+          if (rolePriorityA !== rolePriorityB) {
+            return rolePriorityA - rolePriorityB;
+          }
+          const rankPriorityA = getRankPriority(a.rank);
+          const rankPriorityB = getRankPriority(b.rank);
+          if (rankPriorityA !== rankPriorityB) {
+            return rankPriorityA - rankPriorityB;
           }
           return (a.name || "").localeCompare(b.name || "", "ru");
         });
