@@ -18,6 +18,35 @@ const ROLE_LABELS: Record<string, string> = {
   cadet: "Курсант"
 };
 
+const MILITARY_RANKS = [
+  "Рядовой",
+  "Ефрейтор",
+  "Младший сержант",
+  "Сержант",
+  "Старший сержант",
+  "Старшина",
+  "Прапорщик",
+  "Старший прапорщик",
+  "Младший лейтенант",
+  "Лейтенант",
+  "Старший лейтенант",
+  "Капитан",
+  "Майор",
+  "Подполковник",
+  "Полковник",
+  "Генерал-майор",
+  "Генерал-лейтенант",
+  "Генерал-полковник"
+];
+
+const ACADEMY_UNITS = [
+  "1-й учебный взвод",
+  "2-й учебный взвод",
+  "Учебный центр",
+  "АВНГ",
+  "УВО"
+];
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // INSTRUCTOR PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -58,7 +87,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   const [wlLoading, setWlLoading] = useState(false);
   const [wlLoaded, setWlLoaded] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [form, setForm] = useState({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "", role: "cadet" as "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head", discord_id: "", avatar_url: "" });
+  const [form, setForm] = useState({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "1-й учебный взвод", role: "cadet" as "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head", discord_id: "", avatar_url: "" });
   const [formError, setFormError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
   const [editUser, setEditUser] = useState<import("@/lib/api").AdminUser | null>(null);
@@ -246,7 +275,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       const { adminCreateUser } = await import("@/lib/api");
       await adminCreateUser({ ...form, discord_id: form.discord_id ? form.discord_id.trim() : null, avatar_url: form.avatar_url ? form.avatar_url.trim() : null, is_whitelisted: true });
       setShowAddForm(false);
-      setForm({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "", role: "cadet", discord_id: "", avatar_url: "" });
+      setForm({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "1-й учебный взвод", role: "cadet", discord_id: "", avatar_url: "" });
       loadWhitelist();
     } catch (err: unknown) {
       setFormError(err instanceof Error ? err.message : "Ошибка");
@@ -1199,8 +1228,6 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                   { label: "Static ID (6 цифр)", key: "static_id", placeholder: "000-000", mono: true },
                   { label: "Пароль", key: "password", placeholder: "Придумайте пароль", type: "password" },
                   { label: "Имя / Позывной", key: "name", placeholder: "Фамилия И.О." },
-                  { label: "Звание", key: "rank", placeholder: "Рядовой" },
-                  { label: "Подразделение", key: "unit", placeholder: "1-й учебный взвод" },
                 ].map(({ label, key, placeholder, type, mono }) => (
                   <div key={key}>
                     <label className="rank-badge text-muted-foreground block mb-1">{label}</label>
@@ -1211,10 +1238,34 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                       value={key === "static_id" ? fmtStaticId(form.static_id) : form[key as keyof typeof form]}
                       maxLength={key === "static_id" ? 7 : undefined}
                       onChange={(e) => setForm({ ...form, [key]: key === "static_id" ? e.target.value.replace(/\D/g, "").slice(0, 6) : e.target.value })}
-                      required={key !== "unit"}
+                      required
                     />
                   </div>
                 ))}
+                <div>
+                  <label className="rank-badge text-muted-foreground block mb-1">Звание</label>
+                  <select
+                    className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary"
+                    value={form.rank}
+                    onChange={(e) => setForm({ ...form, rank: e.target.value })}
+                  >
+                    {MILITARY_RANKS.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="rank-badge text-muted-foreground block mb-1">Подразделение</label>
+                  <select
+                    className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary"
+                    value={form.unit}
+                    onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                  >
+                    {ACADEMY_UNITS.map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                </div>
                 <div>
                   <label className="rank-badge text-muted-foreground block mb-1">Роль</label>
                   <select 
@@ -1270,9 +1321,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
               <h3 className="font-oswald text-sm tracking-widest uppercase text-yellow-400">Редактировать: {editUser.name}</h3>
               <div className="grid md:grid-cols-2 gap-3">
                 {[
-                  { label: "Имя", key: "name" },
-                  { label: "Звание", key: "rank" },
-                  { label: "Подразделение", key: "unit" },
+                  { label: "Имя", key: "name", placeholder: "Фамилия И.О." },
                   { label: "Новый пароль", key: "password", type: "password", placeholder: "Оставьте пустым, если не менять" },
                 ].map(({ label, key, type, placeholder }) => (
                   <div key={key}>
@@ -1280,6 +1329,30 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                     <input type={type || "text"} className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary" placeholder={placeholder} value={editForm[key as keyof EditForm]} onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })} />
                   </div>
                 ))}
+                <div>
+                  <label className="rank-badge text-muted-foreground block mb-1">Звание</label>
+                  <select
+                    className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary"
+                    value={editForm.rank}
+                    onChange={(e) => setEditForm({ ...editForm, rank: e.target.value })}
+                  >
+                    {Array.from(new Set([...MILITARY_RANKS, editForm.rank || ""])).filter(Boolean).map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="rank-badge text-muted-foreground block mb-1">Подразделение</label>
+                  <select
+                    className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary"
+                    value={editForm.unit}
+                    onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}
+                  >
+                    {Array.from(new Set([...ACADEMY_UNITS, editForm.unit || ""])).filter(Boolean).map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                </div>
                 <div>
                   <label className="rank-badge text-muted-foreground block mb-1">Static ID (6 цифр)</label>
                   <input
