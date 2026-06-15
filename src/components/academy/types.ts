@@ -12,7 +12,7 @@ export type Section =
   | "ratings"
   | "instructors";
 
-export type UserRole = "cadet" | "instructor" | "head_avng";
+export type UserRole = "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor";
 
 export const NAV_ITEMS: {
   id: Section;
@@ -68,13 +68,13 @@ export const NAV_ITEMS: {
     id: "instructors",
     label: "Инструкторы",
     icon: "ShieldAlert",
-    roles: ["cadet", "instructor", "head_avng"],
+    roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"],
   },
   {
     id: "instructor",
     label: "Панель инструктора",
     icon: "Shield",
-    roles: ["instructor", "head_avng"],
+    roles: ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"],
   },
 ];
 

@@ -259,7 +259,7 @@ export async function adminCreateUser(payload: {
   name: string;
   rank: string;
   unit: string;
-  role: "cadet" | "instructor" | "head_avng";
+  role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor";
   is_whitelisted: boolean;
   discord_id?: string | null;
   avatar_url?: string | null;
@@ -303,7 +303,7 @@ export async function adminUpdateUser(id: number, payload: {
   if (payload.name !== undefined) user.name = payload.name;
   if (payload.rank !== undefined) user.rank = payload.rank;
   if (payload.unit !== undefined) user.unit = payload.unit;
-  if (payload.role !== undefined) user.role = payload.role as "cadet" | "instructor" | "head_avng";
+  if (payload.role !== undefined) user.role = payload.role as any;
   if (payload.is_whitelisted !== undefined) user.is_whitelisted = payload.is_whitelisted;
   if (payload.password) user.password = payload.password;
   if (payload.created_at !== undefined) user.created_at = payload.created_at;
@@ -322,7 +322,8 @@ export async function adminRemoveUser(id: number) {
 
 export async function fetchInstructors(): Promise<User[]> {
   await delay();
-  return USERS.filter((u) => (u.role === "instructor" || u.role === "head_avng") && u.is_whitelisted).map(({ password: _, ...u }) => u);
+  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+  return USERS.filter((u) => isInstructor(u.role) && u.is_whitelisted).map(({ password: _, ...u }) => u);
 }
 
 // ─── Requests API ───────────────────────────────────────────────────────────
@@ -331,7 +332,8 @@ export async function fetchRequests(): Promise<TrainingRequest[]> {
   await delay();
   const user = getUser();
   if (!user) return [];
-  if (user.role === "instructor" || user.role === "head_avng") return [...REQUESTS].reverse();
+  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+  if (isInstructor(user.role)) return [...REQUESTS].reverse();
   return REQUESTS.filter((r) => r.cadet_id === user.id).reverse();
 }
 
@@ -559,7 +561,8 @@ export async function checkPromotionRequirements(type: import("./api").Promotion
 export async function fetchPromotionReports(): Promise<import("./api").PromotionReport[]> {
   await delay(200);
   const user = USERS.find(u => u.id === (currentUserId || 1));
-  if (user?.role === "instructor" || user?.role === "head_avng") {
+  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+  if (user && isInstructor(user.role)) {
     return [...PROMOTION_REPORTS];
   }
   return PROMOTION_REPORTS.filter(r => r.cadet_id === (currentUserId || 1));
@@ -596,7 +599,8 @@ export async function createPromotionReport(promotion_type: import("./api").Prom
   PROMOTION_REPORTS.unshift(newReport);
 
   // Add notifications to instructors
-  USERS.filter(u => u.role === "instructor" || u.role === "head_avng").forEach(inst => {
+  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+  USERS.filter(u => isInstructor(u.role)).forEach(inst => {
     NOTIFICATIONS.unshift({
       id: nextNotifId++,
       user_id: inst.id,

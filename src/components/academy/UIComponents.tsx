@@ -134,7 +134,7 @@ export function InstructorAvatar({
   }, [avatarUrl, discordId]);
 
   // If cadet and no custom/Discord avatar, assign a random FSVNG themed avatar based on ID
-  const isCadet = role !== "instructor" && role !== "head_avng";
+  const isCadet = role === "cadet";
   const defaultCadetAvatar = isCadet && id ? `/avatars/cadet${(id % 4) + 1}.png` : null;
 
   const targetUrl = avatarUrl || discordAvatar || defaultCadetAvatar;
@@ -168,7 +168,7 @@ export function InstructorAvatar({
       style={{ width: size, height: size }}
     >
       <Icon 
-        name={(role === "instructor" || role === "head_avng") ? "Shield" : "User"} 
+        name={(role !== "cadet") ? "Shield" : "User"} 
         size={size * 0.55} 
         className="text-primary" 
       />

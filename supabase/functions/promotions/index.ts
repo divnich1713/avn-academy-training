@@ -170,7 +170,8 @@ Deno.serve(async (req) => {
       let targetUserId = user.id;
       const cadetIdParam = url.searchParams.get("cadet_id");
       if (cadetIdParam) {
-        if (user.role !== "instructor" && user.role !== "head_avng") {
+        const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+        if (!isInstructor(user.role)) {
           return new Response(JSON.stringify({ error: "Только для инструкторов" }), {
             status: 403,
             headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
@@ -196,7 +197,8 @@ Deno.serve(async (req) => {
     if (method === "GET" && !action) {
       let query = "";
       const params: any[] = [];
-      if (user.role === "instructor" || user.role === "head_avng") {
+      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+      if (isInstructor(user.role)) {
         query = `
           SELECT pr.id, pr.promotion_type, pr.status, pr.instructor_comment,
                  pr.reviewed_at, pr.created_at,
@@ -302,7 +304,7 @@ Deno.serve(async (req) => {
       // Уведомление всем инструкторам
       const reqs = PROMOTION_REQUIREMENTS[promotionType];
       const instructors = await client.queryObject<{ id: number }>(
-        `SELECT id FROM ${SCHEMA}.users WHERE role = 'instructor' OR role = 'head_avng'`
+        `SELECT id FROM ${SCHEMA}.users WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor')`
       );
 
       for (const inst of instructors.rows) {
@@ -326,12 +328,13 @@ Deno.serve(async (req) => {
 
     // ===== PUT /promotions?action=review&id=N — инструктор рассматривает рапорт =====
     if (method === "PUT" && action === "review") {
-      if (user.role !== "instructor" && user.role !== "head_avng") {
-        return new Response(JSON.stringify({ error: "Только для инструкторов" }), {
-          status: 403,
-          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
-        });
-      }
+        const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+        if (!isInstructor(user.role)) {
+          return new Response(JSON.stringify({ error: "Только для инструкторов" }), {
+            status: 403,
+            headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+          });
+        }
 
       const reportId = url.searchParams.get("id");
       if (!reportId || !/^\d+$/.test(reportId)) {

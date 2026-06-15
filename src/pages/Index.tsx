@@ -28,7 +28,7 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
   const [section, setSection] = useState<Section>(() => {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get("tab");
-    const isInstr = authUser.role === "instructor" || authUser.role === "head_avng";
+    const isInstr = authUser.role !== "cadet";
     if (tabParam) {
       if ((tabParam === "promotions" || tabParam === "dashboard") && isInstr) {
         return "instructor";
@@ -65,7 +65,7 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
   const role = authUser.role as UserRole;
 
   const navigateTo = (s: Section, requestId?: number, targetCadet?: User) => {
-    const isInstr = authUser.role === "instructor" || authUser.role === "head_avng";
+    const isInstr = authUser.role !== "cadet";
     let targetSection = s;
     if (isInstr && (s === "dashboard" || s === "promotions")) {
       targetSection = "instructor";

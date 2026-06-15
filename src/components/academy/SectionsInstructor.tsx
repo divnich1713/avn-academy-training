@@ -6,7 +6,16 @@ import { TYPE_LABEL, fmt, Spinner, Empty, fmtStaticId } from "./SectionsShared";
 import { InstructorRatingView } from "./SectionsRatings";
 import { PromotionInstructorTab } from "./Promotions";
 
-type EditForm = { static_id: string; name: string; rank: string; unit: string; role: "cadet" | "instructor" | "head_avng"; password: string; created_at: string; discord_id: string; avatar_url: string };
+type EditForm = { static_id: string; name: string; rank: string; unit: string; role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor"; password: string; created_at: string; discord_id: string; avatar_url: string };
+
+const ROLE_LABELS: Record<string, string> = {
+  cadet: "Курсант",
+  instructor: "Инст.АВНГ",
+  junior_instructor: "Мл.Инст.АВНГ",
+  senior_instructor: "Ст.Инст.АВНГ",
+  chief_instructor: "Гл.Инст.АВНГ",
+  head_avng: "Нач.АВНГ"
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INSTRUCTOR PANEL
@@ -48,7 +57,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   const [wlLoading, setWlLoading] = useState(false);
   const [wlLoaded, setWlLoaded] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [form, setForm] = useState({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "", role: "cadet" as "cadet" | "instructor" | "head_avng", discord_id: "", avatar_url: "" });
+  const [form, setForm] = useState({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "", role: "cadet" as "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor", discord_id: "", avatar_url: "" });
   const [formError, setFormError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
   const [editUser, setEditUser] = useState<import("@/lib/api").AdminUser | null>(null);
@@ -1115,13 +1124,16 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                   <select 
                     className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary disabled:opacity-50" 
                     value={form.role} 
-                    onChange={(e) => setForm({ ...form, role: e.target.value as "cadet" | "instructor" | "head_avng" })}
+                    onChange={(e) => setForm({ ...form, role: e.target.value as any })}
                     disabled={authUser.role !== "head_avng"}
                   >
                     <option value="cadet">Курсант</option>
                     {authUser.role === "head_avng" && (
                       <>
-                        <option value="instructor">Инструктор</option>
+                        <option value="instructor">Инст.АВНГ</option>
+                        <option value="junior_instructor">Мл.Инст.АВНГ</option>
+                        <option value="senior_instructor">Ст.Инст.АВНГ</option>
+                        <option value="chief_instructor">Гл.Инст.АВНГ</option>
                         <option value="head_avng">Нач.АВНГ</option>
                       </>
                     )}
@@ -1187,11 +1199,14 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                   <select 
                     className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary disabled:opacity-50" 
                     value={editForm.role} 
-                    onChange={(e) => setEditForm({ ...editForm, role: e.target.value as "cadet" | "instructor" | "head_avng" })}
+                    onChange={(e) => setEditForm({ ...editForm, role: e.target.value as any })}
                     disabled={authUser.role !== "head_avng"}
                   >
                     <option value="cadet">Курсант</option>
-                    <option value="instructor">Инструктор</option>
+                    <option value="instructor">Инст.АВНГ</option>
+                    <option value="junior_instructor">Мл.Инст.АВНГ</option>
+                    <option value="senior_instructor">Ст.Инст.АВНГ</option>
+                    <option value="chief_instructor">Гл.Инст.АВНГ</option>
                     <option value="head_avng">Нач.АВНГ</option>
                   </select>
                 </div>
@@ -1293,11 +1308,11 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                               <span className={`rank-badge px-2 py-0.5 border ${
                                 u.role === "head_avng"
                                   ? "text-red-400 border-red-800 bg-red-900/20"
-                                  : u.role === "instructor"
+                                  : ["instructor", "chief_instructor", "senior_instructor", "junior_instructor"].includes(u.role)
                                   ? "text-yellow-400 border-yellow-800 bg-yellow-900/20"
                                   : "text-primary border-primary/30 bg-primary/10"
                               }`}>
-                                {u.role === "head_avng" ? "Нач.АВНГ" : u.role === "instructor" ? "Инструктор" : "Курсант"}
+                                {ROLE_LABELS[u.role] || u.role}
                               </span>
                             </td>
                             <td className="px-4 py-3 text-center">

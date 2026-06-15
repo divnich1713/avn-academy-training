@@ -20,6 +20,15 @@ import {
   OathMemo
 } from "./MaterialsMemos";
 
+const ROLE_LABELS: Record<string, string> = {
+  cadet: "Курсант",
+  instructor: "Инст.АВНГ",
+  junior_instructor: "Мл.Инст.АВНГ",
+  senior_instructor: "Ст.Инст.АВНГ",
+  chief_instructor: "Гл.Инст.АВНГ",
+  head_avng: "Нач.АВНГ"
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -774,18 +783,18 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
       {targetUser && (
         <button
           onClick={() => {
-            if (targetUser?.role === "instructor" || targetUser?.role === "head_avng") onNavigate?.("instructors");
-            else if (authUser.role === "instructor" || authUser.role === "head_avng") onNavigate?.("instructor");
+            if (targetUser?.role && targetUser.role !== "cadet") onNavigate?.("instructors");
+            else if (authUser.role !== "cadet") onNavigate?.("instructor");
             else onNavigate?.("dashboard");
           }}
           className="bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-primary hover:text-primary-foreground hover:bg-primary transition-all flex items-center gap-1.5 font-mono uppercase tracking-wider card-glow"
         >
-          <Icon name="ArrowLeft" size={12} /> {(targetUser?.role === "instructor" || targetUser?.role === "head_avng") ? "Назад к списку инструкторов" : (authUser.role === "instructor" || authUser.role === "head_avng") ? "Назад в панель инструктора" : "Назад"}
+          <Icon name="ArrowLeft" size={12} /> {(targetUser?.role && targetUser.role !== "cadet") ? "Назад к списку инструкторов" : (authUser.role !== "cadet") ? "Назад в панель инструктора" : "Назад"}
         </button>
       )}
       <SectionHeader
-        title={displayUser.role === "head_avng" ? "Профиль Нач.АВНГ" : displayUser.role === "instructor" ? "Профиль инструктора" : "Профиль курсанта"}
-        sub={displayUser.role === "head_avng" ? "Карточка начальника академии" : displayUser.role === "instructor" ? "Личные и служебные данные инструктора" : "Личные данные и история обучения"}
+        title={displayUser.role === "head_avng" ? "Профиль Нач.АВНГ" : displayUser.role !== "cadet" ? "Профиль инструктора" : "Профиль курсанта"}
+        sub={displayUser.role === "head_avng" ? "Карточка начальника академии" : displayUser.role !== "cadet" ? "Личные и служебные данные инструктора" : "Личные данные и история обучения"}
       />
       <div className="grid md:grid-cols-3 gap-4">
         <div className="corner-mark bg-tactical-card border border-tactical-border p-6 card-glow flex flex-col items-center text-center">
@@ -885,7 +894,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
                 { label: "Подразделение", value: isSergeant ? "УВО" : (displayUser.unit || "—") },
                 { label: "Static ID", value: fmtStaticId(displayUser.static_id) },
                 { label: "Дата зачисления" , value: displayUser.created_at ? new Date(displayUser.created_at).toLocaleDateString("ru-RU") : "—" },
-                { label: "Роль", value: displayUser.role === "head_avng" ? "Нач.АВНГ" : displayUser.role === "instructor" ? "Инструктор" : "Курсант" },
+                { label: "Роль", value: ROLE_LABELS[displayUser.role] || displayUser.role },
               ];
               if (isSergeant) {
                 items.push({ label: "Статус", value: "Закончил Академию АВНГ и переведен в УВО" });

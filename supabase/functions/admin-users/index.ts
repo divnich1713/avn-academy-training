@@ -18,7 +18,7 @@ async function getDbClient() {
   await client.queryArray(`ALTER TABLE ${SCHEMA}.users ADD COLUMN IF NOT EXISTS discord_id VARCHAR(255) DEFAULT NULL`).catch(console.error);
   await client.queryArray(`ALTER TABLE ${SCHEMA}.users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(1024) DEFAULT NULL`).catch(console.error);
   await client.queryArray(`ALTER TABLE ${SCHEMA}.users DROP CONSTRAINT IF EXISTS users_role_check`).catch(console.error);
-  await client.queryArray(`ALTER TABLE ${SCHEMA}.users ADD CONSTRAINT users_role_check CHECK (role IN ('cadet', 'instructor', 'head_avng'))`).catch(console.error);
+  await client.queryArray(`ALTER TABLE ${SCHEMA}.users ADD CONSTRAINT users_role_check CHECK (role IN ('cadet', 'instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor'))`).catch(console.error);
   return client;
 }
 
@@ -37,7 +37,7 @@ async function getRequester(client: Client, token: string | null): Promise<{ id:
      WHERE s.token = $1 AND s.expires_at > NOW()`,
     [token]
   );
-  if (res.rows.length > 0 && (res.rows[0].role === "instructor" || res.rows[0].role === "head_avng")) {
+  if (res.rows.length > 0 && (res.rows[0].role === "instructor" || res.rows[0].role === "head_avng" || res.rows[0].role === "chief_instructor" || res.rows[0].role === "senior_instructor" || res.rows[0].role === "junior_instructor")) {
     return res.rows[0];
   }
   return null;
@@ -119,14 +119,15 @@ Deno.serve(async (req) => {
         });
       }
 
-      if (role !== "cadet" && role !== "instructor" && role !== "head_avng") {
+      if (role !== "cadet" && role !== "instructor" && role !== "head_avng" && role !== "chief_instructor" && role !== "senior_instructor" && role !== "junior_instructor") {
         return new Response(JSON.stringify({ error: "Неверная роль" }), {
           status: 400,
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
         });
       }
 
-      if ((role === "instructor" || role === "head_avng") && requester.role !== "head_avng") {
+      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+      if (isInstructor(role) && requester.role !== "head_avng") {
         return new Response(JSON.stringify({ error: "Только Начальник АВНГ может назначать инструкторов" }), {
           status: 403,
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
@@ -173,7 +174,7 @@ Deno.serve(async (req) => {
         fields.push(`is_whitelisted = $${idx++}`);
         values.push(Boolean(body.is_whitelisted));
       }
-      if (body.role && (body.role === "cadet" || body.role === "instructor" || body.role === "head_avng")) {
+      if (body.role && (body.role === "cadet" || body.role === "instructor" || body.role === "head_avng" || body.role === "chief_instructor" || body.role === "senior_instructor" || body.role === "junior_instructor")) {
         if (requester.role !== "head_avng") {
           const curUserRes = await client.queryObject<{ role: string }>(
             `SELECT role FROM ${SCHEMA}.users WHERE id = $1`,
@@ -181,7 +182,8 @@ Deno.serve(async (req) => {
           );
           const currentRole = curUserRes.rows[0]?.role;
           if (currentRole !== body.role) {
-            if (body.role === "instructor" || body.role === "head_avng" || currentRole === "instructor" || currentRole === "head_avng") {
+            const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"].includes(r);
+            if (isInstructor(body.role) || isInstructor(currentRole)) {
               return new Response(JSON.stringify({ error: "Только Начальник АВНГ может изменять роли инструкторов" }), {
                 status: 403,
                 headers: { ...CORS_HEADERS, "Content-Type": "application/json" }

@@ -33,7 +33,7 @@ def get_instructor(token: str):
     )
     row = cur.fetchone()
     cur.close(); conn.close()
-    if row and row[1] in ("instructor", "head_avng"):
+    if row and row[1] in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"):
         return row[0]
     return None
 
@@ -91,7 +91,7 @@ def create_user(event: dict) -> dict:
         return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "Заполните все поля"})}
     if len(static_id) != 6 or not static_id.isdigit():
         return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "Static ID должен содержать 6 цифр"})}
-    if role not in ("cadet", "instructor", "head_avng"):
+    if role not in ("cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"):
         return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "Неверная роль"})}
 
     conn = get_conn()
@@ -132,7 +132,7 @@ def update_user(event: dict, path: str) -> dict:
         fields.append("static_id = %s"); values.append(static_id)
     if body.get("is_whitelisted") is not None:
         fields.append("is_whitelisted = %s"); values.append(bool(body["is_whitelisted"]))
-    if body.get("role") in ("cadet", "instructor", "head_avng"):
+    if body.get("role") in ("cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor"):
         fields.append("role = %s"); values.append(body["role"])
     if body.get("name", "").strip():
         fields.append("name = %s"); values.append(body["name"].strip())

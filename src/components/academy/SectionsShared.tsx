@@ -432,7 +432,7 @@ export function RequestSection({
   const [requests, setRequests] = useState<TrainingRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const isInstructor = authUser.role === "instructor" || authUser.role === "head_avng";
+  const isInstructor = authUser.role !== "cadet";
 
   const load = useCallback(async () => {
     setLoading(true);

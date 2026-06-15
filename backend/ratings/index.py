@@ -68,7 +68,7 @@ def handler(event: dict, context) -> dict:
                         COUNT(r.id) as rating_count
                         FROM {SCHEMA}.users u
                         LEFT JOIN {SCHEMA}.instructor_ratings r ON r.instructor_id = u.id
-                        WHERE u.role = 'instructor' OR u.role = 'head_avng'
+                        WHERE u.role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor')
                         GROUP BY u.id, u.name, u.rank, u.unit
                         ORDER BY avg_rating DESC NULLS LAST"""
                 )
