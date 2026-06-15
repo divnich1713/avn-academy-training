@@ -628,7 +628,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
   const displayUser = targetUser || authUser;
 
   useEffect(() => {
-    if (displayUser.role === "instructor") {
+    if (displayUser.role !== "cadet") {
       setLoadingR(false);
       setLoadingG(false);
       return;
@@ -636,7 +636,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
 
     fetchRequests()
       .then((all) => {
-        if (authUser.role === "instructor" || authUser.role === "head_avng") {
+        if (authUser.role !== "cadet") {
           setRequests(all.filter((r) => r.cadet_id === displayUser.id));
         } else {
           setRequests(all);
@@ -653,7 +653,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
 
   // Load instructor rating and activity timeline
   useEffect(() => {
-    if (displayUser.role !== "instructor") return;
+    if (displayUser.role === "cadet") return;
 
     setLoadingAct(true);
 
@@ -846,7 +846,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
               )}
             </div>
           ) : (
-            displayUser.role === "instructor" && (
+            displayUser.role !== "cadet" && (
               <div className="mt-4 p-3 bg-tactical-panel border border-tactical-border w-full text-left font-mono">
                 <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Профиль Discord</p>
                 <p className="text-xs text-muted-foreground italic mt-0.5">Не привязан</p>
@@ -854,7 +854,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
             )
           )}
 
-          {displayUser.role !== "instructor" && (
+          {displayUser.role === "cadet" && (
             <div className="mt-4 grid grid-cols-2 gap-2 w-full">
               <div className="bg-tactical-panel border border-tactical-border p-2 text-center">
                 <p className="font-oswald text-xl text-gold">{avgGrade}</p>
@@ -866,7 +866,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
               </div>
             </div>
           )}
-          {displayUser.role === "instructor" && (
+          {displayUser.role !== "cadet" && (
             <div className="mt-4 grid grid-cols-2 gap-2 w-full">
               <div className="bg-tactical-panel border border-tactical-border p-2 text-center">
                 <p className="font-oswald text-xl text-yellow-400">{rating?.points ?? 0}</p>
@@ -906,7 +906,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
         </div>
       </div>
 
-      {displayUser.role === "instructor" && (
+      {displayUser.role !== "cadet" && (
         <div className="space-y-6">
           {/* Timeframe Selector */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -997,7 +997,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
         </div>
       )}
 
-      {displayUser.role !== "instructor" && (
+      {displayUser.role === "cadet" && (
         <>
           {/* Tabs */}
           <div className="flex gap-1 border-b border-tactical-border">

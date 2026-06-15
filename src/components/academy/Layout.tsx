@@ -140,7 +140,7 @@ export function AppSidebar({
   onNavigate,
   onClose,
 }: AppSidebarProps) {
-  const visibleNav = NAV_ITEMS.filter((n) => n.roles.includes(role));
+  const visibleNav = NAV_ITEMS.filter((n) => n.roles.includes(role) && n.id !== "profile");
 
   const getMenuIcon = (id: Section) => {
     switch (id) {

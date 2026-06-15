@@ -62,7 +62,7 @@ export const NAV_ITEMS: {
     icon: "BarChart3",
     roles: ["cadet"],
   },
-  { id: "profile", label: "Профиль курсанта", icon: "User", roles: ["cadet"] },
+  { id: "profile", label: "Профиль курсанта", icon: "User", roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"] },
   {
     id: "ratings",
     label: "Рейтинг инструкторов",
