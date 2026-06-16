@@ -231,7 +231,7 @@ Deno.serve(async (req) => {
 
   const url = new URL(req.url);
   // Router path cleaning
-  const path = url.pathname.replace(/\/functions\/v1\/testing/, "").replace(/\/+$/, "");
+  const path = url.pathname.replace(/\/functions\/v1\/testing/, "").replace(/^\/testing/, "").replace(/\/+$/, "");
 
   let client: Client | null = null;
   try {
