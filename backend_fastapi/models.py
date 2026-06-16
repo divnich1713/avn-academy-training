@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Numeric, Table, text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Numeric, Table, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -39,10 +39,10 @@ class TestQuestion(Base):
     id = Column(Integer, primary_key=True, index=True)
     subject = Column(String(255), nullable=False)
     type = Column(String(50), nullable=False) # choice, multichoice, matching, essay
-    question_text = Column(text().type, nullable=False)
+    question_text = Column(Text, nullable=False)
     options = Column(JSONB, nullable=True)
     correct_answer = Column(JSONB, nullable=False)
-    explanation = Column(text().type, nullable=True)
+    explanation = Column(Text, nullable=True)
     elo_rating = Column(Integer, default=1000)
     criteria_matrix = Column(JSONB, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -75,7 +75,7 @@ class TestAnswer(Base):
     student_answer = Column(JSONB, nullable=False)
     is_correct = Column(Boolean, nullable=True)
     grade = Column(Numeric(5, 2), nullable=True)
-    feedback = Column(text().type, nullable=True)
+    feedback = Column(Text, nullable=True)
     criteria_evaluation = Column(JSONB, nullable=True)
     answered_at = Column(DateTime, default=datetime.utcnow)
 
