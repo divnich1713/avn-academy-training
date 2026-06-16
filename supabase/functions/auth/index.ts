@@ -49,35 +49,48 @@ Deno.serve(async (req) => {
 
     try {
       const botToken = Deno.env.get("DISCORD_BOT_TOKEN");
-      if (botToken) {
-        const discordRes = await fetch(`https://discord.com/api/v10/users/${discordId}`, {
-          headers: {
-            "Authorization": `Bot ${botToken}`
-          }
-        });
-        if (discordRes.ok) {
-          const data = await discordRes.json();
-          const avatarUrl = data.avatar 
-            ? `https://cdn.discordapp.com/avatars/${data.id}/${data.avatar}.png`
-            : undefined;
-          return new Response(JSON.stringify({
-            username: data.username,
-            global_name: data.global_name || undefined,
-            avatar: avatarUrl ? { link: avatarUrl } : undefined,
-            avatarUrl: avatarUrl
-          }), {
-            status: 200,
+      if (!botToken) {
+        return new Response(
+          JSON.stringify({
+            error: "DISCORD_BOT_TOKEN is not configured in Supabase Edge Functions environment variables. Please set it using 'supabase secrets set DISCORD_BOT_TOKEN=...'"
+          }),
+          {
+            status: 500,
             headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
-          });
-        }
+          }
+        );
       }
 
-      const discordRes = await fetch(`https://discordlookup.mesalytic.org/v1/user/${discordId}`);
+      const discordRes = await fetch(`https://discord.com/api/v10/users/${discordId}`, {
+        headers: {
+          "Authorization": `Bot ${botToken.trim()}`
+        }
+      });
+
       if (!discordRes.ok) {
-        throw new Error("Failed to fetch Discord profile");
+        const errText = await discordRes.text();
+        return new Response(
+          JSON.stringify({
+            error: `Discord API returned HTTP ${discordRes.status}: ${errText}`
+          }),
+          {
+            status: 502,
+            headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+          }
+        );
       }
+
       const data = await discordRes.json();
-      return new Response(JSON.stringify(data), {
+      const avatarUrl = data.avatar 
+        ? `https://cdn.discordapp.com/avatars/${data.id}/${data.avatar}.png`
+        : undefined;
+
+      return new Response(JSON.stringify({
+        username: data.username,
+        global_name: data.global_name || undefined,
+        avatar: avatarUrl ? { link: avatarUrl } : undefined,
+        avatarUrl: avatarUrl
+      }), {
         status: 200,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
       });
