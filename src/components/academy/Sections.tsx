@@ -15,3 +15,6 @@ export const Instructors = lazy(() => import("./SectionsCadet").then(m => ({ def
 export const InstructorPanel = lazy(() => import("./SectionsInstructor").then(m => ({ default: m.InstructorPanel })));
 export const InstructorRatings = lazy(() => import("./SectionsRatings").then(m => ({ default: m.InstructorRatings })));
 export const PromotionSection = lazy(() => import("./Promotions").then(m => ({ default: m.PromotionSection })));
+export const TestingSystem = lazy(() => import("./TestingSystem").then(m => ({ default: m.TestingSystem })));
+export const TestingHistory = lazy(() => import("./TestingHistory").then(m => ({ default: m.TestingHistory })));
+export const TestingAdmin = lazy(() => import("./TestingAdmin").then(m => ({ default: m.TestingAdmin })));

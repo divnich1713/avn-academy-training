@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  api:
+    build: ./backend_fastapi
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@localhost:54322/postgres}
+      - REDIS_URL=redis://redis:6379/0
+      - SCHEMA=t_p29017774_avn_academy_training
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - redis
+    restart: always
+
+  worker:
+    build: ./worker
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@localhost:54322/postgres}
+      - REDIS_URL=redis://redis:6379/0
+      - SCHEMA=t_p29017774_avn_academy_training
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - redis
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+
+  web:
+    image: node:20-alpine
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+    environment:
+      - VITE_USE_MOCK=false
+      - VITE_TESTING_API_URL=http://localhost:8000
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 3000"
+    restart: always
+
+volumes:
+  redis_data:

@@ -15,6 +15,7 @@ import {
   Plus, Minus, Send, MessageSquare, Clock, MapPin, Activity,
   BarChart3, TrendingUp, Settings, Home, ChevronsUpDown,
   PanelLeft, MoreVertical, Copy, RefreshCw,
+  History, LineChart, LayoutDashboard, ArrowRight, CornerDownLeft, Play, Coffee,
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, React.FC<LucideProps>> = {
@@ -29,6 +30,7 @@ const ICON_MAP: Record<string, React.FC<LucideProps>> = {
   Plus, Minus, Send, MessageSquare, Clock, MapPin, Activity,
   BarChart3, TrendingUp, Settings, Home, ChevronsUpDown,
   PanelLeft, MoreVertical, Copy, RefreshCw,
+  History, LineChart, LayoutDashboard, ArrowRight, CornerDownLeft, Play, Coffee,
 };
 
 interface IconProps extends LucideProps {
