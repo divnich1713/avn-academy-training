@@ -1,6 +1,35 @@
 import React from 'react';
-import * as LucideIcons from 'lucide-react';
 import { LucideProps } from 'lucide-react';
+
+// P1-4: Named imports instead of `import * as LucideIcons` to enable tree-shaking.
+// Only the icons actually used across the project are imported (~40 vs 1500+).
+import {
+  Loader2, Award, XCircle, Check, X, Bell, Users, FileText,
+  GraduationCap, Wrench, ClipboardList, BookOpen, Eye,
+  ExternalLink, Download, AlertTriangle, Video, Shield,
+  ShieldAlert, Lock, UserMinus, Scale, Search, User,
+  ArrowLeft, Inbox, CheckCircle, CheckSquare, Percent,
+  Medal, Menu, LogOut, ChevronDown, Star, CircleAlert,
+  UserX, Zap, Target, ChevronUp, Flame, Info, Calendar,
+  Hash, ChevronLeft, ChevronRight, Trash2, Edit, Save,
+  Plus, Minus, Send, MessageSquare, Clock, MapPin, Activity,
+  BarChart3, TrendingUp, Settings, Home, ChevronsUpDown,
+  PanelLeft, MoreVertical, Copy, RefreshCw,
+} from 'lucide-react';
+
+const ICON_MAP: Record<string, React.FC<LucideProps>> = {
+  Loader2, Award, XCircle, Check, X, Bell, Users, FileText,
+  GraduationCap, Wrench, ClipboardList, BookOpen, Eye,
+  ExternalLink, Download, AlertTriangle, Video, Shield,
+  ShieldAlert, Lock, UserMinus, Scale, Search, User,
+  ArrowLeft, Inbox, CheckCircle, CheckSquare, Percent,
+  Medal, Menu, LogOut, ChevronDown, Star, CircleAlert,
+  UserX, Zap, Target, ChevronUp, Flame, Info, Calendar,
+  Hash, ChevronLeft, ChevronRight, Trash2, Edit, Save,
+  Plus, Minus, Send, MessageSquare, Clock, MapPin, Activity,
+  BarChart3, TrendingUp, Settings, Home, ChevronsUpDown,
+  PanelLeft, MoreVertical, Copy, RefreshCw,
+};
 
 interface IconProps extends LucideProps {
   name: string;
@@ -35,11 +64,11 @@ const Icon: React.FC<IconProps> = ({ name, fallback = 'CircleAlert', ...props })
     );
   }
 
-  const IconComponent = (LucideIcons as Record<string, React.FC<LucideProps>>)[name];
+  const IconComponent = ICON_MAP[name];
 
   if (!IconComponent) {
     // Если иконка не найдена, используем fallback иконку
-    const FallbackIcon = (LucideIcons as Record<string, React.FC<LucideProps>>)[fallback];
+    const FallbackIcon = ICON_MAP[fallback];
 
     // Если даже fallback не найден, возвращаем пустой span
     if (!FallbackIcon) {

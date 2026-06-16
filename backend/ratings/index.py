@@ -1,7 +1,9 @@
 import json
 import os
+import re
 
 SCHEMA = "t_p29017774_avn_academy_training"
+assert re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", SCHEMA), f"Invalid SCHEMA: {SCHEMA}"
 
 
 def get_conn():
@@ -9,12 +11,25 @@ def get_conn():
     return psycopg2.connect(os.environ["DATABASE_URL"])
 
 
-def cors_headers():
+ALLOWED_ORIGINS = [
+    "https://avn-academy-training.netlify.app",
+    "http://localhost:5173",
+    "http://localhost:4173",
+]
+
+
+def cors_headers(origin=""):
+    allowed = origin if origin in ALLOWED_ORIGINS else ALLOWED_ORIGINS[0]
     return {
-        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Origin": allowed,
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, X-Session-Token",
     }
+
+
+def get_origin(event):
+    headers = event.get("headers") or {}
+    return headers.get("origin") or headers.get("Origin") or ""
 
 
 def get_user_by_token(conn, token):
@@ -38,18 +53,21 @@ def handler(event: dict, context) -> dict:
     GET ?action=my_rating&instructor_id=X — оценка текущего курсанта для инструктора
     POST / — курсант ставит оценку инструктору (или обновляет)
     """
+    origin = get_origin(event)
+    _cors = cors_headers(origin)
+
     if event.get("httpMethod") == "OPTIONS":
-        return {"statusCode": 200, "headers": cors_headers(), "body": ""}
+        return {"statusCode": 200, "headers": _cors, "body": ""}
 
     token = event.get("headers", {}).get("X-Session-Token", "")
     if not token:
-        return {"statusCode": 401, "headers": cors_headers(), "body": json.dumps({"error": "Не авторизован"})}
+        return {"statusCode": 401, "headers": _cors, "body": json.dumps({"error": "Не авторизован"})}
 
     conn = get_conn()
     user = get_user_by_token(conn, token)
     if not user:
         conn.close()
-        return {"statusCode": 401, "headers": cors_headers(), "body": json.dumps({"error": "Сессия истекла"})}
+        return {"statusCode": 401, "headers": _cors, "body": json.dumps({"error": "Сессия истекла"})}
 
     method = event.get("httpMethod", "GET")
     params = event.get("queryStringParameters") or {}
@@ -62,16 +80,25 @@ def handler(event: dict, context) -> dict:
         # GET / — список инструкторов с рейтингом
         if method == "GET" and not action:
             with conn.cursor() as cur:
-                cur.execute(
-                    f"""SELECT u.id, u.name, u.rank, u.unit,
-                        ROUND(AVG(r.rating)::numeric, 2) as avg_rating,
-                        COUNT(r.id) as rating_count
-                        FROM {SCHEMA}.users u
-                        LEFT JOIN {SCHEMA}.instructor_ratings r ON r.instructor_id = u.id
-                        WHERE u.role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head')
-                        GROUP BY u.id, u.name, u.rank, u.unit
-                        ORDER BY avg_rating DESC NULLS LAST"""
-                )
+                # P3-19: Use materialized view instead of expensive AVG/GROUP BY JOIN
+                try:
+                    cur.execute(
+                        f"""SELECT id, name, rank, unit, avg_rating, rating_count
+                            FROM {SCHEMA}.instructor_ratings_summary
+                            ORDER BY avg_rating DESC NULLS LAST"""
+                    )
+                except Exception:
+                    # Fallback: matview might not exist yet
+                    cur.execute(
+                        f"""SELECT u.id, u.name, u.rank, u.unit,
+                            ROUND(AVG(r.rating)::numeric, 2) as avg_rating,
+                            COUNT(r.id) as rating_count
+                            FROM {SCHEMA}.users u
+                            LEFT JOIN {SCHEMA}.instructor_ratings r ON r.instructor_id = u.id
+                            WHERE u.role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head')
+                            GROUP BY u.id, u.name, u.rank, u.unit
+                            ORDER BY avg_rating DESC NULLS LAST"""
+                    )
                 rows = cur.fetchall()
                 instructors = []
                 for row in rows:
@@ -94,7 +121,7 @@ def handler(event: dict, context) -> dict:
                     for row in cur.fetchall():
                         my_ratings[row[0]] = {"rating": row[1], "comment": row[2]}
 
-            return {"statusCode": 200, "headers": cors_headers(), "body": json.dumps({
+            return {"statusCode": 200, "headers": _cors, "body": json.dumps({
                 "instructors": instructors,
                 "my_ratings": my_ratings,
             })}
@@ -102,16 +129,16 @@ def handler(event: dict, context) -> dict:
         # POST / — поставить или обновить оценку инструктору (только курсанты)
         if method == "POST":
             if user["role"] != "cadet":
-                return {"statusCode": 403, "headers": cors_headers(), "body": json.dumps({"error": "Только курсанты могут оценивать"})}
+                return {"statusCode": 403, "headers": _cors, "body": json.dumps({"error": "Только курсанты могут оценивать"})}
 
             instructor_id = int(body.get("instructor_id", 0))
             rating = int(body.get("rating", 0))
             comment = body.get("comment", "").strip() or None
 
             if not instructor_id:
-                return {"statusCode": 400, "headers": cors_headers(), "body": json.dumps({"error": "Укажите инструктора"})}
+                return {"statusCode": 400, "headers": _cors, "body": json.dumps({"error": "Укажите инструктора"})}
             if rating < 1 or rating > 5:
-                return {"statusCode": 400, "headers": cors_headers(), "body": json.dumps({"error": "Оценка от 1 до 5"})}
+                return {"statusCode": 400, "headers": _cors, "body": json.dumps({"error": "Оценка от 1 до 5"})}
 
             with conn.cursor() as cur:
                 cur.execute(
@@ -122,9 +149,16 @@ def handler(event: dict, context) -> dict:
                     (instructor_id, user["id"], rating, comment),
                 )
             conn.commit()
-            return {"statusCode": 200, "headers": cors_headers(), "body": json.dumps({"success": True})}
+            # P3-19: Refresh materialized view after rating change
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {SCHEMA}.instructor_ratings_summary")
+                conn.commit()
+            except Exception:
+                pass  # Matview might not exist yet
+            return {"statusCode": 200, "headers": _cors, "body": json.dumps({"success": True})}
 
     finally:
         conn.close()
 
-    return {"statusCode": 404, "headers": cors_headers(), "body": json.dumps({"error": "Не найдено"})}
+    return {"statusCode": 404, "headers": _cors, "body": json.dumps({"error": "Не найдено"})}

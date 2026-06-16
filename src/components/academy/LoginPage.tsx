@@ -2,7 +2,6 @@ import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { apiLogin, setToken, User } from "@/lib/api";
 import { fmtStaticId } from "./SectionsShared";
-import { HUDParticles } from "./HUDParticles";
 
 interface LoginPageProps {
   onLogin: (user: User, token: string) => void;
@@ -34,11 +33,10 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       <div 
         className="absolute inset-0 bg-cover bg-center opacity-40 pointer-events-none"
         style={{ 
-          backgroundImage: 'url("/academy_bg.jpg")'
+          backgroundImage: 'url("/academy_bg.webp")'
         }}
       />
       <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/80 to-background pointer-events-none" />
-      <HUDParticles />
       <div className="w-full max-w-sm relative z-10">
         <div className="flex flex-col items-center mb-8">
           <img

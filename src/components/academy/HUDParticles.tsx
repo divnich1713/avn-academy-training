@@ -13,35 +13,35 @@ interface Particle {
 export function HUDParticles() {
   const [particles] = useState<Particle[]>(() => {
     const generated: Particle[] = [];
-    // Generate ash particles (15 items)
-    for (let i = 0; i < 15; i++) {
+    // Generate ash particles (25 items)
+    for (let i = 0; i < 25; i++) {
       generated.push({
         id: i,
         type: "ash",
         left: Math.random() * 100,
-        size: Math.random() * 3 + 2, // 2px to 5px
-        duration: Math.random() * 6 + 6, // 6s to 12s
-        delay: Math.random() * -12, // negative delay to start scattered
-        opacity: Math.random() * 0.4 + 0.2, // 0.2 to 0.6
+        size: Math.random() * 3 + 1.5, // 1.5px to 4.5px
+        duration: Math.random() * 8 + 8, // 8s to 16s
+        delay: Math.random() * -16, // negative delay to start scattered
+        opacity: Math.random() * 0.25 + 0.1, // 0.1 to 0.35 (subtle)
       });
     }
-    // Generate gold star particles (10 items)
-    for (let i = 0; i < 10; i++) {
+    // Generate gold star particles (15 items)
+    for (let i = 0; i < 15; i++) {
       generated.push({
-        id: i + 15,
+        id: i + 25,
         type: "star",
         left: Math.random() * 100,
-        size: Math.random() * 6 + 6, // 6px to 12px
-        duration: Math.random() * 8 + 7, // 7s to 15s
-        delay: Math.random() * -15, // negative delay to start scattered
-        opacity: Math.random() * 0.5 + 0.4, // 0.4 to 0.9
+        size: Math.random() * 5 + 4, // 4px to 9px
+        duration: Math.random() * 12 + 10, // 10s to 22s
+        delay: Math.random() * -22, // negative delay to start scattered
+        opacity: Math.random() * 0.35 + 0.15, // 0.15 to 0.5 (subtle)
       });
     }
     return generated;
   });
 
   return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden z-20">
+    <div className="fixed inset-0 pointer-events-none overflow-hidden z-[9999] w-screen h-screen">
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes fall-ash-internal {
           0% {
@@ -49,13 +49,13 @@ export function HUDParticles() {
             opacity: 0;
           }
           10% {
-            opacity: 0.5;
+            opacity: 0.35;
           }
           90% {
-            opacity: 0.5;
+            opacity: 0.35;
           }
           100% {
-            transform: translateY(1000px) translateX(30px) rotate(360deg);
+            transform: translateY(105vh) translateX(40px) rotate(360deg);
             opacity: 0;
           }
         }
@@ -67,17 +67,17 @@ export function HUDParticles() {
             filter: drop-shadow(0 0 0px #eab308);
           }
           10% {
-            opacity: 0.8;
-            filter: drop-shadow(0 0 2px #eab308);
+            opacity: 0.5;
+            filter: drop-shadow(0 0 1px #eab308);
           }
           50% {
-            filter: drop-shadow(0 0 5px #facc15);
+            filter: drop-shadow(0 0 3px #facc15);
           }
           90% {
-            opacity: 0.7;
+            opacity: 0.4;
           }
           100% {
-            transform: translateY(1000px) translateX(-25px) rotate(-180deg) scale(1.1);
+            transform: translateY(105vh) translateX(-35px) rotate(-180deg) scale(1.1);
             opacity: 0;
             filter: drop-shadow(0 0 0px #eab308);
           }

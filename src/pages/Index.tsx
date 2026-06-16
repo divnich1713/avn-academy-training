@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { Section, UserRole, NAV_ITEMS } from "@/components/academy/types";
 import { AppHeader, AppSidebar } from "@/components/academy/Layout";
-import { HUDParticles } from "@/components/academy/HUDParticles";
 import Icon from "@/components/ui/icon";
 import {
   Dashboard,
@@ -55,10 +54,10 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
   });
   const [selectedCadet, setSelectedCadet] = useState<User | null>(null);
 
-  // Poll for profile/promotion updates every 5 seconds for active cadets
+  // P1-7: Reduced polling from 5s to 60s to decrease re-renders and network load
   useEffect(() => {
     if (authUser.role === "cadet" && onReloadUser) {
-      const interval = setInterval(onReloadUser, 5000);
+      const interval = setInterval(onReloadUser, 60000);
       return () => clearInterval(interval);
     }
   }, [authUser.role, onReloadUser]);
@@ -213,7 +212,7 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
       <div 
         className="fixed inset-0 bg-cover bg-center opacity-10 pointer-events-none z-0"
         style={{ 
-          backgroundImage: 'url("/academy_bg.jpg")'
+          backgroundImage: 'url("/academy_bg.webp")'
         }}
       />
       <div className="fixed inset-0 bg-gradient-to-b from-background/40 via-background/90 to-background pointer-events-none z-0" />
@@ -239,6 +238,11 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
 
 
           <main className="flex-1 overflow-y-auto p-4 md:p-6">
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-20">
+                <Icon name="Loader2" size={28} className="text-primary animate-spin" />
+              </div>
+            }>
             <div className="max-w-6xl mx-auto space-y-6">
               {section === "dashboard" && !isSergeantCadet && !isExpiredCadet ? (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
@@ -249,7 +253,6 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
 
                   {/* Right HUD Column matching layout */}
                   <div className="lg:col-span-3 space-y-4 relative overflow-hidden min-h-[450px]">
-                    <HUDParticles />
 
                     {/* Eagle Emblem transparent card */}
                     <div className="relative border border-red-950/60 bg-tactical-card/25 p-3.5 h-36 overflow-hidden flex flex-col justify-between corner-mark card-glow z-10">
@@ -356,7 +359,7 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3 border-t border-tactical-border/30 pt-6">
                   {/* 1: Map pattern background */}
                   <div className="h-20 border border-tactical-border/50 bg-tactical-card/20 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-cover bg-center opacity-10" style={{ backgroundImage: 'url("/patrol_map.jpg")' }} />
+                    <div className="absolute inset-0 bg-cover bg-center opacity-10" style={{ backgroundImage: 'url("/patrol_map.webp")' }} />
                     <p className="p-2 text-[8px] font-mono text-muted-foreground uppercase">КООРДИНАТЫ БАЗЫ</p>
                   </div>
                   {/* 2: Rotating Radar scope */}
@@ -392,6 +395,7 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
                 </div>
               )}
             </div>
+            </Suspense>
           </main>
         </div>
       </div>

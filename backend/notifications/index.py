@@ -1,7 +1,9 @@
 import json
 import os
+import re
 
 SCHEMA = "t_p29017774_avn_academy_training"
+assert re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", SCHEMA), f"Invalid SCHEMA: {SCHEMA}"
 
 
 def get_conn():
@@ -9,12 +11,25 @@ def get_conn():
     return psycopg2.connect(os.environ["DATABASE_URL"])
 
 
-def cors_headers():
+ALLOWED_ORIGINS = [
+    "https://avn-academy-training.netlify.app",
+    "http://localhost:5173",
+    "http://localhost:4173",
+]
+
+
+def cors_headers(origin=""):
+    allowed = origin if origin in ALLOWED_ORIGINS else ALLOWED_ORIGINS[0]
     return {
-        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Origin": allowed,
         "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, X-Session-Token",
     }
+
+
+def get_origin(event):
+    headers = event.get("headers") or {}
+    return headers.get("origin") or headers.get("Origin") or ""
 
 
 def get_user_by_token(conn, token):
@@ -38,18 +53,21 @@ def handler(event: dict, context) -> dict:
     PUT ?action=read — пометить все как прочитанные
     PUT ?action=read_one&id=X — пометить одно уведомление как прочитанное
     """
+    origin = get_origin(event)
+    _cors = cors_headers(origin)
+
     if event.get("httpMethod") == "OPTIONS":
-        return {"statusCode": 200, "headers": cors_headers(), "body": ""}
+        return {"statusCode": 200, "headers": _cors, "body": ""}
 
     token = event.get("headers", {}).get("X-Session-Token", "")
     if not token:
-        return {"statusCode": 401, "headers": cors_headers(), "body": json.dumps({"error": "Не авторизован"})}
+        return {"statusCode": 401, "headers": _cors, "body": json.dumps({"error": "Не авторизован"})}
 
     conn = get_conn()
     user = get_user_by_token(conn, token)
     if not user:
         conn.close()
-        return {"statusCode": 401, "headers": cors_headers(), "body": json.dumps({"error": "Сессия истекла"})}
+        return {"statusCode": 401, "headers": _cors, "body": json.dumps({"error": "Сессия истекла"})}
 
     method = event.get("httpMethod", "GET")
     params = event.get("queryStringParameters") or {}
@@ -83,7 +101,7 @@ def handler(event: dict, context) -> dict:
                     (user["id"],),
                 )
                 unread_count = cur.fetchone()[0]
-            return {"statusCode": 200, "headers": cors_headers(), "body": json.dumps({
+            return {"statusCode": 200, "headers": _cors, "body": json.dumps({
                 "notifications": notifications,
                 "unread_count": unread_count,
             })}
@@ -96,7 +114,7 @@ def handler(event: dict, context) -> dict:
                     (user["id"],),
                 )
             conn.commit()
-            return {"statusCode": 200, "headers": cors_headers(), "body": json.dumps({"success": True})}
+            return {"statusCode": 200, "headers": _cors, "body": json.dumps({"success": True})}
 
         # PUT ?action=read_one&id=X — пометить одно как прочитанное
         if method == "PUT" and action == "read_one":
@@ -107,9 +125,9 @@ def handler(event: dict, context) -> dict:
                     (notif_id, user["id"]),
                 )
             conn.commit()
-            return {"statusCode": 200, "headers": cors_headers(), "body": json.dumps({"success": True})}
+            return {"statusCode": 200, "headers": _cors, "body": json.dumps({"success": True})}
 
     finally:
         conn.close()
 
-    return {"statusCode": 404, "headers": cors_headers(), "body": json.dumps({"error": "Не найдено"})}
+    return {"statusCode": 404, "headers": _cors, "body": json.dumps({"error": "Не найдено"})}

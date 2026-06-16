@@ -1,24 +1,25 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense, useMemo } from "react";
 import { createPortal } from "react-dom";
 import Icon from "@/components/ui/icon";
 import { SectionHeader, StatCard, StatusBadge, GradeCircle, OnlineStatus, InstructorAvatar } from "./UIComponents";
-import { User, fetchRequests, fetchGrades, fetchInstructors, fetchRatings, fetchPromotionReports, fetchDiscordProfile, TrainingRequest, Grade, PromotionReport, InstructorRating } from "@/lib/api";
+import { User, fetchDiscordProfile, TrainingRequest, Grade, PromotionReport, InstructorRating } from "@/lib/api";
+import { useRequests, useGrades, useInstructors, useRatings, usePromotionReports } from "@/lib/useQueries";
 import { MOCK_MATERIALS } from "./types";
 import { TYPE_LABEL, fmt, avg, Spinner, Empty, RequestSection, fmtStaticId } from "./SectionsShared";
-import {
-  PatrolMemo,
-  ArrestMemo,
-  WeaponMemo,
-  LegalMemo,
-  SearchMemo,
-  WeaponSizMemo,
-  RightsMemo,
-  AccessMemo,
-  ReleaseMemo,
-  TerritoryMemo,
-  MapMemo,
-  OathMemo
-} from "./MaterialsMemos";
+
+// P2-10: Lazy-load individual memos — each ~10-20KB, only loaded when opened
+const PatrolMemo = lazy(() => import("./MaterialsMemos").then(m => ({ default: m.PatrolMemo })));
+const ArrestMemo = lazy(() => import("./MaterialsMemos").then(m => ({ default: m.ArrestMemo })));
+const WeaponMemo = lazy(() => import("./MaterialsMemos").then(m => ({ default: m.WeaponMemo })));
+const LegalMemo = lazy(() => import("./MaterialsMemos").then(m => ({ default: m.LegalMemo })));
+const SearchMemo = lazy(() => import("./MaterialsMemos").then(m => ({ default: m.SearchMemo })));
+const WeaponSizMemo = lazy(() => import("./MaterialsMemos").then(m => ({ default: m.WeaponSizMemo })));
+const RightsMemo = lazy(() => import("./MaterialsMemos").then(m => ({ default: m.RightsMemo })));
+const AccessMemo = lazy(() => import("./MaterialsMemos").then(m => ({ default: m.AccessMemo })));
+const ReleaseMemo = lazy(() => import("./MaterialsMemos").then(m => ({ default: m.ReleaseMemo })));
+const TerritoryMemo = lazy(() => import("./MaterialsMemos").then(m => ({ default: m.TerritoryMemo })));
+const MapMemo = lazy(() => import("./MaterialsMemos").then(m => ({ default: m.MapMemo })));
+const OathMemo = lazy(() => import("./MaterialsMemos").then(m => ({ default: m.OathMemo })));
 
 const ROLE_LABELS: Record<string, string> = {
   head_avng: "Нач.АВНГ",
@@ -35,14 +36,10 @@ const ROLE_LABELS: Record<string, string> = {
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
 export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate?: (s: import("./types").Section, id?: number) => void }) {
-  const [requests, setRequests] = useState<TrainingRequest[]>([]);
-  const [grades, setGrades] = useState<Grade[]>([]);
+  // P1-6: React Query — cached, deduplicated, auto-refetch
+  const { data: requests = [] } = useRequests();
+  const { data: grades = [] } = useGrades();
   const isInstructor = authUser.role === "instructor" || authUser.role === "head_avng";
-
-  useEffect(() => {
-    fetchRequests().then(setRequests).catch(() => {});
-    fetchGrades().then(setGrades).catch(() => {});
-  }, []);
 
   const myGrades = grades.filter((g) => g.cadet_id === authUser.id);
   const approvedCount = myGrades.filter((g) => g.grade >= 3).length;
@@ -112,7 +109,7 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
       <div className="relative overflow-hidden border border-tactical-border/60 bg-tactical-panel h-52 flex flex-col justify-end p-6 md:p-8 corner-mark">
         <div 
           className="absolute inset-0 bg-cover bg-center opacity-85"
-          style={{ backgroundImage: 'url("/academy_bg.jpg")' }}
+          style={{ backgroundImage: 'url("/academy_bg.webp")' }}
         />
         <div 
           className="absolute right-0 top-0 bottom-0 w-80 bg-contain bg-right bg-no-repeat opacity-30 pointer-events-none z-0"
@@ -175,7 +172,7 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
             <div className="relative border border-tactical-border/60 bg-tactical-card/30 p-4 h-28 overflow-hidden flex flex-col justify-between">
               <div 
                 className="absolute right-2 bottom-2 w-16 h-16 opacity-15 pointer-events-none bg-contain bg-center bg-no-repeat"
-                style={{ backgroundImage: 'url("/rosgvardia_emblem_color.png")' }}
+                style={{ backgroundImage: 'url("/rosgvardia_emblem_color.webp")' }}
               />
               <div className="flex justify-between items-start">
                 <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">ПРОЦЕНТ ЗАЧЕТОВ</span>
@@ -190,7 +187,7 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
             <div className="relative border border-tactical-border/60 bg-tactical-card/30 p-4 h-28 overflow-hidden flex flex-col justify-between">
               <div 
                 className="absolute inset-0 bg-cover bg-center opacity-10 pointer-events-none"
-                style={{ backgroundImage: 'url("/patrol_guard.jpg")' }}
+                style={{ backgroundImage: 'url("/patrol_guard.webp")' }}
               />
               <div className="flex justify-between items-start">
                 <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">ВСЕГО ОЦЕНОК</span>
@@ -225,7 +222,7 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
         <div className="relative bg-tactical-card border border-tactical-border/60 p-4 flex flex-col justify-between overflow-hidden min-h-[190px]">
           <div 
             className="absolute inset-0 bg-cover bg-center opacity-30 pointer-events-none"
-            style={{ backgroundImage: 'url("/personal_data_bg.jpg")' }}
+            style={{ backgroundImage: 'url("/personal_data_bg.webp")' }}
           />
           <div className="relative z-10 w-full">
             <h3 className="font-oswald text-xs tracking-widest uppercase text-muted-foreground mb-3 pb-1 border-b border-tactical-border/30">ЛИЧНЫЕ ДАННЫЕ</h3>
@@ -252,7 +249,7 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
         <div className="relative bg-tactical-card border border-tactical-border/60 p-4 flex flex-col justify-between overflow-hidden min-h-[190px]">
           <div 
             className="absolute inset-0 bg-cover bg-center opacity-25 pointer-events-none"
-            style={{ backgroundImage: 'url("/rosgvardia_always_on_guard.png")' }}
+            style={{ backgroundImage: 'url("/rosgvardia_always_on_guard.webp")' }}
           />
           <div className="relative z-10 w-full">
             <h3 className="font-oswald text-xs tracking-widest uppercase text-muted-foreground mb-3 pb-1 border-b border-tactical-border/30">РЕЗУЛЬТАТЫ СДАЧИ</h3>
@@ -273,7 +270,7 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
         <div className="relative bg-tactical-card border border-tactical-border/60 p-4 flex flex-col justify-between overflow-hidden min-h-[190px]">
           <div 
             className="absolute inset-0 bg-cover bg-center opacity-20 pointer-events-none"
-            style={{ backgroundImage: 'url("/patrol_guard.jpg")' }}
+            style={{ backgroundImage: 'url("/patrol_guard.webp")' }}
           />
           <div className="relative z-10 h-full w-full flex flex-col justify-between">
             <div>
@@ -406,18 +403,20 @@ export function Materials() {
       </div>
 
       {/* Instructional Modals */}
-      <PatrolMemo isOpen={showPatrolMemo} onClose={() => setShowPatrolMemo(false)} />
-      <ArrestMemo isOpen={showArrestMemo} onClose={() => setShowArrestMemo(false)} />
-      <WeaponMemo isOpen={showWeaponMemo} onClose={() => setShowWeaponMemo(false)} />
-      <LegalMemo isOpen={showLegalMemo} onClose={() => setShowLegalMemo(false)} />
-      <SearchMemo isOpen={showSearchMemo} onClose={() => setShowSearchMemo(false)} />
-      <WeaponSizMemo isOpen={showWeaponSizMemo} onClose={() => setShowWeaponSizMemo(false)} />
-      <RightsMemo isOpen={showRightsMemo} onClose={() => setShowRightsMemo(false)} />
-      <AccessMemo isOpen={showAccessMemo} onClose={() => setShowAccessMemo(false)} />
-      <ReleaseMemo isOpen={showReleaseMemo} onClose={() => setShowReleaseMemo(false)} />
-      <TerritoryMemo isOpen={showTerritoryMemo} onClose={() => setShowTerritoryMemo(false)} />
-      <MapMemo isOpen={showMapMemo} onClose={() => setShowMapMemo(false)} />
-      <OathMemo isOpen={showOathMemo} onClose={() => setShowOathMemo(false)} />
+      <Suspense fallback={null}>
+        <PatrolMemo isOpen={showPatrolMemo} onClose={() => setShowPatrolMemo(false)} />
+        <ArrestMemo isOpen={showArrestMemo} onClose={() => setShowArrestMemo(false)} />
+        <WeaponMemo isOpen={showWeaponMemo} onClose={() => setShowWeaponMemo(false)} />
+        <LegalMemo isOpen={showLegalMemo} onClose={() => setShowLegalMemo(false)} />
+        <SearchMemo isOpen={showSearchMemo} onClose={() => setShowSearchMemo(false)} />
+        <WeaponSizMemo isOpen={showWeaponSizMemo} onClose={() => setShowWeaponSizMemo(false)} />
+        <RightsMemo isOpen={showRightsMemo} onClose={() => setShowRightsMemo(false)} />
+        <AccessMemo isOpen={showAccessMemo} onClose={() => setShowAccessMemo(false)} />
+        <ReleaseMemo isOpen={showReleaseMemo} onClose={() => setShowReleaseMemo(false)} />
+        <TerritoryMemo isOpen={showTerritoryMemo} onClose={() => setShowTerritoryMemo(false)} />
+        <MapMemo isOpen={showMapMemo} onClose={() => setShowMapMemo(false)} />
+        <OathMemo isOpen={showOathMemo} onClose={() => setShowOathMemo(false)} />
+      </Suspense>
     </div>
   );
 }
@@ -536,15 +535,9 @@ export function Reports({ authUser, highlightRequestId }: { authUser: User; high
 // GRADES
 // ═══════════════════════════════════════════════════════════════════════════════
 export function Grades({ authUser }: { authUser: User }) {
-  const [grades, setGrades] = useState<Grade[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchGrades()
-      .then((all) => setGrades(all.filter((g) => g.cadet_id === authUser.id)))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [authUser.id]);
+  // P1-6: React Query
+  const { data: allGrades = [], isLoading: loading } = useGrades();
+  const grades = useMemo(() => allGrades.filter((g) => g.cadet_id === authUser.id), [allGrades, authUser.id]);
 
   const approvedCount = grades.filter((g) => g.grade >= 3).length;
   const rejectedCount = grades.filter((g) => g.grade < 3).length;
@@ -606,16 +599,7 @@ interface ActionItem {
 }
 
 export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; targetUser?: User; onNavigate?: (s: import("./types").Section, id?: number, u?: User) => void }) {
-  const [requests, setRequests] = useState<TrainingRequest[]>([]);
-  const [grades, setGrades] = useState<Grade[]>([]);
-  const [loadingR, setLoadingR] = useState(true);
-  const [loadingG, setLoadingG] = useState(true);
   const [tab, setTab] = useState<"requests" | "grades">("requests");
-
-  const [rating, setRating] = useState<InstructorRating | null>(null);
-  const [ratingPosition, setRatingPosition] = useState<number | null>(null);
-  const [activities, setActivities] = useState<ActionItem[]>([]);
-  const [loadingAct, setLoadingAct] = useState(false);
   const [actTimeframe, setActTimeframe] = useState<"daily" | "weekly" | "monthly" | "yearly">("weekly");
 
   const [discordProfile, setDiscordProfile] = useState<{
@@ -628,52 +612,39 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
 
   const displayUser = targetUser || authUser;
 
-  useEffect(() => {
-    if (displayUser.role !== "cadet") {
-      setLoadingR(false);
-      setLoadingG(false);
-      return;
+  // P1-6: React Query — cached, deduplicated, shared with other sections
+  const { data: allRequests = [], isLoading: loadingR } = useRequests();
+  const { data: allGrades = [], isLoading: loadingG } = useGrades();
+  const { data: ratingsData } = useRatings(actTimeframe);
+  const { data: allPromReports = [], isLoading: loadingAct } = usePromotionReports();
+
+  // Derived state — replaces the old useEffect+setState patterns
+  const requests = useMemo(() => {
+    if (displayUser.role !== "cadet") return [];
+    if (authUser.role !== "cadet") {
+      return allRequests.filter((r) => r.cadet_id === displayUser.id);
     }
+    return allRequests;
+  }, [allRequests, displayUser.id, displayUser.role, authUser.role]);
 
-    fetchRequests()
-      .then((all) => {
-        if (authUser.role !== "cadet") {
-          setRequests(all.filter((r) => r.cadet_id === displayUser.id));
-        } else {
-          setRequests(all);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoadingR(false));
+  const grades = useMemo(() => {
+    if (displayUser.role !== "cadet") return [];
+    return allGrades.filter((g) => g.cadet_id === displayUser.id);
+  }, [allGrades, displayUser.id, displayUser.role]);
 
-    fetchGrades()
-      .then((all) => setGrades(all.filter((g) => g.cadet_id === displayUser.id)))
-      .catch(() => {})
-      .finally(() => setLoadingG(false));
-  }, [displayUser.id, authUser.role, displayUser.role]);
+  // Instructor rating position
+  const { rating, ratingPosition } = useMemo(() => {
+    if (displayUser.role === "cadet") return { rating: null, ratingPosition: null };
+    const list = ratingsData?.instructors || [];
+    const idx = list.findIndex((i) => i.id === displayUser.id || i.name.toLowerCase().includes(displayUser.name.toLowerCase()) || displayUser.name.toLowerCase().includes(i.name.toLowerCase()));
+    if (idx !== -1) return { rating: list[idx], ratingPosition: idx + 1 };
+    return { rating: null, ratingPosition: null };
+  }, [ratingsData, displayUser.id, displayUser.name, displayUser.role]);
 
-  // Load instructor rating and activity timeline
-  useEffect(() => {
-    if (displayUser.role === "cadet") return;
+  // Instructor activity timeline — computed from cached data
+  const activities = useMemo(() => {
+    if (displayUser.role === "cadet") return [];
 
-    setLoadingAct(true);
-
-    // 1. Fetch ratings
-    fetchRatings(actTimeframe)
-      .then((res) => {
-        const list = res.instructors || [];
-        const idx = list.findIndex((i) => i.id === displayUser.id || i.name.toLowerCase().includes(displayUser.name.toLowerCase()) || displayUser.name.toLowerCase().includes(i.name.toLowerCase()));
-        if (idx !== -1) {
-          setRating(list[idx]);
-          setRatingPosition(idx + 1);
-        } else {
-          setRating(null);
-          setRatingPosition(null);
-        }
-      })
-      .catch(() => {});
-
-    // Helper name matcher
     const isNameMatch = (targetName?: string | null) => {
       if (!targetName) return false;
       const t = targetName.toLowerCase();
@@ -681,64 +652,50 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
       return t.includes(d) || d.includes(t);
     };
 
-    // 2. Fetch all activities
-    Promise.all([
-      fetchGrades().catch(() => [] as Grade[]),
-      fetchRequests().catch(() => [] as TrainingRequest[]),
-      fetchPromotionReports().catch(() => [] as PromotionReport[]),
-    ])
-      .then(([allGrades, allRequests, allPromReports]) => {
-        const combined: ActionItem[] = [];
+    const combined: ActionItem[] = [];
 
-        // Filter and map grades
-        allGrades
-          .filter((g) => isNameMatch(g.instructor_name))
-          .forEach((g) => {
-            combined.push({
-              id: `grade-${g.id}`,
-              type: "grade",
-              title: `Выставил оценку ${g.grade}`,
-              subtitle: `${g.cadet_rank} ${g.cadet_name} по предмету «${g.subject}»`,
-              date: g.graded_at,
-              meta: g.comment,
-            });
-          });
+    allGrades
+      .filter((g) => isNameMatch(g.instructor_name))
+      .forEach((g) => {
+        combined.push({
+          id: `grade-${g.id}`,
+          type: "grade",
+          title: `Выставил оценку ${g.grade}`,
+          subtitle: `${g.cadet_rank} ${g.cadet_name} по предмету «${g.subject}»`,
+          date: g.graded_at,
+          meta: g.comment,
+        });
+      });
 
-        // Filter and map requests
-        allRequests
-          .filter((r) => r.status !== "pending" && isNameMatch(r.reviewer_name))
-          .forEach((r) => {
-            combined.push({
-              id: `request-${r.id}`,
-              type: "request",
-              title: r.status === "approved" ? "Одобрил запрос" : "Отклонил запрос",
-              subtitle: `${r.cadet_rank} ${r.cadet_name} · ${r.subject}`,
-              date: r.updated_at || r.created_at,
-              meta: r.instructor_comment,
-            });
-          });
+    allRequests
+      .filter((r) => r.status !== "pending" && isNameMatch(r.reviewer_name))
+      .forEach((r) => {
+        combined.push({
+          id: `request-${r.id}`,
+          type: "request",
+          title: r.status === "approved" ? "Одобрил запрос" : "Отклонил запрос",
+          subtitle: `${r.cadet_rank} ${r.cadet_name} · ${r.subject}`,
+          date: r.updated_at || r.created_at,
+          meta: r.instructor_comment,
+        });
+      });
 
-        // Filter and map promotion reports
-        allPromReports
-          .filter((rep) => rep.status !== "pending" && isNameMatch(rep.reviewer_name))
-          .forEach((rep) => {
-            combined.push({
-              id: `promotion-${rep.id}`,
-              type: "promotion",
-              title: rep.status === "approved" ? "Одобрил рапорт на повышение" : "Отклонил рапорт на повышение",
-              subtitle: `${rep.cadet_rank} ${rep.cadet_name} до звания ${rep.promotion_type === "junior_sergeant" ? "Мл. Сержант" : "Сержант"}`,
-              date: rep.reviewed_at || rep.created_at,
-              meta: rep.instructor_comment,
-            });
-          });
+    allPromReports
+      .filter((rep) => rep.status !== "pending" && isNameMatch(rep.reviewer_name))
+      .forEach((rep) => {
+        combined.push({
+          id: `promotion-${rep.id}`,
+          type: "promotion",
+          title: rep.status === "approved" ? "Одобрил рапорт на повышение" : "Отклонил рапорт на повышение",
+          subtitle: `${rep.cadet_rank} ${rep.cadet_name} до звания ${rep.promotion_type === "junior_sergeant" ? "Мл. Сержант" : "Сержант"}`,
+          date: rep.reviewed_at || rep.created_at,
+          meta: rep.instructor_comment,
+        });
+      });
 
-        // Sort descending by date
-        combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setActivities(combined.slice(0, 15));
-      })
-      .catch(() => {})
-      .finally(() => setLoadingAct(false));
-  }, [displayUser.id, displayUser.name, displayUser.role, actTimeframe]);
+    combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return combined.slice(0, 15);
+  }, [allGrades, allRequests, allPromReports, displayUser.name, displayUser.role]);
 
   // Fetch Discord profile if discord_id exists and no manual avatar is specified
   useEffect(() => {
@@ -1125,30 +1082,19 @@ function getRankPriority(rankStr: string | null | undefined): number {
 }
 
 export function Instructors({ onNavigate }: { onNavigate?: (s: import("./types").Section, id?: number, u?: User) => void }) {
-  const [instructors, setInstructors] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchInstructors()
-      .then((res) => {
-        const sorted = [...res].sort((a, b) => {
-          const rolePriorityA = getRolePriority(a.role);
-          const rolePriorityB = getRolePriority(b.role);
-          if (rolePriorityA !== rolePriorityB) {
-            return rolePriorityA - rolePriorityB;
-          }
-          const rankPriorityA = getRankPriority(a.rank);
-          const rankPriorityB = getRankPriority(b.rank);
-          if (rankPriorityA !== rankPriorityB) {
-            return rankPriorityA - rankPriorityB;
-          }
-          return (a.name || "").localeCompare(b.name || "", "ru");
-        });
-        setInstructors(sorted);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  // P1-6: React Query
+  const { data: rawInstructors = [], isLoading: loading } = useInstructors();
+  const instructors = useMemo(() => {
+    return [...rawInstructors].sort((a, b) => {
+      const rolePriorityA = getRolePriority(a.role);
+      const rolePriorityB = getRolePriority(b.role);
+      if (rolePriorityA !== rolePriorityB) return rolePriorityA - rolePriorityB;
+      const rankPriorityA = getRankPriority(a.rank);
+      const rankPriorityB = getRankPriority(b.rank);
+      if (rankPriorityA !== rankPriorityB) return rankPriorityA - rankPriorityB;
+      return (a.name || "").localeCompare(b.name || "", "ru");
+    });
+  }, [rawInstructors]);
 
   const commandStaff = instructors.filter(i => i.role === "head_avng" || i.role === "deputy_head");
   const seniorStaff = instructors.filter(i => i.role === "chief_instructor" || i.role === "senior_instructor");

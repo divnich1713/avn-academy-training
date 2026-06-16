@@ -4,7 +4,6 @@ import { User } from "@/lib/api";
 import { NotificationBell } from "./NotificationBell";
 import { InstructorAvatar } from "./UIComponents";
 import { fmtStaticId } from "./SectionsShared";
-import { HUDParticles } from "./HUDParticles";
 
 interface AppHeaderProps {
   role: UserRole;
@@ -169,7 +168,6 @@ export function AppSidebar({
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
       `}
       >
-        <HUDParticles />
         <div className="p-3 space-y-4 relative z-10">
 
           {/* Sidebar Menu matching screenshot */}

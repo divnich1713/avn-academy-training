@@ -74,9 +74,10 @@ export function PatrolMemo({ isOpen, onClose }: MemoProps) {
             <div className="border border-tactical-border p-2 bg-tactical-card/30 rounded">
               <p className="text-xs text-muted-foreground mb-1.5 text-center font-mono uppercase tracking-wider">Карта постов и зон патрулирования</p>
               <img 
-                src="/patrol_map.jpg" 
+                src="/patrol_map.webp" 
                 alt="Карта постов патрулирования" 
                 className="w-full max-h-[350px] object-contain rounded border border-tactical-border bg-black/40"
+                loading="lazy"
               />
             </div>
 
@@ -116,9 +117,10 @@ export function PatrolMemo({ isOpen, onClose }: MemoProps) {
             <div className="border border-tactical-border p-2 bg-tactical-card/30 rounded">
               <p className="text-xs text-muted-foreground mb-1.5 text-center font-mono uppercase tracking-wider">Визуализация несения службы на посту Вышка</p>
               <img 
-                src="/patrol_tower.jpg" 
+                src="/patrol_tower.webp" 
                 alt="Несение службы на посту Вышка" 
                 className="w-full max-h-[350px] object-contain rounded border border-tactical-border bg-black/40"
+                loading="lazy"
               />
             </div>
           </div>
@@ -167,9 +169,10 @@ export function PatrolMemo({ isOpen, onClose }: MemoProps) {
             <div className="border border-tactical-border p-2 bg-tactical-card/30 rounded">
               <p className="text-xs text-muted-foreground mb-1.5 text-center font-mono uppercase tracking-wider">Визуализация несения службы на посту КПП №1</p>
               <img 
-                src="/patrol_kpp1.jpg" 
+                src="/patrol_kpp1.webp" 
                 alt="Несение службы на посту КПП №1" 
                 className="w-full max-h-[350px] object-contain rounded border border-tactical-border bg-black/40"
+                loading="lazy"
               />
             </div>
 
@@ -206,9 +209,10 @@ export function PatrolMemo({ isOpen, onClose }: MemoProps) {
             <div className="border border-tactical-border p-2 bg-tactical-card/30 rounded">
               <p className="text-xs text-muted-foreground mb-1.5 text-center font-mono uppercase tracking-wider">Визуализация несения службы на посту КПП №2</p>
               <img 
-                src="/patrol_kpp2.jpg" 
+                src="/patrol_kpp2.webp" 
                 alt="Несение службы на посту КПП №2" 
                 className="w-full max-h-[350px] object-contain rounded border border-tactical-border bg-black/40"
+                loading="lazy"
               />
             </div>
 
@@ -1689,9 +1693,10 @@ export function MapMemo({ isOpen, onClose }: MemoProps) {
               </p>
               <div className="border border-tactical-border p-2 bg-black/40 rounded overflow-hidden">
                 <img 
-                  src="/world_map.png" 
+                  src="/world_map.webp" 
                   alt="Карта поставок и налетов" 
                   className="w-full h-auto object-contain rounded border border-tactical-border/40"
+                  loading="lazy"
                 />
               </div>
             </div>

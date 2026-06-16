@@ -1,7 +1,9 @@
 import json
 import os
+import re
 
 SCHEMA = "t_p29017774_avn_academy_training"
+assert re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", SCHEMA), f"Invalid SCHEMA: {SCHEMA}"
 
 
 def get_conn():
@@ -9,12 +11,25 @@ def get_conn():
     return psycopg2.connect(os.environ["DATABASE_URL"])
 
 
-def cors_headers():
+ALLOWED_ORIGINS = [
+    "https://avn-academy-training.netlify.app",
+    "http://localhost:5173",
+    "http://localhost:4173",
+]
+
+
+def cors_headers(origin=""):
+    allowed = origin if origin in ALLOWED_ORIGINS else ALLOWED_ORIGINS[0]
     return {
-        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Origin": allowed,
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, X-Session-Token",
     }
+
+
+def get_origin(event):
+    headers = event.get("headers") or {}
+    return headers.get("origin") or headers.get("Origin") or ""
 
 
 def get_user_by_token(conn, token):
@@ -37,18 +52,21 @@ def handler(event: dict, context) -> dict:
     Курсанты: подача запросов, просмотр своих запросов и оценок.
     Инструкторы: просмотр всех запросов, одобрение/отклонение, выставление оценок.
     """
+    origin = get_origin(event)
+    _cors = cors_headers(origin)
+
     if event.get("httpMethod") == "OPTIONS":
-        return {"statusCode": 200, "headers": cors_headers(), "body": ""}
+        return {"statusCode": 200, "headers": _cors, "body": ""}
 
     token = event.get("headers", {}).get("X-Session-Token", "")
     if not token:
-        return {"statusCode": 401, "headers": cors_headers(), "body": json.dumps({"error": "Не авторизован"})}
+        return {"statusCode": 401, "headers": _cors, "body": json.dumps({"error": "Не авторизован"})}
 
     conn = get_conn()
     user = get_user_by_token(conn, token)
     if not user:
         conn.close()
-        return {"statusCode": 401, "headers": cors_headers(), "body": json.dumps({"error": "Сессия истекла"})}
+        return {"statusCode": 401, "headers": _cors, "body": json.dumps({"error": "Сессия истекла"})}
 
     method = event.get("httpMethod", "GET")
     params = event.get("queryStringParameters") or {}
@@ -60,9 +78,15 @@ def handler(event: dict, context) -> dict:
     try:
         # ===== GET /requests — список запросов =====
         if method == "GET" and not action:
+            # P2-12: Pagination support
+            limit = min(int(params.get("limit", 50)), 200)
+            offset = max(int(params.get("offset", 0)), 0)
+
             with conn.cursor() as cur:
                 if user["role"] in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"):
                     # Инструктор видит все запросы
+                    cur.execute(f"SELECT COUNT(*) FROM {SCHEMA}.requests")
+                    total = cur.fetchone()[0]
                     cur.execute(
                         f"""SELECT r.id, r.type, r.subject, r.description, r.preferred_date,
                             r.status, r.instructor_comment, r.created_at, r.updated_at,
@@ -72,10 +96,17 @@ def handler(event: dict, context) -> dict:
                             FROM {SCHEMA}.requests r
                             JOIN {SCHEMA}.users u ON r.user_id = u.id
                             LEFT JOIN {SCHEMA}.users rv ON r.reviewed_by = rv.id
-                            ORDER BY r.created_at DESC"""
+                            ORDER BY r.created_at DESC
+                            LIMIT %s OFFSET %s""",
+                        (limit, offset),
                     )
                 else:
                     # Курсант видит только свои запросы
+                    cur.execute(
+                        f"SELECT COUNT(*) FROM {SCHEMA}.requests WHERE user_id = %s",
+                        (user["id"],),
+                    )
+                    total = cur.fetchone()[0]
                     cur.execute(
                         f"""SELECT r.id, r.type, r.subject, r.description, r.preferred_date,
                             r.status, r.instructor_comment, r.created_at, r.updated_at,
@@ -86,8 +117,9 @@ def handler(event: dict, context) -> dict:
                             JOIN {SCHEMA}.users u ON r.user_id = u.id
                             LEFT JOIN {SCHEMA}.users rv ON r.reviewed_by = rv.id
                             WHERE r.user_id = %s
-                            ORDER BY r.created_at DESC""",
-                        (user["id"],),
+                            ORDER BY r.created_at DESC
+                            LIMIT %s OFFSET %s""",
+                        (user["id"], limit, offset),
                     )
                 rows = cur.fetchall()
                 cols = [d[0] for d in cur.description]
@@ -101,7 +133,7 @@ def handler(event: dict, context) -> dict:
                     if item.get("preferred_date"):
                         item["preferred_date"] = item["preferred_date"].isoformat()
                     requests_list.append(item)
-            return {"statusCode": 200, "headers": cors_headers(), "body": json.dumps({"requests": requests_list})}
+            return {"statusCode": 200, "headers": _cors, "body": json.dumps({"requests": requests_list, "total": total, "limit": limit, "offset": offset})}
 
         # ===== POST /requests — создать запрос (курсант) =====
         if method == "POST" and not action:
@@ -111,9 +143,9 @@ def handler(event: dict, context) -> dict:
             preferred_date = body.get("preferred_date") or None
 
             if not req_type or req_type not in ("lecture", "practice", "exam", "report"):
-                return {"statusCode": 400, "headers": cors_headers(), "body": json.dumps({"error": "Неверный тип запроса"})}
+                return {"statusCode": 400, "headers": _cors, "body": json.dumps({"error": "Неверный тип запроса"})}
             if not subject:
-                return {"statusCode": 400, "headers": cors_headers(), "body": json.dumps({"error": "Укажите тему"})}
+                return {"statusCode": 400, "headers": _cors, "body": json.dumps({"error": "Укажите тему"})}
 
             with conn.cursor() as cur:
                 cur.execute(
@@ -125,29 +157,32 @@ def handler(event: dict, context) -> dict:
                 # Уведомление всем инструкторам о новом запросе
                 type_map = {"lecture": "лекция", "practice": "практика", "exam": "экзамен", "report": "рапорт"}
                 type_text = type_map.get(req_type, req_type)
+                # P2-11: Batch INSERT notifications instead of N+1
                 cur.execute(f"SELECT id FROM {SCHEMA}.users WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head')")
                 instructor_ids = [row[0] for row in cur.fetchall()]
-                for inst_id in instructor_ids:
-                    cur.execute(
-                        f"""INSERT INTO {SCHEMA}.notifications (user_id, type, title, message)
-                            VALUES (%s, %s, %s, %s)""",
-                        (inst_id, "new_request",
-                         f"Новый запрос: {type_text}",
-                         f'{user["rank"]} {user["name"]} подал запрос на тему "{subject}" ({type_text}).'),
+                if instructor_ids:
+                    notif_title = f"Новый запрос: {type_text}"
+                    notif_msg = f'{user["rank"]} {user["name"]} подал запрос на тему "{subject}" ({type_text}).'
+                    notif_values = [(inst_id, "new_request", notif_title, notif_msg) for inst_id in instructor_ids]
+                    from psycopg2.extras import execute_values
+                    execute_values(
+                        cur,
+                        f"INSERT INTO {SCHEMA}.notifications (user_id, type, title, message) VALUES %s",
+                        notif_values
                     )
             conn.commit()
-            return {"statusCode": 200, "headers": cors_headers(), "body": json.dumps({"success": True, "id": new_id})}
+            return {"statusCode": 200, "headers": _cors, "body": json.dumps({"success": True, "id": new_id})}
 
         # ===== PUT /requests?action=review — инструктор одобряет/отклоняет =====
         if method == "PUT" and action == "review":
             if user["role"] not in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"):
-                return {"statusCode": 403, "headers": cors_headers(), "body": json.dumps({"error": "Только для инструкторов"})}
+                return {"statusCode": 403, "headers": _cors, "body": json.dumps({"error": "Только для инструкторов"})}
             request_id = int(params.get("id", 0))
             status = body.get("status")
             comment = body.get("comment", "")
 
             if status not in ("approved", "rejected"):
-                return {"statusCode": 400, "headers": cors_headers(), "body": json.dumps({"error": "Статус: approved или rejected"})}
+                return {"statusCode": 400, "headers": _cors, "body": json.dumps({"error": "Статус: approved или rejected"})}
 
             with conn.cursor() as cur:
                 cur.execute(
@@ -199,12 +234,18 @@ def handler(event: dict, context) -> dict:
                                 (grade_val, grade_comment, user["id"], request_id),
                             )
             conn.commit()
-            return {"statusCode": 200, "headers": cors_headers(), "body": json.dumps({"success": True})}
+            return {"statusCode": 200, "headers": _cors, "body": json.dumps({"success": True})}
 
         # ===== GET /requests?action=grades — оценки =====
         if method == "GET" and action == "grades":
+            # P2-12: Pagination support
+            limit = min(int(params.get("limit", 50)), 200)
+            offset = max(int(params.get("offset", 0)), 0)
+
             with conn.cursor() as cur:
                 if user["role"] in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"):
+                    cur.execute(f"SELECT COUNT(*) FROM {SCHEMA}.grades")
+                    total = cur.fetchone()[0]
                     cur.execute(
                         f"""SELECT g.id, g.subject, g.type, g.grade, g.comment, g.graded_at,
                             u.name as cadet_name, u.rank as cadet_rank, u.id as cadet_id,
@@ -212,9 +253,16 @@ def handler(event: dict, context) -> dict:
                             FROM {SCHEMA}.grades g
                             JOIN {SCHEMA}.users u ON g.user_id = u.id
                             JOIN {SCHEMA}.users i ON g.instructor_id = i.id
-                            ORDER BY g.graded_at DESC"""
+                            ORDER BY g.graded_at DESC
+                            LIMIT %s OFFSET %s""",
+                        (limit, offset),
                     )
                 else:
+                    cur.execute(
+                        f"SELECT COUNT(*) FROM {SCHEMA}.grades WHERE user_id = %s",
+                        (user["id"],),
+                    )
+                    total = cur.fetchone()[0]
                     cur.execute(
                         f"""SELECT g.id, g.subject, g.type, g.grade, g.comment, g.graded_at,
                             u.name as cadet_name, u.rank as cadet_rank, u.id as cadet_id,
@@ -223,8 +271,9 @@ def handler(event: dict, context) -> dict:
                             JOIN {SCHEMA}.users u ON g.user_id = u.id
                             JOIN {SCHEMA}.users i ON g.instructor_id = i.id
                             WHERE g.user_id = %s
-                            ORDER BY g.graded_at DESC""",
-                        (user["id"],),
+                            ORDER BY g.graded_at DESC
+                            LIMIT %s OFFSET %s""",
+                        (user["id"], limit, offset),
                     )
                 rows = cur.fetchall()
                 cols = [d[0] for d in cur.description]
@@ -234,12 +283,12 @@ def handler(event: dict, context) -> dict:
                     if item.get("graded_at"):
                         item["graded_at"] = item["graded_at"].isoformat()
                     grades_list.append(item)
-            return {"statusCode": 200, "headers": cors_headers(), "body": json.dumps({"grades": grades_list})}
+            return {"statusCode": 200, "headers": _cors, "body": json.dumps({"grades": grades_list, "total": total, "limit": limit, "offset": offset})}
 
         # ===== POST /requests?action=grade — инструктор ставит оценку =====
         if method == "POST" and action == "grade":
             if user["role"] not in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"):
-                return {"statusCode": 403, "headers": cors_headers(), "body": json.dumps({"error": "Только для инструкторов"})}
+                return {"statusCode": 403, "headers": _cors, "body": json.dumps({"error": "Только для инструкторов"})}
 
             cadet_id = int(body.get("cadet_id", 0))
             subject = body.get("subject", "").strip()
@@ -249,11 +298,11 @@ def handler(event: dict, context) -> dict:
             request_id = body.get("request_id") or None
 
             if not cadet_id or not subject:
-                return {"statusCode": 400, "headers": cors_headers(), "body": json.dumps({"error": "Укажите курсанта и тему"})}
+                return {"statusCode": 400, "headers": _cors, "body": json.dumps({"error": "Укажите курсанта и тему"})}
             if grade_type not in ("lecture", "practice", "exam"):
-                return {"statusCode": 400, "headers": cors_headers(), "body": json.dumps({"error": "Неверный тип оценки"})}
+                return {"statusCode": 400, "headers": _cors, "body": json.dumps({"error": "Неверный тип оценки"})}
             if grade_val not in (1, 5):
-                return {"statusCode": 400, "headers": cors_headers(), "body": json.dumps({"error": "Неверная оценка (должна быть 1 или 5)"})}
+                return {"statusCode": 400, "headers": _cors, "body": json.dumps({"error": "Неверная оценка (должна быть 1 или 5)"})}
 
             with conn.cursor() as cur:
                 cur.execute(
@@ -283,9 +332,9 @@ def handler(event: dict, context) -> dict:
                     (cadet_id, "grade_added", f"Новое решение: {result_text}", notif_message),
                 )
             conn.commit()
-            return {"statusCode": 200, "headers": cors_headers(), "body": json.dumps({"success": True, "id": new_id})}
+            return {"statusCode": 200, "headers": _cors, "body": json.dumps({"success": True, "id": new_id})}
 
     finally:
         conn.close()
 
-    return {"statusCode": 404, "headers": cors_headers(), "body": json.dumps({"error": "Не найдено"})}
+    return {"statusCode": 404, "headers": _cors, "body": json.dumps({"error": "Не найдено"})}

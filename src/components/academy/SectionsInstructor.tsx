@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Icon from "@/components/ui/icon";
 import { SectionHeader, StatCard, StatusBadge, GradeCircle, OnlineStatus, InstructorAvatar } from "./UIComponents";
-import { User, fetchRequests, reviewRequest, fetchGrades, createGrade, TrainingRequest, Grade } from "@/lib/api";
+import { User, reviewRequest, createGrade, TrainingRequest, Grade } from "@/lib/api";
+import { useRequests, useGrades, useAdminUsers, usePromotionReports, queryKeys } from "@/lib/useQueries";
 import { TYPE_LABEL, fmt, Spinner, Empty, fmtStaticId } from "./SectionsShared";
 import { InstructorRatingView } from "./SectionsRatings";
 import { PromotionInstructorTab } from "./Promotions";
@@ -61,25 +63,22 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   }, [highlightReportId]);
 
   // --- Requests tab ---
-  const [requests, setRequests] = useState<TrainingRequest[]>([]);
-  const [reqLoading, setReqLoading] = useState(true);
+  // --- Requests tab --- P1-6: React Query
+  const queryClient = useQueryClient();
+  const { data: requests = [], isLoading: reqLoading, refetch: refetchRequests } = useRequests();
+  const { data: reports = [] } = usePromotionReports();
   const [reviewComment, setReviewComment] = useState<Record<number, string>>({});
   const [reviewLoading, setReviewLoading] = useState<Record<number, boolean>>({});
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("pending");
   const [selectedRequestIds, setSelectedRequestIds] = useState<number[]>([]);
   const [bulkReviewLoading, setBulkReviewLoading] = useState(false);
-  const [reports, setReports] = useState<PromotionReport[]>([]);
 
   // --- Grades tab ---
-  const [allGrades, setAllGrades] = useState<Grade[]>([]);
-  const [gradesLoading, setGradesLoading] = useState(false);
-  const [gradesLoaded, setGradesLoaded] = useState(false);
+  const { data: allGrades = [], isLoading: gradesLoading } = useGrades();
 
   // --- Whitelist tab ---
-  const [wlUsers, setWlUsers] = useState<import("@/lib/api").AdminUser[]>([]);
-  const [wlLoading, setWlLoading] = useState(false);
-  const [wlLoaded, setWlLoaded] = useState(false);
+  const { data: wlUsers = [], isLoading: wlLoading, refetch: refetchWl } = useAdminUsers();
   const [showAddForm, setShowAddForm] = useState(false);
   const [form, setForm] = useState({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "АВНГ", role: "cadet" as "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed", discord_id: "", avatar_url: "" });
   const [formError, setFormError] = useState("");
@@ -93,51 +92,21 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   const [selectedGradeDate, setSelectedGradeDate] = useState<string>(() => new Date().toLocaleDateString("ru-RU"));
   const [wlSearchQuery, setWlSearchQuery] = useState("");
 
-  const loadRequests = useCallback(async () => {
-    setReqLoading(true);
-    const r = await fetchRequests().catch(() => []);
-    setRequests(r);
-    setSelectedRequestIds([]);
-    const { fetchPromotionReports } = await import("@/lib/api");
-    const rep = await fetchPromotionReports().catch(() => []);
-    setReports(rep);
-    setReqLoading(false);
-  }, []);
-
-  const loadGrades = useCallback(async (force = false) => {
-    if (gradesLoaded && !force) return;
-    setGradesLoading(true);
-    const g = await fetchGrades().catch(() => []);
-    setAllGrades(g);
-    setGradesLoaded(true);
-    setGradesLoading(false);
-  }, [gradesLoaded]);
-
-  const loadWhitelist = useCallback(async () => {
-    setWlLoading(true);
-    const { adminListUsers } = await import("@/lib/api");
-    const users = await adminListUsers().catch(() => []);
-    setWlUsers(users);
-    setWlLoaded(true);
-    setWlLoading(false);
-  }, []);
-
-  useEffect(() => {
-    loadRequests();
-    loadWhitelist();
-  }, [loadRequests, loadWhitelist]);
+  // Fetch whitelist on mount
+  useEffect(() => { refetchWl(); }, [refetchWl]);
 
   const handleTabClick = (tab: typeof activeTab) => {
     setActiveTab(tab);
-    if (tab === "whitelist") loadWhitelist();
-    if (tab === "cadets") loadWhitelist();
-    if (tab === "expired") loadWhitelist();
+    // P1-6: React Query auto-caches — we just invalidate stale data on tab switch
+    if (tab === "whitelist" || tab === "cadets" || tab === "expired") refetchWl();
     if (tab === "grades") {
-      loadGrades();
-      loadWhitelist();
+      queryClient.invalidateQueries({ queryKey: queryKeys.grades });
+      refetchWl();
     }
-    if (tab === "requests") loadRequests();
-    if (tab === "promotions") loadRequests();
+    if (tab === "requests" || tab === "promotions") {
+      queryClient.invalidateQueries({ queryKey: queryKeys.requests });
+      queryClient.invalidateQueries({ queryKey: queryKeys.promotionReports });
+    }
   };
 
   const handleReview = async (id: number, status: "approved" | "rejected") => {
@@ -149,7 +118,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
         if (status === "approved") {
           await adminUpdateUser(cadetId, { is_whitelisted: false });
         }
-        await loadWhitelist();
+        await refetchWl();
       } catch (err) {
         console.error(err);
       }
@@ -160,12 +129,12 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
         try {
           const { adminUpdateUser } = await import("@/lib/api");
           await adminUpdateUser(req.cadet_id, { is_whitelisted: false });
-          await loadWhitelist();
+          await refetchWl();
         } catch (err) {
           console.error(err);
         }
       }
-      await loadRequests();
+      await refetchRequests();
     }
     setReviewLoading((prev) => ({ ...prev, [id]: false }));
   };
@@ -189,8 +158,8 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
           }
         }
       }
-      await loadWhitelist();
-      await loadRequests();
+      await refetchWl();
+      await refetchRequests();
     } catch (err) {
       console.error(err);
     } finally {
@@ -250,7 +219,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       await adminCreateUser({ ...form, discord_id: form.discord_id ? form.discord_id.trim() : null, avatar_url: form.avatar_url ? form.avatar_url.trim() : null, is_whitelisted: true });
       setShowAddForm(false);
       setForm({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "АВНГ", role: "cadet", discord_id: "", avatar_url: "" });
-      loadWhitelist();
+      refetchWl();
     } catch (err: unknown) {
       setFormError(err instanceof Error ? err.message : "Ошибка");
     }
@@ -1352,7 +1321,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
 
       {/* ── PROMOTIONS TAB ── */}
       {activeTab === "promotions" && (
-        <PromotionInstructorTab highlightReportId={highlightReportId} onReviewSuccess={() => { loadWhitelist(); loadRequests(); }} />
+        <PromotionInstructorTab highlightReportId={highlightReportId} onReviewSuccess={() => { refetchWl(); queryClient.invalidateQueries({ queryKey: queryKeys.requests }); queryClient.invalidateQueries({ queryKey: queryKeys.promotionReports }); }} />
       )}
 
       {/* ── RATING TAB ── */}

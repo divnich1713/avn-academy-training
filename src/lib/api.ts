@@ -1,7 +1,11 @@
 // ─── Mock mode: если VITE_USE_MOCK=true — все вызовы идут в локальные заглушки ──
-import * as mockApi from "./mock-api";
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
-if (USE_MOCK) console.log("%c⚡ MOCK MODE — бэкенд не используется", "color: #f59e0b; font-weight: bold; font-size: 14px");
+let mockApi: typeof import("./mock-api") | null = null;
+if (USE_MOCK) {
+  console.log("%c⚡ MOCK MODE — бэкенд не используется", "color: #f59e0b; font-weight: bold; font-size: 14px");
+  // Dynamic import only in mock mode — keeps mock-api out of production bundle
+  import("./mock-api").then(m => { mockApi = m; });
+}
 
 const AUTH_URL = "https://nsybygrjwrzhrpvlzpyv.supabase.co/functions/v1/auth";
 const ADMIN_URL = "https://nsybygrjwrzhrpvlzpyv.supabase.co/functions/v1/admin-users";
@@ -27,7 +31,7 @@ function authHeaders() {
 }
 
 export async function apiLogin(static_id: string, password: string) {
-  if (USE_MOCK) return mockApi.apiLogin(static_id, password);
+  if (USE_MOCK && mockApi) return mockApi.apiLogin(static_id, password);
   const res = await fetch(`${AUTH_URL}/?action=login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -39,7 +43,7 @@ export async function apiLogin(static_id: string, password: string) {
 }
 
 export async function apiMe(): Promise<User | null> {
-  if (USE_MOCK) return mockApi.apiMe();
+  if (USE_MOCK && mockApi) return mockApi.apiMe();
   const token = getToken();
   if (!token) return null;
   const res = await fetch(`${AUTH_URL}/?action=me`, {
@@ -51,7 +55,7 @@ export async function apiMe(): Promise<User | null> {
 }
 
 export async function fetchInstructors(): Promise<User[]> {
-  if (USE_MOCK) return mockApi.fetchInstructors();
+  if (USE_MOCK && mockApi) return mockApi.fetchInstructors();
   const res = await fetch(`${AUTH_URL}/?action=instructors`, { headers: authHeaders() });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
@@ -59,7 +63,7 @@ export async function fetchInstructors(): Promise<User[]> {
 }
 
 export async function apiLogout() {
-  if (USE_MOCK) return mockApi.apiLogout();
+  if (USE_MOCK && mockApi) return mockApi.apiLogout();
   const token = getToken();
   if (!token) return;
   await fetch(`${AUTH_URL}/?action=logout`, {
@@ -70,7 +74,7 @@ export async function apiLogout() {
 }
 
 export async function adminListUsers(): Promise<AdminUser[]> {
-  if (USE_MOCK) return mockApi.adminListUsers();
+  if (USE_MOCK && mockApi) return mockApi.adminListUsers();
   const res = await fetch(ADMIN_URL, { headers: authHeaders() });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
@@ -88,7 +92,7 @@ export async function adminCreateUser(payload: {
   discord_id?: string | null;
   avatar_url?: string | null;
 }) {
-  if (USE_MOCK) return mockApi.adminCreateUser(payload);
+  if (USE_MOCK && mockApi) return mockApi.adminCreateUser(payload);
   const res = await fetch(ADMIN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -111,7 +115,7 @@ export async function adminUpdateUser(id: number, payload: {
   discord_id?: string | null;
   avatar_url?: string | null;
 }) {
-  if (USE_MOCK) return mockApi.adminUpdateUser(id, payload);
+  if (USE_MOCK && mockApi) return mockApi.adminUpdateUser(id, payload);
   const res = await fetch(`${ADMIN_URL}?id=${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -123,7 +127,7 @@ export async function adminUpdateUser(id: number, payload: {
 }
 
 export async function adminRemoveUser(id: number) {
-  if (USE_MOCK) return mockApi.adminRemoveUser(id);
+  if (USE_MOCK && mockApi) return mockApi.adminRemoveUser(id);
   const res = await fetch(`${ADMIN_URL}?id=${id}`, {
     method: "DELETE",
     headers: { ...authHeaders() },
@@ -187,7 +191,7 @@ export interface Grade {
 // ===== Requests API =====
 
 export async function fetchRequests(): Promise<TrainingRequest[]> {
-  if (USE_MOCK) return mockApi.fetchRequests();
+  if (USE_MOCK && mockApi) return mockApi.fetchRequests();
   const res = await fetch(REQUESTS_URL, { headers: authHeaders() });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
@@ -200,7 +204,7 @@ export async function createRequest(payload: {
   description?: string;
   preferred_date?: string;
 }) {
-  if (USE_MOCK) return mockApi.createRequest(payload);
+  if (USE_MOCK && mockApi) return mockApi.createRequest(payload);
   const res = await fetch(REQUESTS_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -212,7 +216,7 @@ export async function createRequest(payload: {
 }
 
 export async function reviewRequest(id: number, status: "approved" | "rejected", comment?: string) {
-  if (USE_MOCK) return mockApi.reviewRequest(id, status, comment);
+  if (USE_MOCK && mockApi) return mockApi.reviewRequest(id, status, comment);
   const res = await fetch(`${REQUESTS_URL}?action=review&id=${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -224,7 +228,7 @@ export async function reviewRequest(id: number, status: "approved" | "rejected",
 }
 
 export async function fetchGrades(): Promise<Grade[]> {
-  if (USE_MOCK) return mockApi.fetchGrades();
+  if (USE_MOCK && mockApi) return mockApi.fetchGrades();
   const res = await fetch(`${REQUESTS_URL}?action=grades`, { headers: authHeaders() });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
@@ -239,7 +243,7 @@ export async function createGrade(payload: {
   comment?: string;
   request_id?: number;
 }) {
-  if (USE_MOCK) return mockApi.createGrade(payload);
+  if (USE_MOCK && mockApi) return mockApi.createGrade(payload);
   const res = await fetch(`${REQUESTS_URL}?action=grade`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -262,7 +266,7 @@ export interface Notification {
 }
 
 export async function fetchNotifications(): Promise<{ notifications: Notification[]; unread_count: number }> {
-  if (USE_MOCK) return mockApi.fetchNotifications();
+  if (USE_MOCK && mockApi) return mockApi.fetchNotifications();
   const res = await fetch(NOTIFICATIONS_URL, { headers: authHeaders() });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
@@ -270,7 +274,7 @@ export async function fetchNotifications(): Promise<{ notifications: Notificatio
 }
 
 export async function markAllNotificationsRead() {
-  if (USE_MOCK) return mockApi.markAllNotificationsRead();
+  if (USE_MOCK && mockApi) return mockApi.markAllNotificationsRead();
   const res = await fetch(`${NOTIFICATIONS_URL}?action=read`, {
     method: "PUT",
     headers: authHeaders(),
@@ -298,7 +302,7 @@ export interface InstructorRating {
 }
 
 export async function fetchRatings(timeframe: "daily" | "weekly" | "monthly" | "yearly" = "weekly"): Promise<{ instructors: InstructorRating[] }> {
-  if (USE_MOCK) return mockApi.fetchRatings(timeframe);
+  if (USE_MOCK && mockApi) return mockApi.fetchRatings(timeframe);
   const res = await fetch(`${RATINGS_URL}?timeframe=${timeframe}`, { headers: authHeaders() });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
@@ -306,7 +310,7 @@ export async function fetchRatings(timeframe: "daily" | "weekly" | "monthly" | "
 }
 
 export async function markNotificationRead(id: number) {
-  if (USE_MOCK) return mockApi.markNotificationRead(id);
+  if (USE_MOCK && mockApi) return mockApi.markNotificationRead(id);
   const res = await fetch(`${NOTIFICATIONS_URL}?action=read_one&id=${id}`, {
     method: "PUT",
     headers: authHeaders(),
@@ -354,7 +358,7 @@ export interface PromotionReport {
 }
 
 export async function checkPromotionRequirements(type: PromotionType, cadetId?: number): Promise<PromotionCheckResult> {
-  if (USE_MOCK) return mockApi.checkPromotionRequirements(type, cadetId);
+  if (USE_MOCK && mockApi) return mockApi.checkPromotionRequirements(type, cadetId);
   let url = `${PROMOTIONS_URL}?action=check&type=${type}`;
   if (cadetId) url += `&cadet_id=${cadetId}`;
   const res = await fetch(url, { headers: authHeaders() });
@@ -364,7 +368,7 @@ export async function checkPromotionRequirements(type: PromotionType, cadetId?: 
 }
 
 export async function fetchPromotionReports(): Promise<PromotionReport[]> {
-  if (USE_MOCK) return mockApi.fetchPromotionReports();
+  if (USE_MOCK && mockApi) return mockApi.fetchPromotionReports();
   const res = await fetch(PROMOTIONS_URL, { headers: authHeaders() });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
@@ -372,7 +376,7 @@ export async function fetchPromotionReports(): Promise<PromotionReport[]> {
 }
 
 export async function createPromotionReport(promotion_type: PromotionType) {
-  if (USE_MOCK) return mockApi.createPromotionReport(promotion_type);
+  if (USE_MOCK && mockApi) return mockApi.createPromotionReport(promotion_type);
   const res = await fetch(PROMOTIONS_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -384,7 +388,7 @@ export async function createPromotionReport(promotion_type: PromotionType) {
 }
 
 export async function reviewPromotionReport(id: number, status: "approved" | "rejected", comment?: string) {
-  if (USE_MOCK) return mockApi.reviewPromotionReport(id, status, comment);
+  if (USE_MOCK && mockApi) return mockApi.reviewPromotionReport(id, status, comment);
   const res = await fetch(`${PROMOTIONS_URL}?action=review&id=${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -396,7 +400,7 @@ export async function reviewPromotionReport(id: number, status: "approved" | "re
 }
 
 export async function fetchDiscordProfile(discordId: string) {
-  if (USE_MOCK) return mockApi.fetchDiscordProfile(discordId);
+  if (USE_MOCK && mockApi) return mockApi.fetchDiscordProfile(discordId);
   const res = await fetch(`${AUTH_URL}/?action=discord&id=${discordId}`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to load Discord profile");
