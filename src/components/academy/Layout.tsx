@@ -143,6 +143,8 @@ export function AppSidebar({
   const visibleNav = NAV_ITEMS.filter((n) => n.roles.includes(role) && n.id !== "profile");
 
   const getMenuIcon = (id: Section) => {
+    const item = NAV_ITEMS.find((n) => n.id === id);
+    if (item) return item.icon;
     switch (id) {
       case "dashboard": return "LayoutGrid";
       case "materials": return "BookOpen";
