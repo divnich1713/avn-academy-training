@@ -469,37 +469,6 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
               <option value="Тест по ФЗ ФСВНГ и уставу ФСВНГ">Тест по ФЗ ФСВНГ и уставу ФСВНГ</option>
             </select>
           </div>
-
-          <div>
-            <div className="flex justify-between items-center text-[10px] font-mono text-muted-foreground uppercase mb-1">
-              <span>Сложность</span>
-              <span className="text-gold font-semibold">{difficulty} / 10</span>
-            </div>
-            <input
-              type="range"
-              min="1"
-              max="10"
-              value={difficulty}
-              onChange={(e) => setDifficulty(parseInt(e.target.value))}
-              className="w-full accent-primary bg-tactical-panel cursor-pointer"
-            />
-          </div>
-
-          <div>
-            <div className="flex justify-between items-center text-[10px] font-mono text-muted-foreground uppercase mb-1">
-              <span>Лимит времени</span>
-              <span className="text-gold font-semibold">{timerMinutes} мин</span>
-            </div>
-            <input
-              type="range"
-              min="15"
-              max="120"
-              step="5"
-              value={timerMinutes}
-              onChange={(e) => setTimerMinutes(parseInt(e.target.value))}
-              className="w-full accent-primary bg-tactical-panel cursor-pointer"
-            />
-          </div>
         </div>
 
         <button
