@@ -1,0 +1,17 @@
+# Render Blueprint Specification
+# See https://render.com/docs/blueprints for more details
+
+services:
+  - type: web
+    name: avn-academy-fastapi
+    env: docker
+    dockerfilePath: backend_fastapi/Dockerfile
+    dockerContext: backend_fastapi
+    plan: free
+    envVars:
+      - key: SCHEMA
+        value: t_p29017774_avn_academy_training
+      - key: DATABASE_URL
+        sync: false # User will provide this in the Render dashboard
+      - key: REDIS_URL
+        value: redis://localhost:6379/0 # Or their production Redis URL
