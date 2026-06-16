@@ -7,11 +7,11 @@ from pydantic import BaseModel
 from sqlalchemy import select, update, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..config import settings
-from ..database import get_db
-from ..models import User, Session, TestQuestion, TestAttempt, TestAnswer, StudentElo
-from ..elo import update_elo
-from ..redis_client import redis_client, check_rate_limit
+from config import settings
+from database import get_db
+from models import User, Session, TestQuestion, TestAttempt, TestAnswer, StudentElo
+from elo import update_elo
+from redis_client import redis_client, check_rate_limit
 
 router = APIRouter(prefix="/api/tests", tags=["Test Engine"])
 

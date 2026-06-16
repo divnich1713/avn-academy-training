@@ -1,5 +1,5 @@
 import redis
-from .config import settings
+from config import settings
 
 # Initialize Redis client (using connection pool)
 pool = redis.ConnectionPool.from_url(settings.REDIS_URL, decode_responses=True)

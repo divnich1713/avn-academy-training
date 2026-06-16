@@ -1,8 +1,8 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .config import settings
-from .routers import test_engine, stats
+from config import settings
+from routers import test_engine, stats
 
 app = FastAPI(
     title="AVN Academy cadet testing microservice",

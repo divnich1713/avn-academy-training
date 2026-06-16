@@ -4,9 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Dict, Any
 from datetime import datetime
 
-from ..database import get_db
-from ..models import User, TestAttempt, TestAnswer, TestQuestion, StudentElo
-from .test_engine import get_current_user
+from database import get_db
+from models import User, TestAttempt, TestAnswer, TestQuestion, StudentElo
+from routers.test_engine import get_current_user
 
 router = APIRouter(prefix="/api/stats", tags=["Statistics"])
 
