@@ -13,7 +13,7 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
   const [loading, setLoading] = useState(true);
   
   // Starting config state
-  const [subject, setSubject] = useState("Основы службы");
+  const [subject, setSubject] = useState("Тест по ФЗ ФСВНГ и уставу ФСВНГ");
   const [difficulty, setDifficulty] = useState(5);
   const [timerMinutes, setTimerMinutes] = useState(45);
   
@@ -466,11 +466,7 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
               onChange={(e) => setSubject(e.target.value)}
               className="w-full bg-tactical-panel border border-tactical-border text-foreground font-mono text-xs p-2.5 focus:outline-none focus:border-primary"
             >
-              <option value="Основы службы">Основы службы</option>
-              <option value="Огневая подготовка">Огневая подготовка</option>
-              <option value="Тактика">Тактика</option>
-              <option value="Уставы">Уставы</option>
-              <option value="Физическая подготовка">Физическая подготовка</option>
+              <option value="Тест по ФЗ ФСВНГ и уставу ФСВНГ">Тест по ФЗ ФСВНГ и уставу ФСВНГ</option>
             </select>
           </div>
 
