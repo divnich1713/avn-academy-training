@@ -186,7 +186,7 @@ async function gradeEssayInBackground(
       `SELECT count(id) FROM ${SCHEMA}.test_answers WHERE attempt_id = $1`,
       [attemptId]
     );
-    const answeredCount = allAns.rows[0][0] as number;
+    const answeredCount = Number(allAns.rows[0][0]);
 
     if (answeredCount >= 30) {
       await client.queryArray(
@@ -276,7 +276,7 @@ Deno.serve(async (req) => {
         `SELECT count(id) FROM ${SCHEMA}.test_answers WHERE attempt_id = $1`,
         [attempt.id]
       );
-      const answeredCount = ansCountRes.rows[0][0] as number;
+      const answeredCount = Number(ansCountRes.rows[0][0]);
 
       return new Response(
         JSON.stringify({
@@ -618,7 +618,7 @@ Deno.serve(async (req) => {
         `SELECT count(id) FROM ${SCHEMA}.test_answers WHERE attempt_id = $1`,
         [attempt_id]
       );
-      const answeredCount = ansCountRes.rows[0][0] as number;
+      const answeredCount = Number(ansCountRes.rows[0][0]);
       const completed = answeredCount >= 30;
 
       if (completed) {
@@ -826,7 +826,7 @@ Deno.serve(async (req) => {
       const data = d3Res.rows.map((row) => ({
         topic: row[0] as string,
         difficulty_elo: Math.round(Number(row[1]) * 10) / 10,
-        questions_count: row[2] as number,
+        questions_count: Number(row[2]),
       }));
 
       return new Response(JSON.stringify(data), {
