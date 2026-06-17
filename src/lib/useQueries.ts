@@ -100,7 +100,6 @@ export function useAdminUsers() {
     queryFn: adminListUsers,
     staleTime: 30_000,
     placeholderData: [],
-    enabled: false,  // Only fetch when explicitly triggered
   });
 }
 

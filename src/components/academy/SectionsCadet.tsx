@@ -1,11 +1,10 @@
 import { useState, useEffect, lazy, Suspense, useMemo } from "react";
-import { createPortal } from "react-dom";
 import Icon from "@/components/ui/icon";
 import { SectionHeader, StatCard, StatusBadge, GradeCircle, OnlineStatus, InstructorAvatar } from "./UIComponents";
-import { User, fetchDiscordProfile, TrainingRequest, Grade, PromotionReport, InstructorRating } from "@/lib/api";
+import { User, fetchDiscordProfile, TrainingRequest } from "@/lib/api";
 import { useRequests, useGrades, useInstructors, useRatings, usePromotionReports } from "@/lib/useQueries";
 import { MOCK_MATERIALS } from "./types";
-import { TYPE_LABEL, fmt, avg, Spinner, Empty, RequestSection, fmtStaticId } from "./SectionsShared";
+import { TYPE_LABEL, fmt, Spinner, Empty, RequestSection, fmtStaticId } from "./SectionsShared";
 
 // P2-10: Lazy-load individual memos — each ~10-20KB, only loaded when opened
 const PatrolMemo = lazy(() => import("./MaterialsMemos").then(m => ({ default: m.PatrolMemo })));
@@ -39,7 +38,7 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
   // P1-6: React Query — cached, deduplicated, auto-refetch
   const { data: requests = [] } = useRequests();
   const { data: grades = [] } = useGrades();
-  const isInstructor = authUser.role === "instructor" || authUser.role === "head_avng";
+
 
   const myGrades = grades.filter((g) => g.cadet_id === authUser.id);
   const approvedCount = myGrades.filter((g) => g.grade >= 3).length;
@@ -58,24 +57,7 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
     : mockRecentRequests;
 
   // Calculate remaining academy duration (7 days limit)
-  const getDaysRemaining = () => {
-    if (!authUser.created_at) return "7 дн.";
-    const createdDate = new Date(authUser.created_at);
-    const currentDate = new Date();
-    
-    // Time difference in milliseconds
-    const diffTime = currentDate.getTime() - createdDate.getTime();
-    const diffDays = diffTime / (1000 * 60 * 60 * 24);
-    
-    const remaining = 7 - diffDays;
-    
-    if (remaining <= 0) return "Срок истёк";
-    if (remaining < 1) {
-      const remainingHours = Math.max(0, Math.floor(remaining * 24));
-      return `${remainingHours} ч.`;
-    }
-    return `${Math.ceil(remaining)} дн.`;
-  };
+
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -96,7 +78,7 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
   };
 
   const rejectedCount = myGrades.filter((g) => g.grade < 3).length;
-  const totalGrades = myGrades.length;
+
 
   const barData = [
     { grade: "Зачтено", count: approvedCount, color: "bg-green-500", text: "text-green-400" },
@@ -140,7 +122,7 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
               { icon: "BookOpen", target: "materials" as const, title: "Материалы", desc: "Учебные материалы и уставы" },
               { icon: "GraduationCap", target: "lectures" as const, title: "Лекции", desc: "Теоретические занятия" },
               { icon: "Wrench", target: "practices" as const, title: "Практики", desc: "Практические задания" },
-              { icon: "FileText", target: "reports" as const, title: "Отчеты", desc: "Рапорты об обучении" },
+              { icon: "FileText", target: "reports" as const, title: "Рапорты", desc: "Подача служебных рапортов и заявлений" },
               { icon: "ClipboardList", target: "exams" as const, title: "Экзамены", desc: "Сдача тестов и нормативов" },
               { icon: "Target", target: "testing" as const, title: "Пройти тест", desc: "Онлайн-тестирование" },
             ].map((act, idx) => (
@@ -609,7 +591,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
     avatarUrl?: string;
   } | null>(null);
   const [loadingDiscord, setLoadingDiscord] = useState(false);
-  const [imageError, setImageError] = useState(false);
+
 
   const displayUser = targetUser || authUser;
 
@@ -700,7 +682,6 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
 
   // Fetch Discord profile if discord_id exists and no manual avatar is specified
   useEffect(() => {
-    setImageError(false);
     if (displayUser.avatar_url) {
       setDiscordProfile(null);
       return;

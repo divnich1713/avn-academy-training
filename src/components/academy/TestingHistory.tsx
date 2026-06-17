@@ -1,14 +1,10 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { testingApi, CadetDashboard, TopicDifficulty, TimePerQuestion, ScoreDistribution } from "@/lib/testingApi";
 import { TestingD3Stats } from "./TestingD3Stats";
 import { toast } from "sonner";
 
-interface HistoryProps {
-  onNavigate?: (tab: string) => void;
-}
-
-export function TestingHistory({ onNavigate }: HistoryProps) {
+export function TestingHistory() {
   const [dashboard, setDashboard] = useState<CadetDashboard | null>(null);
   const [topicDifficulty, setTopicDifficulty] = useState<TopicDifficulty[]>([]);
   const [timePerQuestion, setTimePerQuestion] = useState<TimePerQuestion[]>([]);

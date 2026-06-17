@@ -21,7 +21,7 @@ const PROMOTION_LABELS: Record<PromotionType, string> = {
 export function MilitaryReport({
   cadetName,
   cadetStaticId,
-  cadetRank,
+  cadetRank: _cadetRank,
   promotionType,
   date,
 }: {

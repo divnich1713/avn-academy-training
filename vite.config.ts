@@ -9,7 +9,7 @@ import {componentTagger} from "pp-tagger";
 // Клиент: server.hmr.timeout = 7000 ниже понижает pingInterval @vite/client до 7s.
 const hmrKeepalive = {
     name: 'hmr-ws-keepalive',
-    configureServer(server: any) {
+    configureServer(server: import("vite").ViteDevServer) {
         let timer: ReturnType<typeof setTimeout> | null = null;
         const tick = () => {
             server.ws?.send({type: 'ping'});

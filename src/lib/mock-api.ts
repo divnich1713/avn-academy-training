@@ -14,8 +14,6 @@ import type {
   Grade,
   Notification,
   RequestType,
-  RequestStatus,
-  InstructorRating,
 } from "./api";
 
 // ─── Хранилище (в памяти, сбрасывается при перезагрузке) ────────────────────
@@ -188,13 +186,7 @@ const NOTIFICATIONS: Notification[] = [
   { id: 3, type: "request_reviewed", title: "Рапорт отклонён", message: "Ваш рапорт «Рапорт на повышение в звании» отклонён. request_id:4", is_read: true, created_at: "2026-06-09T15:00:00Z" },
 ];
 
-const RATINGS_DATA: { ratings: Record<number, { rating: number; comment: string | null }>; my_ratings: Record<number, { rating: number; comment: string | null }> } = {
-  ratings: {
-    2: { rating: 4, comment: null },
-    5: { rating: 5, comment: "Отличный инструктор" },
-  },
-  my_ratings: {},
-};
+
 
 // ─── Утилиты ────────────────────────────────────────────────────────────────
 
@@ -446,8 +438,6 @@ export async function fetchRatings(timeframe: "daily" | "weekly" | "monthly" | "
   const instructors: import("./api").InstructorRating[] = USERS
     .filter((u) => u.role === "instructor")
     .map((u) => {
-      const isMe = u.id === (currentUserId || 2);
-      
       // Seed with pseudo-random numbers
       const seed = u.id * 3;
       const tfMultiplier = timeframe === "daily" ? 0.2 : timeframe === "weekly" ? 1.2 : timeframe === "monthly" ? 4.5 : 45;

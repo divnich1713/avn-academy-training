@@ -25,7 +25,7 @@ export function removeToken() {
   localStorage.removeItem("avng_token");
 }
 
-function authHeaders() {
+function authHeaders(): Record<string, string> {
   const token = getToken();
   return token ? { "X-Session-Token": token } : {};
 }
@@ -155,7 +155,7 @@ export interface AdminUser extends User {
   created_at: string;
 }
 
-export type RequestType = "lecture" | "practice" | "exam" | "report";
+export type RequestType = "lecture" | "practice" | "exam" | "report" | "dismissal";
 export type RequestStatus = "pending" | "approved" | "rejected";
 
 export interface TrainingRequest {
@@ -258,6 +258,7 @@ export async function createGrade(payload: {
 
 export interface Notification {
   id: number;
+  user_id?: number;
   type: string;
   title: string;
   message: string;

@@ -1,22 +1,18 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { apiLogout } from "@/lib/api";
 import { testingApi, Question, ActiveSession } from "@/lib/testingApi";
 import { toast } from "sonner";
 import { fmtStaticId } from "./SectionsShared";
 
-interface TestingSystemProps {
-  onNavigate?: (tab: string) => void;
-}
-
-export function TestingSystem({ onNavigate }: TestingSystemProps) {
+export function TestingSystem() {
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [loading, setLoading] = useState(true);
   
   // Starting config state
   const [subject, setSubject] = useState("Тест по ФЗ ФСВНГ и уставу ФСВНГ");
-  const [difficulty, setDifficulty] = useState(5);
-  const [timerMinutes, setTimerMinutes] = useState(45);
+  const [difficulty] = useState(5);
+  const [timerMinutes] = useState(45);
   const [subjectsList, setSubjectsList] = useState<string[]>(["Тест по ФЗ ФСВНГ и уставу ФСВНГ"]);
   // Current test state
   const [question, setQuestion] = useState<Question | null>(null);
@@ -72,7 +68,7 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
         setWarnings(session.warnings_count || 0);
         if (!session.is_frozen) {
           loadNextQuestion(session.attempt_id, session.time_limit_per_question);
-          startTimer(session.remaining_seconds || 2700, session.attempt_id);
+          startTimer(session.remaining_seconds || 2700);
         }
       } else {
         const subjs = await testingApi.getSubjects();
@@ -124,7 +120,7 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
   };
 
   // 3. Timer implementation
-  const startTimer = (secondsLeft: number, attemptId: number) => {
+  const startTimer = (secondsLeft: number) => {
     if (timerRef.current) clearInterval(timerRef.current);
     
     let time = secondsLeft;
@@ -198,7 +194,7 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
   // 5. Start Test handler
   const handleStartTest = async () => {
     try {
-      const res = await testingApi.startTest(subject, difficulty, timerMinutes);
+      await testingApi.startTest(subject, difficulty, timerMinutes);
       toast.success("Тест начат!");
       loadSession();
     } catch (err: any) {
@@ -207,17 +203,7 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
   };
 
   // 6. Freeze/Pause Handler
-  const handleFreeze = async () => {
-    if (!activeSession || !activeSession.attempt_id) return;
-    try {
-      await testingApi.freezeTest(activeSession.attempt_id);
-      if (timerRef.current) clearInterval(timerRef.current);
-      toast.success("Сессия теста успешно заморожена на 30 дней!");
-      loadSession();
-    } catch (err: any) {
-      toast.error("Ошибка заморозки: " + err.message);
-    }
-  };
+
 
   // 7. Resume Handler
   const handleResume = async () => {
@@ -465,7 +451,7 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
                   minute: "2-digit"
                 });
                 const discordText = `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
-**Курсант:** ${certificate.cadet_name} (ID: ${fmtStaticId(certificate.static_id)})
+**Курсант:** ${certificate.cadet_name} | ${fmtStaticId(certificate.static_id)}
 **Звание:** ${certificate.rank || "—"}
 **Подразделение:** ${certificate.unit || "—"}
 **Тема:** ${certificate.subject}

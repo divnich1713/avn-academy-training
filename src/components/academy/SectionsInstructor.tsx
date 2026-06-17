@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Icon from "@/components/ui/icon";
 import { SectionHeader, StatCard, StatusBadge, GradeCircle, OnlineStatus, InstructorAvatar } from "./UIComponents";
-import { User, reviewRequest, createGrade, TrainingRequest, Grade } from "@/lib/api";
+import { User, reviewRequest, TrainingRequest } from "@/lib/api";
 import { useRequests, useGrades, useAdminUsers, usePromotionReports, queryKeys } from "@/lib/useQueries";
 import { TYPE_LABEL, fmt, Spinner, Empty, fmtStaticId } from "./SectionsShared";
 import { InstructorRatingView } from "./SectionsRatings";
@@ -71,14 +71,14 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   const [reviewLoading, setReviewLoading] = useState<Record<number, boolean>>({});
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("pending");
-  const [selectedRequestIds, setSelectedRequestIds] = useState<number[]>([]);
-  const [bulkReviewLoading, setBulkReviewLoading] = useState(false);
+
+
 
   // --- Grades tab ---
   const { data: allGrades = [], isLoading: gradesLoading } = useGrades();
 
   // --- Whitelist tab ---
-  const { data: wlUsers = [], isLoading: wlLoading, refetch: refetchWl } = useAdminUsers();
+  const { data: wlUsers = [], isLoading: wlLoading } = useAdminUsers();
   const [showAddForm, setShowAddForm] = useState(false);
   const [form, setForm] = useState({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "АВНГ", role: "cadet" as "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed", discord_id: "", avatar_url: "" });
   const [formError, setFormError] = useState("");
@@ -92,16 +92,17 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   const [selectedGradeDate, setSelectedGradeDate] = useState<string>(() => new Date().toLocaleDateString("ru-RU"));
   const [wlSearchQuery, setWlSearchQuery] = useState("");
 
-  // Fetch whitelist on mount
-  useEffect(() => { refetchWl(); }, [refetchWl]);
+
 
   const handleTabClick = (tab: typeof activeTab) => {
     setActiveTab(tab);
     // P1-6: React Query auto-caches — we just invalidate stale data on tab switch
-    if (tab === "whitelist" || tab === "cadets" || tab === "expired") refetchWl();
+    if (tab === "whitelist" || tab === "cadets" || tab === "expired") {
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers });
+    }
     if (tab === "grades") {
       queryClient.invalidateQueries({ queryKey: queryKeys.grades });
-      refetchWl();
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers });
     }
     if (tab === "requests" || tab === "promotions") {
       queryClient.invalidateQueries({ queryKey: queryKeys.requests });
@@ -118,7 +119,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
         if (status === "approved") {
           await adminUpdateUser(cadetId, { is_whitelisted: false });
         }
-        await refetchWl();
+        await queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers });
       } catch (err) {
         console.error(err);
       }
@@ -129,7 +130,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
         try {
           const { adminUpdateUser } = await import("@/lib/api");
           await adminUpdateUser(req.cadet_id, { is_whitelisted: false });
-          await refetchWl();
+          await queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers });
         } catch (err) {
           console.error(err);
         }
@@ -139,40 +140,17 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
     setReviewLoading((prev) => ({ ...prev, [id]: false }));
   };
 
-  const handleBulkReview = async (status: "approved" | "rejected") => {
-    if (selectedRequestIds.length === 0) return;
-    setBulkReviewLoading(true);
-    try {
-      const { adminUpdateUser } = await import("@/lib/api");
-      for (const id of selectedRequestIds) {
-        if (id < 0) {
-          const cadetId = -id;
-          if (status === "approved") {
-            await adminUpdateUser(cadetId, { is_whitelisted: false });
-          }
-        } else {
-          const req = requests.find((r) => r.id === id);
-          await reviewRequest(id, status, reviewComment[id] || "").catch(() => {});
-          if (status === "approved" && req && req.subject === "Рапорт на увольнение из академии") {
-            await adminUpdateUser(req.cadet_id, { is_whitelisted: false });
-          }
-        }
-      }
-      await refetchWl();
-      await refetchRequests();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setBulkReviewLoading(false);
-    }
-  };
+
 
 
 
   const toggleWhitelist = async (id: number, current: boolean) => {
     const { adminUpdateUser } = await import("@/lib/api");
     await adminUpdateUser(id, { is_whitelisted: !current });
-    setWlUsers((prev) => prev.map((u) => (u.id === id ? { ...u, is_whitelisted: !current } : u)));
+    queryClient.setQueryData<import("@/lib/api").AdminUser[]>(queryKeys.adminUsers, (prev) => {
+      if (!prev) return [];
+      return prev.map((u) => (u.id === id ? { ...u, is_whitelisted: !current } : u));
+    });
   };
 
   const openEdit = (u: import("@/lib/api").AdminUser) => {
@@ -202,7 +180,20 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       };
       if (editForm.password) payload.password = editForm.password;
       await adminUpdateUser(editUser.id, payload);
-      setWlUsers((prev) => prev.map((u) => u.id === editUser.id ? { ...u, ...editForm, created_at: isoCreatedAt, discord_id: editForm.discord_id ? editForm.discord_id.trim() : null, avatar_url: editForm.avatar_url ? editForm.avatar_url.trim() : null } : u));
+      queryClient.setQueryData<import("@/lib/api").AdminUser[]>(queryKeys.adminUsers, (prev) => {
+        if (!prev) return [];
+        return prev.map((u) =>
+          u.id === editUser.id
+            ? {
+                ...u,
+                ...editForm,
+                created_at: isoCreatedAt,
+                discord_id: editForm.discord_id ? editForm.discord_id.trim() : null,
+                avatar_url: editForm.avatar_url ? editForm.avatar_url.trim() : null,
+              }
+            : u
+        );
+      });
       setEditUser(null);
     } catch (err: unknown) {
       setEditError(err instanceof Error ? err.message : "Ошибка");
@@ -219,7 +210,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       await adminCreateUser({ ...form, discord_id: form.discord_id ? form.discord_id.trim() : null, avatar_url: form.avatar_url ? form.avatar_url.trim() : null, is_whitelisted: true });
       setShowAddForm(false);
       setForm({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "АВНГ", role: "cadet", discord_id: "", avatar_url: "" });
-      refetchWl();
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers });
     } catch (err: unknown) {
       setFormError(err instanceof Error ? err.message : "Ошибка");
     }
@@ -254,7 +245,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       reviewer_name: null,
     }));
 
-  const allRequestsPlusDismissals = requests.filter((r) => r.type !== "report");
+  const allRequestsPlusDismissals = [...requests, ...dismissalRequests].filter((r) => r.type !== "report");
 
   const reqDates = useMemo(() => {
     const dates = new Set<string>();
@@ -639,7 +630,6 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                   type="button"
                   onClick={() => {
                     setFilterType(subTab.id);
-                    setSelectedRequestIds([]);
                   }}
                   className={`font-oswald text-xs tracking-wider uppercase px-3 py-1.5 transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${filterType === subTab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
                 >
@@ -1321,7 +1311,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
 
       {/* ── PROMOTIONS TAB ── */}
       {activeTab === "promotions" && (
-        <PromotionInstructorTab highlightReportId={highlightReportId} onReviewSuccess={() => { refetchWl(); queryClient.invalidateQueries({ queryKey: queryKeys.requests }); queryClient.invalidateQueries({ queryKey: queryKeys.promotionReports }); }} />
+        <PromotionInstructorTab highlightReportId={highlightReportId} onReviewSuccess={() => { queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers }); queryClient.invalidateQueries({ queryKey: queryKeys.requests }); queryClient.invalidateQueries({ queryKey: queryKeys.promotionReports }); }} />
       )}
 
       {/* ── RATING TAB ── */}

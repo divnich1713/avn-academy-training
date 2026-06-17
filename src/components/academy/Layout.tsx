@@ -15,9 +15,9 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({
-  role,
+  role: _role,
   authUser,
-  sidebarOpen,
+  sidebarOpen: _sidebarOpen,
   onToggleSidebar,
   onLogout,
   onNavigate,

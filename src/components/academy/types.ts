@@ -72,6 +72,12 @@ export const NAV_ITEMS: {
     roles: ["cadet"],
   },
   {
+    id: "reports",
+    label: "Рапорты",
+    icon: "FileText",
+    roles: ["cadet"],
+  },
+  {
     id: "grades",
     label: "Система оценок",
     icon: "BarChart3",

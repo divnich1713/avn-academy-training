@@ -50,7 +50,7 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [highlightRequestId, setHighlightRequestId] = useState<number | undefined>();
-  const [highlightReportId, setHighlightReportId] = useState<number | undefined>(() => {
+  const [highlightReportId] = useState<number | undefined>(() => {
     const params = new URLSearchParams(window.location.search);
     const id = params.get("reportId");
     return id ? Number(id) : undefined;
@@ -202,9 +202,9 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
       case "ratings": return <InstructorRatings authUser={authUser} />;
       case "instructors": return <Instructors onNavigate={navigateTo} />;
       case "instructor": return <InstructorPanel authUser={authUser} highlightRequestId={highlightRequestId} highlightReportId={highlightReportId} onViewProfile={(cadet) => navigateTo("profile", undefined, cadet)} />;
-      case "testing": return <TestingSystem onNavigate={navigateTo} />;
-      case "testing-history": return <TestingHistory onNavigate={navigateTo} />;
-      case "testing-admin": return <TestingAdmin onNavigate={navigateTo} />;
+      case "testing": return <TestingSystem />;
+      case "testing-history": return <TestingHistory />;
+      case "testing-admin": return <TestingAdmin />;
     }
   };
 

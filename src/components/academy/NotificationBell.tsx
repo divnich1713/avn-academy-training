@@ -56,7 +56,7 @@ export function NotificationBell({ onNavigate }: { onNavigate: (section: Section
     try {
       const data = await fetchNotifications();
       setNotifications(data.notifications);
-      setUnreadCount((prev) => {
+      setUnreadCount((_prev) => {
         const incoming = data.unread_count;
         if (prevUnreadRef.current !== null && incoming > prevUnreadRef.current) {
           playNotificationSound();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { 
   testingApi, 
@@ -13,11 +13,7 @@ import { TestingD3Stats } from "./TestingD3Stats";
 import { toast } from "sonner";
 import { fmtStaticId } from "./SectionsShared";
 
-interface AdminProps {
-  onNavigate?: (tab: string) => void;
-}
-
-export function TestingAdmin({ onNavigate }: AdminProps) {
+export function TestingAdmin() {
   const [activeTab, setActiveTab] = useState<"results" | "questions" | "settings">("results");
   
   // Results Tab State
@@ -481,6 +477,8 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
       timer_minutes: 45,
       question_count: 20,
       base_elo: 1000,
+      time_limit_per_question: 0,
+      passing_score_percent: 80,
     };
 
     try {
@@ -679,7 +677,7 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
                                     const isPassed = att.score_percent >= 80;
                                     const gradeVal = att.score_percent >= 90 ? 5 : att.score_percent >= 80 ? 4 : att.score_percent >= 60 ? 3 : 2;
                                     const discordText = `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
-**Курсант:** ${att.cadet_name} (ID: ${fmtStaticId(att.static_id)})
+**Курсант:** ${att.cadet_name} | ${fmtStaticId(att.static_id)}
 **Звание:** ${att.rank || "—"}
 **Подразделение:** ${att.unit || "—"}
 **Результат:** ${isPassed ? "🟢 СДАН" : "🔴 НЕ СДАН"}
