@@ -1,5 +1,6 @@
 import { useState, useEffect, lazy, Suspense, useMemo } from "react";
 import Icon from "@/components/ui/icon";
+import { toast } from "sonner";
 import { SectionHeader, StatCard, StatusBadge, GradeCircle, OnlineStatus, InstructorAvatar } from "./UIComponents";
 import { User, fetchDiscordProfile, TrainingRequest } from "@/lib/api";
 import { useRequests, useGrades, useInstructors, useRatings, usePromotionReports } from "@/lib/useQueries";
@@ -577,6 +578,7 @@ interface ActionItem {
 export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; targetUser?: User; onNavigate?: (s: import("./types").Section, id?: number, u?: User) => void }) {
   const [tab, setTab] = useState<"requests" | "grades">("requests");
   const [actTimeframe, setActTimeframe] = useState<"daily" | "weekly" | "monthly" | "yearly">("weekly");
+  const [webhookInput, setWebhookInput] = useState(() => localStorage.getItem("avng_discord_webhook_url") || "");
 
   const [discordProfile, setDiscordProfile] = useState<{
     username: string;
@@ -1031,6 +1033,46 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
             )
           )}
         </>
+      )}
+
+      {displayUser.id === authUser.id && (
+        <div className="bg-tactical-card border border-tactical-border/60 p-4 mt-6 animate-fade-in">
+          <h4 className="font-oswald text-xs tracking-widest uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+            <Icon name="Settings" size={13} className="text-primary" />
+            Настройки интеграции Discord Webhook
+          </h4>
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
+            Укажите URL вебхука Discord, чтобы сообщения о ваших действиях (тесты, рапорты) автоматически присылались в чат. Уведомления отсылаются прямо из браузера клиента.
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="https://discord.com/api/webhooks/..."
+              value={webhookInput}
+              onChange={(e) => setWebhookInput(e.target.value.trim())}
+              className="bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-mono focus:outline-none focus:border-primary transition-colors flex-1"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (webhookInput) {
+                  if (webhookInput.startsWith("https://discord.com/api/webhooks/")) {
+                    localStorage.setItem("avng_discord_webhook_url", webhookInput);
+                    toast.success("Вебхук Discord успешно сохранен!");
+                  } else {
+                    toast.error("Некорректная ссылка на вебхук Discord!");
+                  }
+                } else {
+                  localStorage.removeItem("avng_discord_webhook_url");
+                  toast.success("Вебхук Discord сброшен!");
+                }
+              }}
+              className="bg-primary text-primary-foreground font-oswald text-xs tracking-wider uppercase px-4 py-1.5 hover:bg-primary/90 transition-colors"
+            >
+              Сохранить
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

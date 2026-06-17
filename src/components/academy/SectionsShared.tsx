@@ -3,6 +3,7 @@ import Icon from "@/components/ui/icon";
 import { StatusBadge, SectionHeader } from "./UIComponents";
 import { User } from "@/lib/api";
 import { fetchRequests, createRequest, TrainingRequest } from "@/lib/api";
+import { sendDismissalReportDiscord, sendGeneralRequestDiscord } from "@/lib/discord";
 
 export const TYPE_LABEL: Record<string, string> = {
   lecture: "Лекция",
@@ -322,6 +323,29 @@ export function RequestForm({
       }
 
       await createRequest({ type, subject, description: finalDescription, preferred_date: date || undefined });
+      
+      // Trigger Discord notifications
+      if (subject === "Рапорт на увольнение из академии") {
+        sendDismissalReportDiscord({
+          name: dismissalName,
+          passport: dismissalPassport,
+          rank: dismissalRank,
+          reason: dismissalReason,
+          photoUrl: dismissalPhotoUrl,
+          staticId: authUser.static_id
+        }).catch(err => console.error("Discord error:", err));
+      } else {
+        sendGeneralRequestDiscord({
+          name: authUser.name,
+          rank: authUser.rank,
+          staticId: authUser.static_id,
+          typeLabel: TYPE_LABEL[type],
+          subject,
+          preferredDate: date || "Не указана",
+          details: finalDescription
+        }).catch(err => console.error("Discord error:", err));
+      }
+
       onSubmit();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Ошибка отправки");

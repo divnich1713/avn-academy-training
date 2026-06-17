@@ -4,6 +4,7 @@ import { apiLogout } from "@/lib/api";
 import { testingApi, Question, ActiveSession } from "@/lib/testingApi";
 import { toast } from "sonner";
 import { fmtStaticId } from "./SectionsShared";
+import { sendTestCompletedDiscord } from "@/lib/discord";
 
 export function TestingSystem() {
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
@@ -252,6 +253,16 @@ export function TestingSystem() {
         toast.success("Тестирование успешно завершено!");
         if (res.certificate) {
           setCertificate(res.certificate);
+          sendTestCompletedDiscord({
+            name: res.certificate.cadet_name,
+            rank: res.certificate.rank,
+            staticId: res.certificate.static_id,
+            subject: res.certificate.subject,
+            score: res.certificate.correct_answers_count,
+            totalQuestions: res.certificate.total_questions,
+            percent: res.certificate.percentage,
+            passed: res.certificate.passed
+          }).catch(err => console.error("Discord error:", err));
         } else {
           loadSession();
         }
@@ -300,6 +311,16 @@ export function TestingSystem() {
         toast.success("Тестирование успешно завершено!");
         if (res.certificate) {
           setCertificate(res.certificate);
+          sendTestCompletedDiscord({
+            name: res.certificate.cadet_name,
+            rank: res.certificate.rank,
+            staticId: res.certificate.static_id,
+            subject: res.certificate.subject,
+            score: res.certificate.correct_answers_count,
+            totalQuestions: res.certificate.total_questions,
+            percent: res.certificate.percentage,
+            passed: res.certificate.passed
+          }).catch(err => console.error("Discord error:", err));
         } else {
           loadSession();
         }

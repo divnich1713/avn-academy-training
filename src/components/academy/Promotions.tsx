@@ -12,6 +12,7 @@ import {
   reviewPromotionReport,
 } from "@/lib/api";
 import { fmt, Spinner, Empty, fmtStaticId } from "./SectionsShared";
+import { sendPromotionReportDiscord } from "@/lib/discord";
 
 const PROMOTION_LABELS: Record<PromotionType, string> = {
   junior_sergeant: "Мл. Сержант",
@@ -170,6 +171,15 @@ export function PromotionSection({ authUser }: { authUser: User }) {
     setSubmittedReportLink("");
     try {
       const res = await createPromotionReport(selected);
+      
+      // Trigger Discord notification
+      sendPromotionReportDiscord({
+        name: authUser.name,
+        rank: authUser.rank,
+        staticId: authUser.static_id,
+        promotionTypeLabel: PROMOTION_LABELS[selected],
+      }).catch(err => console.error("Discord error:", err));
+
       const reportId = res?.id || Date.now();
       const link = `${window.location.origin}/?tab=promotions&reportId=${reportId}`;
       setSubmittedReportLink(link);
