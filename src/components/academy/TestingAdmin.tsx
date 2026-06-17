@@ -901,9 +901,9 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
                     </select>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
                     <div>
-                      <label className="text-muted-foreground uppercase block mb-1">Таймер (минут)</label>
+                      <label className="text-muted-foreground uppercase block mb-1 text-[10px]">Таймер (мин)</label>
                       <input
                         type="number"
                         min="15"
@@ -912,11 +912,11 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
                         onChange={(e) => setEditingSettings({ ...editingSettings, timer_minutes: parseInt(e.target.value) || 0 })}
                         className="w-full bg-tactical-panel border border-tactical-border text-foreground p-2 focus:outline-none focus:border-primary font-bold text-center"
                       />
-                      <span className="text-[10px] text-muted-foreground text-center block mt-1">Доп: 15–120 мин.</span>
+                      <span className="text-[10px] text-muted-foreground text-center block mt-1">15–120 мин.</span>
                     </div>
 
                     <div>
-                      <label className="text-muted-foreground uppercase block mb-1">Вопросов в тесте</label>
+                      <label className="text-muted-foreground uppercase block mb-1 text-[10px]">Вопросов</label>
                       <input
                         type="number"
                         min="1"
@@ -925,11 +925,11 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
                         onChange={(e) => setEditingSettings({ ...editingSettings, question_count: parseInt(e.target.value) || 0 })}
                         className="w-full bg-tactical-panel border border-tactical-border text-foreground p-2 focus:outline-none focus:border-primary font-bold text-center"
                       />
-                      <span className="text-[10px] text-muted-foreground text-center block mt-1">Доп: 1–100 вопр.</span>
+                      <span className="text-[10px] text-muted-foreground text-center block mt-1">1–100 вопр.</span>
                     </div>
 
                     <div>
-                      <label className="text-muted-foreground uppercase block mb-1">Начальный ELO</label>
+                      <label className="text-muted-foreground uppercase block mb-1 text-[10px]">Начальный ELO</label>
                       <input
                         type="number"
                         min="100"
@@ -938,7 +938,33 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
                         onChange={(e) => setEditingSettings({ ...editingSettings, base_elo: parseInt(e.target.value) || 0 })}
                         className="w-full bg-tactical-panel border border-tactical-border text-foreground p-2 focus:outline-none focus:border-primary font-bold text-center"
                       />
-                      <span className="text-[10px] text-muted-foreground text-center block mt-1">Дефолтный: 1000 ELO</span>
+                      <span className="text-[10px] text-muted-foreground text-center block mt-1">Дефолт: 1000</span>
+                    </div>
+
+                    <div>
+                      <label className="text-muted-foreground uppercase block mb-1 text-[10px]">Время / вопрос (сек)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="600"
+                        value={editingSettings.time_limit_per_question || 0}
+                        onChange={(e) => setEditingSettings({ ...editingSettings, time_limit_per_question: parseInt(e.target.value) || 0 })}
+                        className="w-full bg-tactical-panel border border-tactical-border text-foreground p-2 focus:outline-none focus:border-primary font-bold text-center"
+                      />
+                      <span className="text-[10px] text-muted-foreground text-center block mt-1">0 — без лим.</span>
+                    </div>
+
+                    <div>
+                      <label className="text-muted-foreground uppercase block mb-1 text-[10px]">Проходной (%)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={editingSettings.passing_score_percent || 80}
+                        onChange={(e) => setEditingSettings({ ...editingSettings, passing_score_percent: parseInt(e.target.value) || 0 })}
+                        className="w-full bg-tactical-panel border border-tactical-border text-foreground p-2 focus:outline-none focus:border-primary font-bold text-center"
+                      />
+                      <span className="text-[10px] text-muted-foreground text-center block mt-1">Дефолт: 80%</span>
                     </div>
                   </div>
 
@@ -946,7 +972,9 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
                     <span className="text-gold uppercase font-bold tracking-wider block mb-1">Информационная справка:</span>
                     <div>• <strong>Вопросов в тесте</strong> — сколько вопросов нужно ответить курсанту до завершения сессии.</div>
                     <div>• <strong>Базовый ELO</strong> — отправная точка для расчета сложности (адаптивная сложность ELO).</div>
-                    <div>• <strong>Таймер</strong> — время, по истечению которого сессия автоматически завершается.</div>
+                    <div>• <strong>Таймер</strong> — общее время, по истечению которого сессия автоматически завершается.</div>
+                    <div>• <strong>Время на 1 вопрос</strong> — лимит времени (в секундах) на ответ на один конкретный вопрос.</div>
+                    <div>• <strong>Проходной балл (%)</strong> — минимальный процент успеваемости для успешной сдачи.</div>
                   </div>
 
                   <button

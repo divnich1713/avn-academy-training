@@ -104,4 +104,6 @@ class TestSettings(Base):
     timer_minutes = Column(Integer, nullable=False, default=45)
     question_count = Column(Integer, nullable=False, default=30)
     base_elo = Column(Integer, nullable=False, default=1000)
+    time_limit_per_question = Column(Integer, nullable=False, default=0)
+    passing_score_percent = Column(Integer, nullable=False, default=80)
 

@@ -24,7 +24,9 @@ async def get_test_settings(db: AsyncSession, subject: str) -> dict:
             return {
                 "timer_minutes": settings_row.timer_minutes,
                 "question_count": settings_row.question_count,
-                "base_elo": settings_row.base_elo
+                "base_elo": settings_row.base_elo,
+                "time_limit_per_question": settings_row.time_limit_per_question,
+                "passing_score_percent": settings_row.passing_score_percent
             }
     except Exception as e:
         print(f"Error querying test_settings: {e}")
@@ -32,7 +34,9 @@ async def get_test_settings(db: AsyncSession, subject: str) -> dict:
     return {
         "timer_minutes": 45,
         "question_count": 30,
-        "base_elo": 1000
+        "base_elo": 1000,
+        "time_limit_per_question": 0,
+        "passing_score_percent": 80
     }
 
 async def get_attempt_subject(db: AsyncSession, attempt_id: int) -> str:
@@ -112,6 +116,15 @@ async def get_active_session(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    # Inline DB schema migration
+    try:
+        from sqlalchemy import text
+        await db.execute(text(f"ALTER TABLE {settings.SCHEMA}.test_settings ADD COLUMN IF NOT EXISTS time_limit_per_question INTEGER DEFAULT 0;"))
+        await db.execute(text(f"ALTER TABLE {settings.SCHEMA}.test_settings ADD COLUMN IF NOT EXISTS passing_score_percent INTEGER DEFAULT 80;"))
+        await db.commit()
+    except Exception as mig_err:
+        print(f"FastAPI active-session inline migration warning: {mig_err}")
+
     stmt = select(TestAttempt).where(
         and_(
             TestAttempt.user_id == user.id,
@@ -153,7 +166,9 @@ async def get_active_session(
         "remaining_seconds": rem_seconds,
         "is_frozen": attempt.remaining_seconds is not None,
         "answered_count": len(answered_ids),
-        "total_questions": settings_data["question_count"]
+        "total_questions": settings_data["question_count"],
+        "time_limit_per_question": settings_data.get("time_limit_per_question", 0),
+        "passing_score_percent": settings_data.get("passing_score_percent", 80)
     }
 
 @router.get("/subjects")
@@ -363,7 +378,9 @@ async def get_next_question(
         "options": options,
         "subject": selected_question.subject,
         "progress": answered_count + 1,
-        "total_questions": q_limit
+        "total_questions": q_limit,
+        "time_limit_per_question": settings_data.get("time_limit_per_question", 0),
+        "passing_score_percent": settings_data.get("passing_score_percent", 80)
     }
 
 
@@ -502,6 +519,7 @@ async def submit_answer(
     completed = answered_count >= q_limit
 
     # Complete test if progress hits dynamic question count limit
+    certificate_data = None
     if completed:
         attempt.status = "completed"
         attempt.completed_at = datetime.utcnow()
@@ -525,14 +543,48 @@ async def submit_answer(
         
         await db.commit()
 
+        # Compute certificate details
+        ans_details_stmt = select(TestAnswer).where(TestAnswer.attempt_id == attempt.id)
+        ans_details_res = await db.execute(ans_details_stmt)
+        ans_rows = ans_details_res.scalars().all()
+        
+        correct_count = sum(1 for ans in ans_rows if ans.is_correct is True)
+        percentage = round((correct_count / q_limit) * 100, 2) if q_limit > 0 else 0.0
+        
+        if percentage >= 90.0:
+            grade_val = 5
+        elif percentage >= 80.0:
+            grade_val = 4
+        elif percentage >= 60.0:
+            grade_val = 3
+        else:
+            grade_val = 2
+            
+        passed = percentage >= settings_data.get("passing_score_percent", 80)
+        
+        certificate_data = {
+            "cadet_name": user.name,
+            "static_id": user.static_id,
+            "rank": user.rank,
+            "unit": user.unit,
+            "subject": question.subject,
+            "completed_at": attempt.completed_at.isoformat() if attempt.completed_at else datetime.utcnow().isoformat(),
+            "correct_answers_count": correct_count,
+            "total_questions": q_limit,
+            "percentage": percentage,
+            "grade": grade_val,
+            "passed": passed
+        }
+
     return {
         "type": question.type,
-        "is_correct": None,
-        "grade": None,
+        "is_correct": is_correct,
+        "grade": grade,
         "correct_answer": None,
         "explanation": None,
         "new_rating": new_student_elo,
-        "completed": completed
+        "completed": completed,
+        "certificate": certificate_data
     }
 
 
@@ -587,6 +639,8 @@ class TestSettingsUpdate(BaseModel):
     timer_minutes: int
     question_count: int
     base_elo: int
+    time_limit_per_question: Optional[int] = 0
+    passing_score_percent: Optional[int] = 80
 
 def check_admin_access(user: User):
     if user.role not in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "cadet"):
@@ -679,7 +733,9 @@ async def get_settings_admin(
             subject="Тест по ФЗ ФСВНГ и уставу ФСВНГ",
             timer_minutes=45,
             question_count=30,
-            base_elo=1000
+            base_elo=1000,
+            time_limit_per_question=0,
+            passing_score_percent=80
         )
         db.add(default_settings)
         await db.commit()
@@ -704,13 +760,17 @@ async def update_settings_admin(
             subject=payload.subject,
             timer_minutes=payload.timer_minutes,
             question_count=payload.question_count,
-            base_elo=payload.base_elo
+            base_elo=payload.base_elo,
+            time_limit_per_question=payload.time_limit_per_question,
+            passing_score_percent=payload.passing_score_percent
         )
         db.add(settings_row)
     else:
         settings_row.timer_minutes = payload.timer_minutes
         settings_row.question_count = payload.question_count
         settings_row.base_elo = payload.base_elo
+        settings_row.time_limit_per_question = payload.time_limit_per_question
+        settings_row.passing_score_percent = payload.passing_score_percent
         
     await db.commit()
     await db.refresh(settings_row)

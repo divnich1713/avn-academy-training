@@ -25,13 +25,40 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
   const [isAnnulling, setIsAnnulling] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Per-question timer & certificate states
+  const [questionSecondsLeft, setQuestionSecondsLeft] = useState<number | null>(null);
+  const [certificate, setCertificate] = useState<any>(null);
+
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const questionTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const selectedAnswerRef = useRef<any>(null);
+  const questionRef = useRef<Question | null>(null);
+  const activeSessionRef = useRef<ActiveSession | null>(null);
+  const isSubmittingRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    selectedAnswerRef.current = selectedAnswer;
+  }, [selectedAnswer]);
+
+  useEffect(() => {
+    questionRef.current = question;
+  }, [question]);
+
+  useEffect(() => {
+    activeSessionRef.current = activeSession;
+  }, [activeSession]);
+
+  useEffect(() => {
+    isSubmittingRef.current = isSubmitting;
+  }, [isSubmitting]);
 
   // 1. Check active session on load
   useEffect(() => {
     loadSession();
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (questionTimerRef.current) clearInterval(questionTimerRef.current);
     };
   }, []);
 
@@ -43,7 +70,7 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
       if (session.active && session.attempt_id) {
         setWarnings(session.warnings_count || 0);
         if (!session.is_frozen) {
-          loadNextQuestion(session.attempt_id);
+          loadNextQuestion(session.attempt_id, session.time_limit_per_question);
           startTimer(session.remaining_seconds || 2700, session.attempt_id);
         }
       } else {
@@ -61,11 +88,10 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
   };
 
   // 2. Load next question
-  const loadNextQuestion = async (attemptId: number) => {
+  const loadNextQuestion = async (attemptId: number, timeLimit?: number) => {
     try {
       const res = await testingApi.getNextQuestion(attemptId);
       if ("completed" in res && res.completed) {
-        toast.success("Тестирование успешно завершено!");
         loadSession();
       } else {
         const q = res as Question;
@@ -82,6 +108,14 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
           setSelectedAnswer(initPairs);
         }
         else if (q.type === "essay") setSelectedAnswer("");
+
+        // Setup question timer
+        const limit = timeLimit !== undefined ? timeLimit : ((res as any).time_limit_per_question || 0);
+        if (limit > 0) {
+          setQuestionSecondsLeft(limit);
+        } else {
+          setQuestionSecondsLeft(null);
+        }
       }
     } catch (err: any) {
       toast.error("Ошибка загрузки вопроса: " + err.message);
@@ -229,15 +263,19 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
       const res = await testingApi.submitAnswer(activeSession.attempt_id, question.question_id, selectedAnswer);
       if (res.completed) {
         toast.success("Тестирование успешно завершено!");
-        loadSession();
+        if (res.certificate) {
+          setCertificate(res.certificate);
+        } else {
+          loadSession();
+        }
       } else {
-        await loadNextQuestion(activeSession.attempt_id);
+        await loadNextQuestion(activeSession.attempt_id, activeSession.time_limit_per_question);
       }
     } catch (err: any) {
       const errMsg = String(err.message || "");
       if (errMsg.toLowerCase().includes("ответили") || errMsg.toLowerCase().includes("already answered")) {
         toast.info("Ответ уже был записан ранее. Загружаем следующий вопрос...");
-        await loadNextQuestion(activeSession.attempt_id);
+        await loadNextQuestion(activeSession.attempt_id, activeSession.time_limit_per_question);
       } else {
         toast.error("Ошибка отправки ответа: " + err.message);
       }
@@ -246,11 +284,187 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
     }
   };
 
+  // 8.5. Auto Submit when question timer expires
+  const handleAutoSubmit = async () => {
+    const currentSession = activeSessionRef.current;
+    const currentQuestion = questionRef.current;
+    const currentAnswer = selectedAnswerRef.current;
+    const currentlySubmitting = isSubmittingRef.current;
+
+    if (!currentSession || !currentSession.attempt_id || !currentQuestion || currentlySubmitting) return;
+
+    let finalAnswer = currentAnswer;
+    if (currentQuestion.type === "matching" && (!finalAnswer || Object.keys(finalAnswer).length === 0)) {
+      finalAnswer = {};
+    } else if (currentQuestion.type === "multichoice" && (!finalAnswer || finalAnswer.length === 0)) {
+      finalAnswer = [];
+    } else if (currentQuestion.type === "choice" && !finalAnswer) {
+      finalAnswer = "";
+    } else if (currentQuestion.type === "essay" && !finalAnswer) {
+      finalAnswer = "";
+    }
+
+    setIsSubmitting(true);
+    toast.info("Время на ответ истекло! Автоматическая отправка...", { duration: 2000 });
+
+    try {
+      const res = await testingApi.submitAnswer(currentSession.attempt_id, currentQuestion.question_id, finalAnswer);
+      if (res.completed) {
+        toast.success("Тестирование успешно завершено!");
+        if (res.certificate) {
+          setCertificate(res.certificate);
+        } else {
+          loadSession();
+        }
+      } else {
+        await loadNextQuestion(currentSession.attempt_id, currentSession.time_limit_per_question);
+      }
+    } catch (err: any) {
+      const errMsg = String(err.message || "");
+      if (errMsg.toLowerCase().includes("ответили") || errMsg.toLowerCase().includes("already answered")) {
+        await loadNextQuestion(currentSession.attempt_id, currentSession.time_limit_per_question);
+      } else {
+        toast.error("Ошибка авто-отправки: " + err.message);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 8.6. Question timer interval
+  useEffect(() => {
+    if (questionSecondsLeft === null) {
+      if (questionTimerRef.current) clearInterval(questionTimerRef.current);
+      return;
+    }
+
+    if (questionTimerRef.current) clearInterval(questionTimerRef.current);
+
+    questionTimerRef.current = setInterval(() => {
+      setQuestionSecondsLeft((prev) => {
+        if (prev === null) return null;
+        if (prev <= 1) {
+          clearInterval(questionTimerRef.current!);
+          handleAutoSubmit();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (questionTimerRef.current) clearInterval(questionTimerRef.current);
+    };
+  }, [questionSecondsLeft]);
+
   // Rendering Helpers
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[300px]">
         <Icon name="Loader2" className="text-primary animate-spin" size={36} />
+      </div>
+    );
+  }
+
+  // Certificate Display
+  if (certificate) {
+    const isPassed = certificate.passed;
+    const completedDate = new Date(certificate.completed_at).toLocaleDateString("ru-RU", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+
+    return (
+      <div className="max-w-2xl mx-auto animate-scale-in py-4">
+        <div className={`corner-mark bg-tactical-card border p-8 space-y-8 relative card-glow text-center overflow-hidden ${
+          isPassed ? "border-gold/60 shadow-[0_0_25px_rgba(212,163,89,0.15)]" : "border-destructive/40"
+        }`}>
+          {/* Certificate Header Watermark */}
+          <div className="absolute inset-0 pointer-events-none opacity-[0.03] flex items-center justify-center">
+            <Icon name="Award" size={320} className={isPassed ? "text-gold" : "text-muted-foreground"} />
+          </div>
+
+          <div className="space-y-2 relative">
+            <div className="flex justify-center mb-2">
+              <Icon name="Award" size={64} className={isPassed ? "text-gold animate-pulse" : "text-muted-foreground"} />
+            </div>
+            <h2 className="font-oswald text-2xl tracking-widest uppercase text-foreground">
+              СЕРТИФИКАТ
+            </h2>
+            <p className="text-muted-foreground text-xs uppercase tracking-widest font-mono">
+              о прохождении тестирования
+            </p>
+          </div>
+
+          <div className="space-y-1 relative">
+            <span className="text-muted-foreground text-xs font-mono italic">Настоящим подтверждается, что</span>
+            <h3 className="text-xl font-bold font-sans text-foreground py-2 border-b border-tactical-border/30 max-w-md mx-auto">
+              {certificate.cadet_name}
+            </h3>
+            <div className="flex justify-center gap-3 text-[10px] font-mono text-muted-foreground mt-2">
+              <span>ID: <strong className="text-foreground">{certificate.static_id}</strong></span>
+              <span>•</span>
+              <span>Звание: <strong className="text-foreground">{certificate.rank}</strong></span>
+              <span>•</span>
+              <span>Подразделение: <strong className="text-foreground">{certificate.unit}</strong></span>
+            </div>
+          </div>
+
+          <div className="space-y-2 relative">
+            <span className="text-muted-foreground text-xs font-mono italic">завершил(а) тестирование по теме</span>
+            <h4 className="text-md font-mono font-bold text-gold px-4 py-1.5 bg-tactical-panel/40 border border-tactical-border/50 max-w-lg mx-auto rounded-sm">
+              {certificate.subject}
+            </h4>
+            <span className="text-[10px] font-mono text-muted-foreground block mt-1">
+              Дата сдачи: {completedDate}
+            </span>
+          </div>
+
+          {/* Metrics Panel */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-tactical-panel/30 border border-tactical-border/50 p-4 font-mono text-xs max-w-xl mx-auto rounded-sm relative">
+            <div className="text-center p-2 border-r border-tactical-border/30 last:border-0 sm:block flex justify-between items-center">
+              <span className="text-muted-foreground text-[10px] uppercase block mb-1">Верные ответы</span>
+              <strong className="text-sm text-foreground block">{certificate.correct_answers_count} из {certificate.total_questions}</strong>
+            </div>
+            <div className="text-center p-2 border-r border-tactical-border/30 last:border-0 sm:block flex justify-between items-center">
+              <span className="text-muted-foreground text-[10px] uppercase block mb-1">Процент верных</span>
+              <strong className="text-sm text-gold block">{certificate.percentage}%</strong>
+            </div>
+            <div className="text-center p-2 border-r border-tactical-border/30 last:border-0 sm:block flex justify-between items-center">
+              <span className="text-muted-foreground text-[10px] uppercase block mb-1">Ваша оценка</span>
+              <strong className={`text-sm block font-bold ${
+                certificate.grade >= 4 ? "text-primary" : certificate.grade === 3 ? "text-gold" : "text-destructive"
+              }`}>{certificate.grade}</strong>
+            </div>
+            <div className="text-center p-2 last:border-0 sm:block flex justify-between items-center">
+              <span className="text-muted-foreground text-[10px] uppercase block mb-1">Результат</span>
+              <strong className={`text-sm block font-bold uppercase tracking-wider ${
+                isPassed ? "text-primary" : "text-destructive"
+              }`}>{isPassed ? "Сдан" : "Не сдан"}</strong>
+            </div>
+          </div>
+
+          {!isPassed && (
+            <p className="text-destructive font-mono text-[10px] uppercase tracking-wider animate-pulse relative">
+              Внимание: минимальный проходной балл составляет 80%. Тест не сдан.
+            </p>
+          )}
+
+          <div className="pt-4 flex justify-center relative">
+            <button
+              onClick={() => {
+                setCertificate(null);
+                loadSession();
+              }}
+              className="bg-primary hover:bg-primary/95 text-primary-foreground font-mono text-xs uppercase tracking-widest px-8 py-3 border border-primary/20 shadow-lg font-bold"
+            >
+              Завершить
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -301,11 +515,31 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
         </div>
 
         {/* Question Panel */}
-        <div className="corner-mark bg-tactical-card border border-tactical-border p-6 space-y-6 relative card-glow">
+        <div className="corner-mark bg-tactical-card border border-tactical-border p-6 space-y-6 relative card-glow overflow-hidden">
+          {questionSecondsLeft !== null && activeSession?.time_limit_per_question && (
+            <div 
+              className="absolute top-0 left-0 h-[3px] bg-primary transition-all duration-1000"
+              style={{ 
+                width: `${(questionSecondsLeft / activeSession.time_limit_per_question) * 100}%`,
+                backgroundColor: questionSecondsLeft <= 10 ? "rgb(239 68 68)" : "var(--color-primary, rgb(212 163 89))"
+              }}
+            />
+          )}
           <div className="flex justify-between items-start gap-4">
-            <span className="px-2 py-0.5 bg-primary/10 border border-primary/20 text-[10px] text-primary font-mono uppercase">
-              {question.subject}
-            </span>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <span className="px-2 py-0.5 bg-primary/10 border border-primary/20 text-[10px] text-primary font-mono uppercase">
+                {question.subject}
+              </span>
+              {questionSecondsLeft !== null && (
+                <span className={`px-2 py-0.5 font-mono text-[10px] uppercase border animate-pulse ${
+                  questionSecondsLeft <= 10
+                    ? "bg-destructive/10 border-destructive text-destructive font-bold"
+                    : "bg-gold/10 border-gold/40 text-gold"
+                }`}>
+                  Осталось времени: {questionSecondsLeft} сек.
+                </span>
+              )}
+            </div>
             <span className="text-xs text-muted-foreground font-mono">
               Тип: {question.type === "choice" ? "Базовый (Один выбор)" : question.type === "multichoice" ? "Продвинутый (Множ. выбор)" : question.type === "matching" ? "Продвинутый (Сопоставление)" : "Бонусный (Эссе)"}
             </span>

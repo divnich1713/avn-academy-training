@@ -43,6 +43,8 @@ export interface ActiveSession {
   is_frozen?: boolean;
   answered_count?: number;
   total_questions?: number;
+  time_limit_per_question?: number;
+  passing_score_percent?: number;
 }
 
 export interface CadetAttempt {
@@ -137,6 +139,19 @@ export const testingApi = {
     explanation: string;
     new_rating: number;
     completed: boolean;
+    certificate?: {
+      cadet_name: string;
+      static_id: string;
+      rank: string;
+      unit: string;
+      subject: string;
+      completed_at: string;
+      correct_answers_count: number;
+      total_questions: number;
+      percentage: number;
+      grade: number;
+      passed: boolean;
+    } | null;
   }> {
     return request("/api/tests/submit-answer", {
       method: "POST",
@@ -213,6 +228,8 @@ export interface TestSettings {
   timer_minutes: number;
   question_count: number;
   base_elo: number;
+  time_limit_per_question: number;
+  passing_score_percent: number;
 }
 
 export interface QuestionAdmin {

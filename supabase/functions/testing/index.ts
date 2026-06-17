@@ -233,7 +233,7 @@ async function gradeEssayInBackground(
 async function getTestSettings(client: Client, subject: string) {
   try {
     const res = await client.queryObject<any>(
-      `SELECT timer_minutes, question_count, base_elo FROM ${SCHEMA}.test_settings WHERE subject = $1`,
+      `SELECT timer_minutes, question_count, base_elo, time_limit_per_question, passing_score_percent FROM ${SCHEMA}.test_settings WHERE subject = $1`,
       [subject]
     );
     if (res.rows.length > 0) {
@@ -242,7 +242,7 @@ async function getTestSettings(client: Client, subject: string) {
   } catch (err) {
     console.error("Error fetching test settings, using defaults: ", err);
   }
-  return { timer_minutes: 45, question_count: 30, base_elo: 1000 };
+  return { timer_minutes: 45, question_count: 30, base_elo: 1000, time_limit_per_question: 0, passing_score_percent: 80 };
 }
 
 async function getAttemptSubject(client: Client, attemptId: number): Promise<string> {
@@ -273,6 +273,21 @@ Deno.serve(async (req) => {
   let client: Client | null = null;
   try {
     client = await getDbClient();
+    
+    // Inline database migration to ensure columns exist
+    try {
+      await client.queryArray(`
+        ALTER TABLE ${SCHEMA}.test_settings 
+        ADD COLUMN IF NOT EXISTS time_limit_per_question INTEGER DEFAULT 0;
+      `);
+      await client.queryArray(`
+        ALTER TABLE ${SCHEMA}.test_settings 
+        ADD COLUMN IF NOT EXISTS passing_score_percent INTEGER DEFAULT 80;
+      `);
+    } catch (migErr) {
+      console.error("Deno DB migration error: ", migErr);
+    }
+
     const user = await getCurrentUser(req, client);
 
     // ==========================================
@@ -328,6 +343,8 @@ Deno.serve(async (req) => {
           is_frozen: attempt.remaining_seconds !== null,
           answered_count: answeredCount,
           total_questions: settingsData.question_count,
+          time_limit_per_question: settingsData.time_limit_per_question || 0,
+          passing_score_percent: settingsData.passing_score_percent || 80,
         }),
         { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
       );
@@ -563,6 +580,8 @@ Deno.serve(async (req) => {
           subject: selected.subject,
           progress: answeredCount + 1,
           total_questions: qLimit,
+          time_limit_per_question: settingsData.time_limit_per_question || 0,
+          passing_score_percent: settingsData.passing_score_percent || 80,
         }),
         { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
       );
@@ -693,6 +712,7 @@ Deno.serve(async (req) => {
       const settingsData = await getTestSettings(client, question.subject);
       const completed = answeredCount >= settingsData.question_count;
 
+      let certificateData = null;
       if (completed) {
         await client.queryArray(
           `UPDATE ${SCHEMA}.test_attempts SET status = 'completed', completed_at = NOW() WHERE id = $1`,
@@ -707,17 +727,55 @@ Deno.serve(async (req) => {
            SET elo_rating = EXCLUDED.elo_rating, updated_at = NOW()`,
           [user.id, question.subject, newStudentElo]
         );
+
+        // Get completed_at timestamp
+        const attRes = await client.queryArray(
+          `SELECT completed_at FROM ${SCHEMA}.test_attempts WHERE id = $1`,
+          [attempt_id]
+        );
+        const completedAt = attRes.rows[0]?.[0] || new Date().toISOString();
+
+        // Compute certificate details
+        const answersRes = await client.queryObject<any>(
+          `SELECT is_correct FROM ${SCHEMA}.test_answers WHERE attempt_id = $1`,
+          [attempt_id]
+        );
+        const correctCount = answersRes.rows.filter((ans: any) => ans.is_correct === true).length;
+        const totalQ = settingsData.question_count;
+        const percentage = totalQ > 0 ? Math.round((correctCount / totalQ) * 10000) / 100 : 0;
+        
+        let gradeVal = 2;
+        if (percentage >= 90) gradeVal = 5;
+        else if (percentage >= 80) gradeVal = 4;
+        else if (percentage >= 60) gradeVal = 3;
+
+        const passed = percentage >= (settingsData.passing_score_percent || 80);
+
+        certificateData = {
+          cadet_name: user.name,
+          static_id: user.static_id,
+          rank: user.rank,
+          unit: user.unit,
+          subject: question.subject,
+          completed_at: completedAt,
+          correct_answers_count: correctCount,
+          total_questions: totalQ,
+          percentage: percentage,
+          grade: gradeVal,
+          passed: passed
+        };
       }
 
       return new Response(
         JSON.stringify({
           type: question.type,
-          is_correct: null,
-          grade: null,
+          is_correct: isCorrect,
+          grade: grade,
           correct_answer: null,
           explanation: null,
           new_rating: newStudentElo,
           completed: completed,
+          certificate: certificateData,
         }),
         { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
       );
