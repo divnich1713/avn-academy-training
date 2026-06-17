@@ -309,7 +309,7 @@ export async function sendGeneralRequestDiscord({
 // 5. Request Reviewed Notification (Green / Red)
 export async function sendRequestReviewedDiscord({
   name,
-  rank,
+  rank: _rank,
   staticId,
   typeLabel,
   subject,
@@ -333,15 +333,15 @@ export async function sendRequestReviewedDiscord({
 
   const isApproved = status === "approved";
   const title = isApproved 
-    ? (isExam ? "🎓 Экзамен сдан (Запрос одобрен)" : "✅ Запрос одобрен")
-    : (isExam ? "❌ Экзамен не сдан (Запрос отклонен)" : "❌ Запрос отклонен");
+    ? (isExam ? "🎓 Экзамен разрешен (Запрос одобрен)" : "✅ Запрос одобрен")
+    : (isExam ? "❌ Экзамен не разрешен (Запрос отклонен)" : "❌ Запрос отклонен");
   const color = isApproved ? 5763719 : 15548997; // Green for approved, Red for rejected
 
   await sendDiscordEmbed({
     title,
     color,
     fields: [
-      { name: "Курсант", value: `${rank} ${name} (${staticId})`, inline: true },
+      { name: "Курсант", value: `**Курсант:** ${name} | ${fmtStaticId(staticId)}`, inline: true },
       { name: "Категория", value: typeLabel, inline: true },
       { name: "Тема / Занятие", value: subject, inline: false },
       { name: "Проверил", value: reviewerName, inline: true },
