@@ -12,7 +12,10 @@ app = FastAPI(
 
 # CORS configuration
 origins = [
+    "https://avn-academy-training.vercel.app",
+    "https://avn-academy-training-divnich1713s-projects.vercel.app",
     "https://avn-academy-training.netlify.app",
+    "https://avn-academy-training-netlify-app.ru",
     "http://localhost:5173",
     "http://localhost:4173",
 ]
@@ -20,6 +23,7 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex="https://.*\\.vercel\\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

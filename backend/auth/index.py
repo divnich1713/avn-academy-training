@@ -14,14 +14,22 @@ assert re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", SCHEMA), f"Invalid SCHEMA: {SCHEM
 
 # P0-3: Restrict CORS to known origins instead of wildcard "*"
 ALLOWED_ORIGINS = [
+    "https://avn-academy-training.vercel.app",
+    "https://avn-academy-training-divnich1713s-projects.vercel.app",
     "https://avn-academy-training.netlify.app",
+    "https://avn-academy-training-netlify-app.ru",
     "http://localhost:5173",
     "http://localhost:4173",
 ]
 
 
 def cors_headers(origin=""):
-    allowed = origin if origin in ALLOWED_ORIGINS else ALLOWED_ORIGINS[0]
+    is_allowed = (
+        origin in ALLOWED_ORIGINS or 
+        origin.endswith(".vercel.app") or 
+        (origin.startswith("https://") and ".vercel.app" in origin)
+    )
+    allowed = origin if is_allowed else ALLOWED_ORIGINS[0]
     return {
         "Access-Control-Allow-Origin": allowed,
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
