@@ -40,12 +40,16 @@ export async function sendDiscordEmbed(payload: {
   }
 
   try {
+    const pingRoleId = localStorage.getItem("avng_discord_ping_role_id") || import.meta.env.VITE_DISCORD_PING_ROLE_ID || "";
+    const content = pingRoleId ? `<@&${pingRoleId.replace(/\D/g, "")}>` : undefined;
+
     const response = await fetch(webhookUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        content,
         embeds: [
           {
             title: payload.title,

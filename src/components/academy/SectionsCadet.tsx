@@ -583,6 +583,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
   const [promotionWebhook, setPromotionWebhook] = useState(() => localStorage.getItem("avng_discord_promotion_webhook_url") || "");
   const [testWebhook, setTestWebhook] = useState(() => localStorage.getItem("avng_discord_test_webhook_url") || "");
   const [requestWebhook, setRequestWebhook] = useState(() => localStorage.getItem("avng_discord_request_webhook_url") || "");
+  const [pingRoleId, setPingRoleId] = useState(() => localStorage.getItem("avng_discord_ping_role_id") || "");
 
   const [discordProfile, setDiscordProfile] = useState<{
     username: string;
@@ -1117,6 +1118,19 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
               </div>
             </div>
 
+            <div>
+              <label className="block text-[10px] font-ibm uppercase tracking-wider text-muted-foreground mb-1">
+                ID роли Discord для упоминания/пинга (например, роли Инструкторов)
+              </label>
+              <input
+                type="text"
+                placeholder="ID роли Discord (например, 1150493827103984640) или оставьте пустым"
+                value={pingRoleId}
+                onChange={(e) => setPingRoleId(e.target.value.trim())}
+                className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-mono focus:outline-none focus:border-primary transition-colors"
+              />
+            </div>
+
             <div className="flex justify-end pt-2">
               <button
                 type="button"
@@ -1126,13 +1140,19 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
                     { key: "avng_discord_dismissal_webhook_url", value: dismissalWebhook, label: "Рапорты на увольнение" },
                     { key: "avng_discord_promotion_webhook_url", value: promotionWebhook, label: "Рапорты на повышение" },
                     { key: "avng_discord_test_webhook_url", value: testWebhook, label: "Результаты тестов" },
-                    { key: "avng_discord_request_webhook_url", value: requestWebhook, label: "Запросы на лекции/практики" }
+                    { key: "avng_discord_request_webhook_url", value: requestWebhook, label: "Запросы на лекции/практики" },
+                    { key: "avng_discord_ping_role_id", value: pingRoleId, label: "ID роли для пинга" }
                   ];
 
                   let hasError = false;
                   
                   for (const item of items) {
-                    if (item.value && !item.value.startsWith("https://discord.com/api/webhooks/")) {
+                    if (item.key === "avng_discord_ping_role_id") {
+                      if (item.value && !/^\d+$/.test(item.value)) {
+                        toast.error(`Некорректный ID роли Discord в поле "${item.label}"! Он должен состоять только из цифр.`);
+                        hasError = true;
+                      }
+                    } else if (item.value && !item.value.startsWith("https://discord.com/api/webhooks/")) {
                       toast.error(`Некорректная ссылка на вебхук Discord в поле "${item.label}"!`);
                       hasError = true;
                     }
