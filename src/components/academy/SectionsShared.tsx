@@ -339,6 +339,7 @@ export function RequestForm({
           name: authUser.name,
           rank: authUser.rank,
           staticId: authUser.static_id,
+          unit: authUser.unit || "АВНГ",
           typeLabel: TYPE_LABEL[type],
           subject,
           preferredDate: date || "Не указана",

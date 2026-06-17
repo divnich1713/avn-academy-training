@@ -270,6 +270,7 @@ export async function sendGeneralRequestDiscord({
   name,
   rank,
   staticId,
+  unit,
   typeLabel,
   subject,
   preferredDate,
@@ -278,6 +279,7 @@ export async function sendGeneralRequestDiscord({
   name: string;
   rank: string;
   staticId: string;
+  unit?: string;
   typeLabel: string;
   subject: string;
   preferredDate: string;
@@ -302,16 +304,20 @@ export async function sendGeneralRequestDiscord({
     color = 3447003; // Blue
   }
 
+  const formattedStaticId = fmtStaticId(staticId);
+  const description = `**Курсант:** ${name} | ${formattedStaticId}
+**Звание:** ${rank || "—"}
+**Подразделение:** ${unit || "АВНГ"}
+**Тема / Занятие:**
+  ${subject}
+**Желаемая дата:**
+  ${preferredDate}`;
+
   await sendDiscordEmbed({
     title,
+    description,
     color,
-    fields: [
-      { name: "Курсант", value: `${rank} ${name} (${staticId})`, inline: true },
-      { name: "Категория", value: typeLabel, inline: true },
-      { name: "Тема / Занятие", value: subject, inline: false },
-      { name: "Желаемая дата", value: preferredDate, inline: true },
-      ...(details ? [{ name: "Дополнительно / Доказательства", value: details.substring(0, 1024), inline: false }] : []),
-    ],
+    fields: details ? [{ name: "Дополнительно / Доказательства", value: details.substring(0, 1024), inline: false }] : [],
   }, targetType);
 }
 
