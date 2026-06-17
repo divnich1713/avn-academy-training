@@ -641,9 +641,10 @@ export function TestingAdmin() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in text-foreground">
-      {/* Tactical Sub-tabs Navigation */}
-      <div className="flex border-b border-tactical-border/70 gap-2">
+    <>
+      <div className="space-y-6 animate-fade-in text-foreground">
+        {/* Tactical Sub-tabs Navigation */}
+        <div className="flex border-b border-tactical-border/70 gap-2">
         <button
           onClick={() => setActiveTab("results")}
           className={`flex items-center gap-2 font-mono text-xs uppercase px-4 py-2 border-t border-x transition-all ${
@@ -1175,6 +1176,7 @@ export function TestingAdmin() {
           )}
         </div>
       )}
+    </div>
 
       {/* QUESTION CREATE/EDIT MODAL */}
       {showQuestionModal && (
@@ -1698,6 +1700,6 @@ export function TestingAdmin() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
