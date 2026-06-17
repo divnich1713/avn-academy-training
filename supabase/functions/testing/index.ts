@@ -492,7 +492,7 @@ Deno.serve(async (req) => {
     if (path === "/api/tests/next-question" && req.method === "GET") {
       const attemptId = Number(url.searchParams.get("attempt_id"));
       const attemptRes = await client.queryObject<any>(
-        `SELECT id, start_elo, end_elo, expires_at, remaining_seconds FROM ${SCHEMA}.test_attempts WHERE id = $1 AND user_id = $2 AND status = 'in_progress'`,
+        `SELECT id, start_elo, end_elo, expires_at, remaining_seconds, subject FROM ${SCHEMA}.test_attempts WHERE id = $1 AND user_id = $2 AND status = 'in_progress'`,
         [attemptId, user.id]
       );
 
