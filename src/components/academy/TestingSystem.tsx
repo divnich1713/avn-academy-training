@@ -231,8 +231,12 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
 
     try {
       const res = await testingApi.submitAnswer(activeSession.attempt_id, question.question_id, selectedAnswer);
-      setFeedbackData(res);
-      setShowFeedback(true);
+      if (res.completed) {
+        toast.success("Тестирование успешно завершено!");
+        loadSession();
+      } else {
+        loadNextQuestion(activeSession.attempt_id);
+      }
     } catch (err: any) {
       toast.error("Ошибка отправки ответа: " + err.message);
     }
