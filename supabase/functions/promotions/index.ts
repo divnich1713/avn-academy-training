@@ -25,7 +25,7 @@ const PROMOTION_REQUIREMENTS: Record<string, {
       { category: "Практика", label: "Вышка — 30 мин (доклад каждые 10 мин)", type: "practice", subject: "Вышка — 30 мин" },
       { category: "Практика", label: "Патруль по территории — 30 мин (доклад каждые 10 мин)", type: "practice", subject: "Патруль по территории — 30 мин" },
       { category: "Дополнительно", label: "Заполнение личного дела", type: "practice", subject: "Заполнение личного дела" },
-      { category: "Аттестация", label: "Экзамен теоретические тесты — Устав ФСВНГ — ФЗ о ФСВНГ", type: "exam", subject: "Экзамен теоретические тесты — Устав ФСВНГ — ФЗ о ФСВНГ" },
+      { category: "Аттестация", label: "Тест: ФЗ о ФСВНГ и Внутреннему Уставу", type: "test", subject: "Тест по ФЗ ФСВНГ и уставу ФСВНГ" },
     ],
   },
   sergeant: {
@@ -40,7 +40,7 @@ const PROMOTION_REQUIREMENTS: Record<string, {
       { category: "Теория", label: "Лекция: УК / ПК / КоАП", type: "lecture", subject: "Лекция УК, ПК и КоАП" },
       { category: "Теория", label: "Лекция: О ФЗ закрытых территорий", type: "lecture", subject: "Лекция: О ФЗ закрытых территорий" },
       { category: "Аттестация", label: "Экзамен процедуры практики — Штраф — Задержание — Арест", type: "exam", subject: "Экзамен процедуры практики — Штраф — Задержание — Арест" },
-      { category: "Аттестация", label: "Экзамен (теоретические тесты): УК, ПК, КоАП.", type: "exam", subject: "Экзамен (теоретические тесты): УК, ПК, КоАП." },
+      { category: "Аттестация", label: "Тест: УК, ПК, КоАП", type: "test", subject: "Тест по \"УК и КоАП, ПК\"" },
     ],
   },
 };
@@ -83,6 +83,7 @@ async function checkRequirements(
   const reqs = PROMOTION_REQUIREMENTS[promotionType];
   if (!reqs) return null;
 
+  // Query manual/instructor grades
   const gradesRes = await client.queryObject<{
     subject: string;
     type: string;
@@ -100,10 +101,41 @@ async function checkRequirements(
     gradeMap.set(key, { grade: row.grade, graded_at: row.graded_at });
   }
 
+  // Query online test attempts and compute average score percentage
+  const testAttemptsRes = await client.queryObject<{
+    subject: string;
+    completed_at: Date;
+    score_percent: number;
+  }>(
+    `SELECT a.subject, a.completed_at, COALESCE(AVG(ans.grade), 0) as score_percent
+     FROM ${SCHEMA}.test_attempts a
+     LEFT JOIN ${SCHEMA}.test_answers ans ON a.id = ans.attempt_id
+     WHERE a.user_id = $1 AND a.status = 'completed'
+     GROUP BY a.id, a.subject, a.completed_at`,
+    [userId]
+  );
+
+  const testMap = new Map<string, { grade: number; graded_at: Date }>();
+  for (const row of testAttemptsRes.rows) {
+    const score = Number(row.score_percent);
+    if (score >= 80) {
+      // Map score percentage to display grade (e.g. 5 for >= 90%, 4 for >= 80%, 3 for >= 60%)
+      let displayGrade = 3;
+      if (score >= 90) displayGrade = 5;
+      else if (score >= 80) displayGrade = 4;
+
+      // Keep the attempt with the highest score or the latest completed one
+      const existing = testMap.get(row.subject);
+      if (!existing || displayGrade > existing.grade) {
+        testMap.set(row.subject, { grade: displayGrade, graded_at: row.completed_at });
+      }
+    }
+  }
+
   let completedCount = 0;
   const items = reqs.items.map((item) => {
-    const key = `${item.type}::${item.subject}`;
-    const found = gradeMap.get(key);
+    const isTest = item.type === "test";
+    const found = isTest ? testMap.get(item.subject) : gradeMap.get(`${item.type}::${item.subject}`);
     const completed = !!found;
     if (completed) completedCount++;
     return {

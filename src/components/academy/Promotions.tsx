@@ -98,7 +98,7 @@ export function MilitaryReport({
             <li>• Вышка — 30 мин (доклад каждые 10 мин);</li>
             <li>• Патруль по территории — 30 мин (доклад каждые 10 мин);</li>
             <li>• Заполнение личного дела;</li>
-            <li>• Экзамен: Устав ФСВНГ и ФЗ о ФСВНГ;</li>
+            <li>• Тест: ФЗ о ФСВНГ и Внутреннему Уставу;</li>
           </ul>
         )}
       </div>
@@ -322,7 +322,7 @@ export function PromotionSection({ authUser }: { authUser: User }) {
                             {item.label}
                           </p>
                           <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                            {item.type === "lecture" ? "Лекция" : item.type === "practice" ? "Практика" : "Экзамен"}
+                            {item.type === "lecture" ? "Лекция" : item.type === "practice" ? "Практика" : item.type === "test" ? "Тест" : "Экзамен"}
                             {item.completed && item.graded_at && ` · ${fmt(item.graded_at)}`}
                           </p>
                         </div>

@@ -327,7 +327,7 @@ export type PromotionType = "junior_sergeant" | "sergeant";
 export interface PromotionRequirementItem {
   category: string;
   label: string;
-  type: "lecture" | "practice" | "exam";
+  type: "lecture" | "practice" | "exam" | "test";
   subject: string;
   completed: boolean;
   grade?: number;

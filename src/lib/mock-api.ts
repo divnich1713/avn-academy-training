@@ -178,6 +178,8 @@ const GRADES: Grade[] = [
   { id: 5, subject: "Медицинская подготовка", type: "practice", grade: 3, comment: "Необходимо повторить", graded_at: "2026-06-01T16:00:00Z", cadet_name: "Алексеев А.В.", cadet_rank: "Рядовой", cadet_id: 1, instructor_name: "Кап. Воронов В.И." },
   { id: 6, subject: "Строевая подготовка", type: "practice", grade: 5, comment: null, graded_at: "2026-06-09T09:00:00Z", cadet_name: "Борисов К.Н.", cadet_rank: "Рядовой", cadet_id: 3, instructor_name: "Кап. Воронов В.И." },
   { id: 7, subject: "Тактическая подготовка", type: "lecture", grade: 4, comment: null, graded_at: "2026-06-10T12:00:00Z", cadet_name: "Васильев Д.О.", cadet_rank: "Ефрейтор", cadet_id: 4, instructor_name: "Ст. лейт. Панов Д.С." },
+  { id: 8, subject: "Тест по ФЗ ФСВНГ и уставу ФСВНГ", type: "test" as any, grade: 5, comment: "Сдано на 90%", graded_at: "2026-06-15T10:00:00Z", cadet_name: "Алексеев А.В.", cadet_rank: "Рядовой", cadet_id: 1, instructor_name: "Система тестирования" },
+  { id: 9, subject: "Тест по \"УК и КоАП, ПК\"", type: "test" as any, grade: 4, comment: "Сдано на 80%", graded_at: "2026-06-16T11:00:00Z", cadet_name: "Алексеев А.В.", cadet_rank: "Рядовой", cadet_id: 1, instructor_name: "Система тестирования" },
 ];
 
 const NOTIFICATIONS: Notification[] = [
@@ -494,7 +496,7 @@ const MOCK_PROMOTION_REQUIREMENTS = {
       { category: "Практика", label: "Вышка — 30 мин (доклад каждые 10 мин)", type: "practice" as const, subject: "Вышка — 30 мин" },
       { category: "Практика", label: "Патруль по территории — 30 мин (доклад каждые 10 мин)", type: "practice" as const, subject: "Патруль по территории — 30 мин" },
       { category: "Дополнительно", label: "Заполнение личного дела", type: "practice" as const, subject: "Заполнение личного дела" },
-      { category: "Аттестация", label: "Экзамен: Устав ФСВНГ и ФЗ о ФСВНГ", type: "exam" as const, subject: "Экзамен: Устав ФСВНГ и ФЗ о ФСВНГ" },
+      { category: "Аттестация", label: "Тест: ФЗ о ФСВНГ и Внутреннему Уставу", type: "test" as const, subject: "Тест по ФЗ ФСВНГ и уставу ФСВНГ" },
     ],
   },
   sergeant: {
@@ -511,7 +513,7 @@ const MOCK_PROMOTION_REQUIREMENTS = {
       { category: "Теория", label: "Лекция: УК / ПК / КоАП", type: "lecture" as const, subject: "Лекция УК, ПК и КоАП" },
       { category: "Теория", label: "Лекция: О ФЗ закрытых территорий", type: "lecture" as const, subject: "Лекция: О ФЗ закрытых территорий" },
       { category: "Аттестация", label: "Экзамен процедуры: Штраф, Задержание, Арест", type: "exam" as const, subject: "Экзамен процедуры: Штраф, Задержание, Арест" },
-      { category: "Аттестация", label: "Экзамен тесты: УК, ПК, КоАП", type: "exam" as const, subject: "Экзамен тесты: УК, ПК, КоАП" },
+      { category: "Аттестация", label: "Тест: УК, ПК, КоАП", type: "test" as const, subject: "Тест по \"УК и КоАП, ПК\"" },
     ],
   },
 };
@@ -534,7 +536,8 @@ export async function checkPromotionRequirements(type: import("./api").Promotion
 
   let completedCount = 0;
   const items = reqs.items.map((item) => {
-    const found = gradeMap.get(`${item.type}::${item.subject}`);
+    const key = `${item.type}::${item.subject}`;
+    const found = gradeMap.get(key);
     const completed = !!found;
     if (completed) completedCount++;
     return {
