@@ -624,12 +624,13 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
                         <th className="p-3 text-muted-foreground uppercase font-semibold">Результат</th>
                         <th className="p-3 text-muted-foreground uppercase font-semibold">Дата</th>
                         <th className="p-3 text-muted-foreground uppercase font-semibold">Статус</th>
+                        <th className="p-3 text-muted-foreground uppercase font-semibold text-right">Действия</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredAttempts.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                          <td colSpan={9} className="p-8 text-center text-muted-foreground">
                             Сессий тестирования не найдено по выбранным фильтрам.
                           </td>
                         </tr>
@@ -662,6 +663,39 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
                               >
                                 {att.status === "completed" ? "Сдал" : att.status === "aborted" ? "Списал" : "В процессе"}
                               </span>
+                            </td>
+                            <td className="p-3 text-right">
+                              {att.status === "completed" && (
+                                <button
+                                  onClick={() => {
+                                    const completedDate = new Date(att.completed_at || att.started_at).toLocaleDateString("ru-RU", {
+                                      year: "numeric",
+                                      month: "long",
+                                      day: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit"
+                                    });
+                                    const isPassed = att.score_percent >= 80;
+                                    const gradeVal = att.score_percent >= 90 ? 5 : att.score_percent >= 80 ? 4 : att.score_percent >= 60 ? 3 : 2;
+                                    const discordText = `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
+**Курсант:** ${att.cadet_name} (ID: ${att.static_id})
+**Звание:** ${att.rank || "—"}
+**Подразделение:** ${att.unit || "—"}
+**Результат:** ${isPassed ? "🟢 СДАН" : "🔴 НЕ СДАН"}
+**Оценка:** ${gradeVal}
+**Процент верных:** ${att.score_percent}%
+**Дата сдачи:** ${completedDate}
+**Ссылка на систему:** ${window.location.origin}`;
+                                    
+                                    navigator.clipboard.writeText(discordText);
+                                    toast.success(`Результат ${att.cadet_name} скопирован для Discord!`);
+                                  }}
+                                  className="text-[10px] text-primary hover:underline font-mono uppercase tracking-wider flex items-center justify-end gap-1 ml-auto"
+                                >
+                                  <Icon name="Copy" size={10} />
+                                  В Discord
+                                </button>
+                              )}
                             </td>
                           </tr>
                         ))

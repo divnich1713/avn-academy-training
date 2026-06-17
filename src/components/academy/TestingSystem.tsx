@@ -453,7 +453,35 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
             </p>
           )}
 
-          <div className="pt-4 flex justify-center relative">
+          <div className="pt-4 flex flex-col sm:flex-row justify-center items-center gap-4 relative">
+            <button
+              onClick={() => {
+                const completedDate = new Date(certificate.completed_at).toLocaleDateString("ru-RU", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit"
+                });
+                const discordText = `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
+**Курсант:** ${certificate.cadet_name} (ID: ${certificate.static_id})
+**Звание:** ${certificate.rank || "—"}
+**Подразделение:** ${certificate.unit || "—"}
+**Тема:** ${certificate.subject}
+**Результат:** ${certificate.passed ? "🟢 СДАН" : "🔴 НЕ СДАН"}
+**Оценка:** ${certificate.grade}
+**Верные ответы:** ${certificate.correct_answers_count} из ${certificate.total_questions} (${certificate.percentage}%)
+**Дата сдачи:** ${completedDate}
+**Ссылка на систему:** ${window.location.origin}`;
+                
+                navigator.clipboard.writeText(discordText);
+                toast.success("Данные для Discord успешно скопированы!");
+              }}
+              className="bg-tactical-panel hover:bg-tactical-border/60 text-primary font-mono text-xs uppercase tracking-widest px-6 py-3 border border-primary/20 shadow-lg font-bold flex items-center gap-2"
+            >
+              <Icon name="Copy" size={14} />
+              Скопировать для Discord
+            </button>
             <button
               onClick={() => {
                 setCertificate(null);
