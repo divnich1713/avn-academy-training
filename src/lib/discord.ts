@@ -78,28 +78,32 @@ export async function sendDiscordEmbed(payload: {
 // 1. Dismissal report notification (Red)
 export async function sendDismissalReportDiscord({
   name,
-  passport,
   rank,
   reason,
   photoUrl,
   staticId,
+  unit,
 }: {
   name: string;
-  passport: string;
   rank: string;
   reason: string;
   photoUrl: string;
   staticId: string;
+  unit?: string;
 }) {
+  const formattedStaticId = fmtStaticId(staticId);
+  const description = `**Курсант:** ${name} | ${formattedStaticId}
+**Звание:** ${rank || "—"}
+**Подразделение:** ${unit || "АВНГ"}
+**Причина:** ${reason}
+
+Ссылка на фотокарточку (удостоверение)
+${photoUrl}`;
+
   await sendDiscordEmbed({
     title: "🚨 Подан рапорт на увольнение из академии",
+    description,
     color: 15548997, // Red
-    fields: [
-      { name: "Курсант", value: `${rank} ${name} (${staticId})`, inline: true },
-      { name: "Паспорт", value: passport, inline: true },
-      { name: "Причина", value: reason, inline: false },
-      { name: "Ссылка на фотокарточку (удостоверение)", value: photoUrl, inline: false },
-    ],
   }, "dismissal");
 }
 

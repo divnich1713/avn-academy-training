@@ -328,11 +328,11 @@ export function RequestForm({
       if (subject === "Рапорт на увольнение из академии") {
         sendDismissalReportDiscord({
           name: dismissalName,
-          passport: dismissalPassport,
           rank: dismissalRank,
           reason: dismissalReason,
           photoUrl: dismissalPhotoUrl,
-          staticId: authUser.static_id
+          staticId: authUser.static_id,
+          unit: authUser.unit || "АВНГ"
         }).catch(err => console.error("Discord error:", err));
       } else {
         sendGeneralRequestDiscord({
