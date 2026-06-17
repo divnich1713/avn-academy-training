@@ -462,96 +462,150 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
     return groupedWlUsers.filter((g) => g.dateStr === selectedWlDate);
   }, [groupedWlUsers, selectedWlDate, wlSearchQuery]);
 
-  const renderRequestCard = (r: import("@/lib/api").TrainingRequest) => (
-    <div key={r.id} className={`border p-4 space-y-3 transition-colors ${r.type === "dismissal" ? "bg-red-950/20 border-red-500/80 shadow-[0_0_10px_rgba(220,38,38,0.15)]" : "bg-tactical-card border-tactical-border hover:border-primary/30"} ${r.id === highlightRequestId ? "border-primary" : ""}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className={`w-8 h-8 border flex items-center justify-center flex-shrink-0 mt-0.5 ${r.type === "dismissal" ? "bg-red-950 border-red-500 text-red-500" : "bg-primary/10 border-primary/20 text-primary"}`}>
-            <Icon name={r.type === "dismissal" ? "UserMinus" : "User"} size={14} />
+  const renderRequestCard = (r: import("@/lib/api").TrainingRequest) => {
+    const getCardStyle = (type: string) => {
+      switch (type) {
+        case "dismissal":
+          return {
+            bg: "bg-red-950/20 border-red-500/80 shadow-[0_0_10px_rgba(220,38,38,0.15)]",
+            iconBg: "bg-red-950 border-red-500 text-red-500",
+            iconName: "UserMinus",
+            badgeColor: "text-red-400 border-red-800 bg-red-950/40",
+            titleColor: "text-red-200 font-semibold",
+            nameColor: "text-red-400"
+          };
+        case "practice":
+          return {
+            bg: "bg-blue-950/20 border-blue-500/80 shadow-[0_0_10px_rgba(59,130,246,0.15)]",
+            iconBg: "bg-blue-950 border-blue-500 text-blue-500",
+            iconName: "Wrench",
+            badgeColor: "text-blue-400 border-blue-800 bg-blue-950/40",
+            titleColor: "text-blue-200 font-semibold",
+            nameColor: "text-blue-400"
+          };
+        case "lecture":
+          return {
+            bg: "bg-yellow-950/20 border-yellow-500/80 shadow-[0_0_10px_rgba(234,179,8,0.15)]",
+            iconBg: "bg-yellow-950 border-yellow-500 text-yellow-500",
+            iconName: "BookOpen",
+            badgeColor: "text-yellow-400 border-yellow-800 bg-yellow-950/40",
+            titleColor: "text-yellow-200 font-semibold",
+            nameColor: "text-yellow-400"
+          };
+        case "exam":
+          return {
+            bg: "bg-purple-950/20 border-purple-500/80 shadow-[0_0_10px_rgba(168,85,247,0.15)]",
+            iconBg: "bg-purple-950 border-purple-500 text-purple-500",
+            iconName: "ClipboardList",
+            badgeColor: "text-purple-400 border-purple-800 bg-purple-950/40",
+            titleColor: "text-purple-200 font-semibold",
+            nameColor: "text-purple-400"
+          };
+        default:
+          return {
+            bg: "bg-tactical-card border-tactical-border hover:border-primary/30",
+            iconBg: "bg-primary/10 border-primary/20 text-primary",
+            iconName: "User",
+            badgeColor: "text-muted-foreground bg-tactical-panel border-tactical-border",
+            titleColor: "text-foreground",
+            nameColor: "text-foreground"
+          };
+      }
+    };
+
+    const style = getCardStyle(r.type);
+
+    return (
+      <div key={r.id} className={`border p-4 space-y-3 transition-colors ${style.bg} ${r.id === highlightRequestId ? "border-primary" : ""}`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className={`w-8 h-8 border flex items-center justify-center flex-shrink-0 mt-0.5 ${style.iconBg}`}>
+              <Icon name={style.iconName} size={14} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => onViewProfile?.({ id: r.cadet_id, name: r.cadet_name, rank: r.cadet_rank, static_id: r.cadet_static_id } as any)}
+                  className={`font-ibm text-sm font-medium hover:text-primary transition-colors hover:underline text-left ${style.nameColor}`}
+                >
+                  {r.cadet_rank} {r.cadet_name}
+                </button>
+                <span className={`rank-badge px-1.5 py-0.5 border ${style.badgeColor}`}>{TYPE_LABEL[r.type]}</span>
+              </div>
+              <p className={`text-sm mt-0.5 ${style.titleColor}`}>{r.subject}</p>
+              <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                {fmt(r.created_at)}
+                {r.preferred_date && fmt(r.created_at) !== fmt(r.preferred_date) && ` · Дата: ${fmt(r.preferred_date)}`}
+              </p>
+              {r.description && (
+                <div className="text-xs text-muted-foreground mt-1 bg-tactical-panel border border-tactical-border/60 p-2 font-mono whitespace-pre-line text-[11px] leading-relaxed">
+                  {r.description.split("\n").map((line, idx) => {
+                    const urlMatch = line.match(/(https?:\/\/[^\s]+)/);
+                    if (urlMatch) {
+                      const url = urlMatch[0];
+                      const label = line.substring(0, line.indexOf(url));
+                      return (
+                        <div key={idx} className="flex flex-wrap items-center gap-1">
+                          {label && <span className="text-muted-foreground">{label}</span>}
+                          <a 
+                            href={url} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-primary hover:underline flex items-center gap-0.5 break-all"
+                          >
+                            {url}
+                            <Icon name="ExternalLink" size={10} className="inline flex-shrink-0" />
+                          </a>
+                        </div>
+                      );
+                    }
+                    return <div key={idx}>{line}</div>;
+                  })}
+                </div>
+              )}
+            </div>
           </div>
-          <div>
+          <StatusBadge status={r.status} />
+        </div>
+        {r.status === "pending" && (
+          <div className="border-t border-tactical-border pt-3 space-y-2">
+            <input
+              className="w-full bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary transition-colors"
+              placeholder="Комментарий инструктора (необязательно)..."
+              value={reviewComment[r.id] || ""}
+              onChange={(e) => setReviewComment((prev) => ({ ...prev, [r.id]: e.target.value }))}
+            />
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 type="button"
-                onClick={() => onViewProfile?.({ id: r.cadet_id, name: r.cadet_name, rank: r.cadet_rank, static_id: r.cadet_static_id } as any)}
-                className={`font-ibm text-sm font-medium hover:text-primary transition-colors hover:underline text-left ${r.type === "dismissal" ? "text-red-400" : "text-foreground"}`}
+                disabled={reviewLoading[r.id]}
+                onClick={() => handleReview(r.id, "approved")}
+                className="rank-badge text-green-400 border border-green-800 px-3 py-1 hover:bg-green-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
               >
-                {r.cadet_rank} {r.cadet_name}
+                <Icon name="Check" size={12} />Одобрить
               </button>
-              <span className={`rank-badge px-1.5 py-0.5 border ${r.type === "dismissal" ? "text-red-400 bg-red-950/40 border-red-800" : "text-muted-foreground bg-tactical-panel border-tactical-border"}`}>{TYPE_LABEL[r.type]}</span>
+              <button
+                type="button"
+                disabled={reviewLoading[r.id]}
+                onClick={() => handleReview(r.id, "rejected")}
+                className="rank-badge text-red-400 border border-red-800 px-3 py-1 hover:bg-red-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
+              >
+                <Icon name="X" size={12} />Отклонить
+              </button>
+               {reviewLoading[r.id] && <Icon name="Loader2" size={14} className="text-primary animate-spin" />}
             </div>
-            <p className={`text-sm mt-0.5 ${r.type === "dismissal" ? "text-red-200 font-semibold" : "text-foreground"}`}>{r.subject}</p>
-            <p className="text-xs text-muted-foreground font-mono mt-0.5">
-              {fmt(r.created_at)}
-              {r.preferred_date && fmt(r.created_at) !== fmt(r.preferred_date) && ` · Дата: ${fmt(r.preferred_date)}`}
-            </p>
-            {r.description && (
-              <div className="text-xs text-muted-foreground mt-1 bg-tactical-panel border border-tactical-border/60 p-2 font-mono whitespace-pre-line text-[11px] leading-relaxed">
-                {r.description.split("\n").map((line, idx) => {
-                  const urlMatch = line.match(/(https?:\/\/[^\s]+)/);
-                  if (urlMatch) {
-                    const url = urlMatch[0];
-                    const label = line.substring(0, line.indexOf(url));
-                    return (
-                      <div key={idx} className="flex flex-wrap items-center gap-1">
-                        {label && <span className="text-muted-foreground">{label}</span>}
-                        <a 
-                          href={url} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="text-primary hover:underline flex items-center gap-0.5 break-all"
-                        >
-                          {url}
-                          <Icon name="ExternalLink" size={10} className="inline flex-shrink-0" />
-                        </a>
-                      </div>
-                    );
-                  }
-                  return <div key={idx}>{line}</div>;
-                })}
-              </div>
-            )}
           </div>
-        </div>
-        <StatusBadge status={r.status} />
+        )}
+        {r.status !== "pending" && r.reviewer_name && (
+          <p className="text-xs text-muted-foreground font-mono border-t border-tactical-border pt-2">
+            Рассмотрел: {r.reviewer_name}
+            {r.instructor_comment && ` · "${r.instructor_comment}"`}
+          </p>
+        )}
       </div>
-      {r.status === "pending" && (
-        <div className="border-t border-tactical-border pt-3 space-y-2">
-          <input
-            className="w-full bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary transition-colors"
-            placeholder="Комментарий инструктора (необязательно)..."
-            value={reviewComment[r.id] || ""}
-            onChange={(e) => setReviewComment((prev) => ({ ...prev, [r.id]: e.target.value }))}
-          />
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              disabled={reviewLoading[r.id]}
-              onClick={() => handleReview(r.id, "approved")}
-              className="rank-badge text-green-400 border border-green-800 px-3 py-1 hover:bg-green-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
-            >
-              <Icon name="Check" size={12} />Одобрить
-            </button>
-            <button
-              type="button"
-              disabled={reviewLoading[r.id]}
-              onClick={() => handleReview(r.id, "rejected")}
-              className="rank-badge text-red-400 border border-red-800 px-3 py-1 hover:bg-red-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
-            >
-              <Icon name="X" size={12} />Отклонить
-            </button>
-             {reviewLoading[r.id] && <Icon name="Loader2" size={14} className="text-primary animate-spin" />}
-          </div>
-        </div>
-      )}
-      {r.status !== "pending" && r.reviewer_name && (
-        <p className="text-xs text-muted-foreground font-mono border-t border-tactical-border pt-2">
-          Рассмотрел: {r.reviewer_name}
-          {r.instructor_comment && ` · "${r.instructor_comment}"`}
-        </p>
-      )}
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="animate-fade-in space-y-6">

@@ -44,6 +44,52 @@ function getSectionForNotif(n: Notification): { section: Section; requestId?: nu
   return null;
 }
 
+function getNotifStyles(n: Notification) {
+  const msg = n.message.toLowerCase();
+  const title = n.title.toLowerCase();
+  const isUnread = !n.is_read;
+  
+  if (msg.includes("увольн") || title.includes("увольн")) {
+    return {
+      iconColor: isUnread ? "text-red-400" : "text-red-800/60",
+      dotColor: "bg-red-500",
+      borderColor: "border-l-2 border-l-red-500/50",
+      bgColor: isUnread ? "bg-red-950/20 hover:bg-red-950/30" : "hover:bg-red-950/10"
+    };
+  }
+  if (msg.includes("практик") || title.includes("практик")) {
+    return {
+      iconColor: isUnread ? "text-blue-400" : "text-blue-800/60",
+      dotColor: "bg-blue-500",
+      borderColor: "border-l-2 border-l-blue-500/50",
+      bgColor: isUnread ? "bg-blue-950/20 hover:bg-blue-950/30" : "hover:bg-blue-950/10"
+    };
+  }
+  if (msg.includes("лекци") || title.includes("лекци") || msg.includes("запрос") || title.includes("запрос")) {
+    return {
+      iconColor: isUnread ? "text-yellow-400" : "text-yellow-800/60",
+      dotColor: "bg-yellow-500",
+      borderColor: "border-l-2 border-l-yellow-500/50",
+      bgColor: isUnread ? "bg-yellow-950/20 hover:bg-yellow-950/30" : "hover:bg-yellow-950/10"
+    };
+  }
+  if (msg.includes("экзамен") || title.includes("экзамен")) {
+    return {
+      iconColor: isUnread ? "text-purple-400" : "text-purple-800/60",
+      dotColor: "bg-purple-500",
+      borderColor: "border-l-2 border-l-purple-500/50",
+      bgColor: isUnread ? "bg-purple-950/20 hover:bg-purple-950/30" : "hover:bg-purple-950/10"
+    };
+  }
+  // Default to yellow for general requests/notifications
+  return {
+    iconColor: isUnread ? "text-yellow-400" : "text-muted-foreground",
+    dotColor: "bg-yellow-400",
+    borderColor: "border-l-2 border-l-yellow-500/30",
+    bgColor: isUnread ? "bg-yellow-950/10 hover:bg-yellow-950/20" : "hover:bg-tactical-panel/50"
+  };
+}
+
 export function NotificationBell({ onNavigate }: { onNavigate: (section: Section, requestId?: number) => void }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -179,37 +225,38 @@ export function NotificationBell({ onNavigate }: { onNavigate: (section: Section
                 <p className="text-xs text-muted-foreground font-ibm">Нет уведомлений</p>
               </div>
             ) : (
-              notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className={`px-3 py-2.5 border-b border-tactical-border/50 flex gap-2.5 cursor-pointer hover:bg-primary/5 transition-colors ${
-                    !n.is_read ? "bg-primary/5" : ""
-                  }`}
-                  onClick={() => {
-                    if (!n.is_read) handleMarkOne(n.id);
-                    const dest = getSectionForNotif(n);
-                    if (dest) { setOpen(false); onNavigate(dest.section, dest.requestId); }
-                  }}
-                >
-                  <div className={`mt-0.5 flex-shrink-0 ${!n.is_read ? "text-yellow-400" : "text-muted-foreground"}`}>
-                    <Icon name={typeIcon(n.type)} size={14} />
+              notifications.map((n) => {
+                const style = getNotifStyles(n);
+                return (
+                  <div
+                    key={n.id}
+                    className={`px-3 py-2.5 border-b border-tactical-border/50 flex gap-2.5 cursor-pointer transition-colors ${style.bgColor} ${style.borderColor}`}
+                    onClick={() => {
+                      if (!n.is_read) handleMarkOne(n.id);
+                      const dest = getSectionForNotif(n);
+                      if (dest) { setOpen(false); onNavigate(dest.section, dest.requestId); }
+                    }}
+                  >
+                    <div className={`mt-0.5 flex-shrink-0 ${style.iconColor}`}>
+                      <Icon name={typeIcon(n.type)} size={14} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-xs font-semibold font-ibm leading-tight ${!n.is_read ? "text-foreground" : "text-muted-foreground"}`}>
+                        {n.title}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground font-ibm leading-snug mt-0.5 break-words">
+                        {n.message}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground/60 font-mono mt-1">
+                        {formatTime(n.created_at)}
+                      </p>
+                    </div>
+                    {!n.is_read && (
+                      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5 ${style.dotColor}`} />
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-xs font-semibold font-ibm leading-tight ${!n.is_read ? "text-foreground" : "text-muted-foreground"}`}>
-                      {n.title}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground font-ibm leading-snug mt-0.5 break-words">
-                      {n.message}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground/60 font-mono mt-1">
-                      {formatTime(n.created_at)}
-                    </p>
-                  </div>
-                  {!n.is_read && (
-                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 flex-shrink-0 mt-1.5" />
-                  )}
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

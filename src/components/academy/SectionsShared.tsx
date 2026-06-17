@@ -64,26 +64,81 @@ export function RequestCard({
     if (highlight) setExpanded(true);
   }, [highlight]);
 
+  const getCardStyle = (type: string, subject: string) => {
+    const isDismissal = type === "dismissal" || (type === "report" && subject === "Рапорт на увольнение из академии");
+    if (isDismissal) {
+      return {
+        bg: "bg-red-950/20 border-red-500/80 shadow-[0_0_10px_rgba(220,38,38,0.15)]",
+        iconBg: "bg-red-950 border-red-500 text-red-500",
+        iconName: "UserMinus",
+        badgeColor: "text-red-400 border-red-800 bg-red-950/40",
+        titleColor: "text-red-200 font-semibold",
+        nameColor: "text-red-400"
+      };
+    }
+    switch (type) {
+      case "practice":
+        return {
+          bg: "bg-blue-950/20 border-blue-500/80 shadow-[0_0_10px_rgba(59,130,246,0.15)]",
+          iconBg: "bg-blue-950 border-blue-500 text-blue-500",
+          iconName: "Wrench",
+          badgeColor: "text-blue-400 border-blue-800 bg-blue-950/40",
+          titleColor: "text-blue-200 font-semibold",
+          nameColor: "text-blue-400"
+        };
+      case "lecture":
+        return {
+          bg: "bg-yellow-950/20 border-yellow-500/80 shadow-[0_0_10px_rgba(234,179,8,0.15)]",
+          iconBg: "bg-yellow-950 border-yellow-500 text-yellow-500",
+          iconName: "BookOpen",
+          badgeColor: "text-yellow-400 border-yellow-800 bg-yellow-950/40",
+          titleColor: "text-yellow-200 font-semibold",
+          nameColor: "text-yellow-400"
+        };
+      case "exam":
+        return {
+          bg: "bg-purple-950/20 border-purple-500/80 shadow-[0_0_10px_rgba(168,85,247,0.15)]",
+          iconBg: "bg-purple-950 border-purple-500 text-purple-500",
+          iconName: "ClipboardList",
+          badgeColor: "text-purple-400 border-purple-800 bg-purple-950/40",
+          titleColor: "text-purple-200 font-semibold",
+          nameColor: "text-purple-400"
+        };
+      default:
+        return {
+          bg: "bg-tactical-card border-tactical-border hover:border-primary/30",
+          iconBg: "bg-primary/10 border-primary/20 text-primary",
+          iconName: icon || "User",
+          badgeColor: "text-muted-foreground bg-tactical-panel border-tactical-border",
+          titleColor: "text-foreground",
+          nameColor: "text-foreground"
+        };
+    }
+  };
+
+  const style = getCardStyle(r.type, r.subject);
+
   return (
     <div
-      className={`bg-tactical-card border p-4 transition-colors cursor-pointer ${
-        highlight ? "border-primary animate-pulse-once" : "border-tactical-border hover:border-primary/30"
+      className={`border p-4 transition-colors cursor-pointer ${style.bg} ${
+        highlight ? "border-primary animate-pulse-once" : ""
       }`}
       onClick={() => setExpanded((v) => !v)}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <div className="w-8 h-8 bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <Icon name={icon} fallback="FileText" size={14} className="text-primary" />
+          <div className={`w-8 h-8 border flex items-center justify-center flex-shrink-0 mt-0.5 ${style.iconBg}`}>
+            <Icon name={style.iconName} fallback="FileText" size={14} />
           </div>
           <div>
-            <h4 className="font-ibm text-sm font-medium text-foreground">{r.subject}</h4>
+            <h4 className={`font-ibm text-sm font-medium ${style.titleColor}`}>{r.subject}</h4>
             <p className="text-xs text-muted-foreground font-mono mt-0.5">
-              {TYPE_LABEL[r.type]} · {fmt(r.created_at)}
+              <span className={`rank-badge px-1.5 py-0.5 border mr-1.5 ${style.badgeColor}`}>{TYPE_LABEL[r.type]}</span>
+              {fmt(r.created_at)}
               {r.preferred_date && fmt(r.created_at) !== fmt(r.preferred_date) && ` · Дата: ${fmt(r.preferred_date)}`}
             </p>
             {r.cadet_name && (
-              <p className="text-xs text-muted-foreground font-mono">{r.cadet_rank} {r.cadet_name}</p>
+              <p className={`text-xs font-mono mt-1 ${style.nameColor}`}>{r.cadet_rank} {r.cadet_name}</p>
             )}
           </div>
         </div>

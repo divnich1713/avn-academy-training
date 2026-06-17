@@ -951,21 +951,65 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
           {tab === "requests" && (
             loadingR ? <Spinner /> : requests.length === 0 ? <Empty text="Запросов нет" /> : (
               <div className="space-y-2">
-                {requests.map((r) => (
-                  <div key={r.id} className="bg-tactical-card border border-tactical-border p-3 flex items-center justify-between gap-3 hover:border-primary/30 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-7 h-7 bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
-                        <Icon name="FileText" size={12} className="text-primary" />
+                {requests.map((r) => {
+                  const getHistoryStyle = (type: string, subject: string) => {
+                    const isDismissal = type === "dismissal" || (type === "report" && subject === "Рапорт на увольнение из академии");
+                    if (isDismissal) {
+                      return {
+                        bg: "bg-red-950/20 border-red-500/50 shadow-[0_0_10px_rgba(220,38,38,0.1)]",
+                        iconBg: "bg-red-950 border-red-500/50 text-red-500",
+                        iconName: "UserMinus",
+                        titleColor: "text-red-200 font-semibold"
+                      };
+                    }
+                    switch (type) {
+                      case "practice":
+                        return {
+                          bg: "bg-blue-950/20 border-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.1)]",
+                          iconBg: "bg-blue-950 border-blue-500/50 text-blue-500",
+                          iconName: "Wrench",
+                          titleColor: "text-blue-200 font-semibold"
+                        };
+                      case "lecture":
+                        return {
+                          bg: "bg-yellow-950/20 border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.1)]",
+                          iconBg: "bg-yellow-950 border-yellow-500/50 text-yellow-500",
+                          iconName: "BookOpen",
+                          titleColor: "text-yellow-200 font-semibold"
+                        };
+                      case "exam":
+                        return {
+                          bg: "bg-purple-950/20 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.1)]",
+                          iconBg: "bg-purple-950 border-purple-500/50 text-purple-500",
+                          iconName: "ClipboardList",
+                          titleColor: "text-purple-200 font-semibold"
+                        };
+                      default:
+                        return {
+                          bg: "bg-tactical-card border border-tactical-border hover:border-primary/30",
+                          iconBg: "bg-primary/10 border-primary/20 text-primary",
+                          iconName: "FileText",
+                          titleColor: "text-foreground"
+                        };
+                    }
+                  };
+                  const style = getHistoryStyle(r.type, r.subject);
+                  return (
+                    <div key={r.id} className={`border p-3 flex items-center justify-between gap-3 transition-colors ${style.bg}`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-7 h-7 border flex items-center justify-center flex-shrink-0 ${style.iconBg}`}>
+                          <Icon name={style.iconName} size={12} />
+                        </div>
+                        <div>
+                          <p className={`text-sm font-ibm ${style.titleColor}`}>{r.subject}</p>
+                          <p className="text-xs text-muted-foreground font-mono">{TYPE_LABEL[r.type]} · {fmt(r.created_at)}</p>
+                          {r.instructor_comment && <p className="text-xs text-muted-foreground italic mt-0.5">"{r.instructor_comment}"</p>}
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-ibm text-foreground">{r.subject}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{TYPE_LABEL[r.type]} · {fmt(r.created_at)}</p>
-                        {r.instructor_comment && <p className="text-xs text-muted-foreground italic mt-0.5">"{r.instructor_comment}"</p>}
-                      </div>
+                      <StatusBadge status={r.status} />
                     </div>
-                    <StatusBadge status={r.status} />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )
           )}
