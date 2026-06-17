@@ -66,6 +66,8 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
   const [settingsList, setSettingsList] = useState<TestSettings[]>([]);
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [editingSettings, setEditingSettings] = useState<TestSettings | null>(null);
+  const [newSubject, setNewSubject] = useState("");
+  const [showAddSubject, setShowAddSubject] = useState(false);
 
   useEffect(() => {
     if (activeTab === "results") {
@@ -455,6 +457,44 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
     }
   };
 
+  const handleCreateSubject = async () => {
+    if (!newSubject.trim()) {
+      toast.warning("Введите название темы!");
+      return;
+    }
+    const exists = settingsList.some((s) => s.subject.toLowerCase() === newSubject.trim().toLowerCase());
+    if (exists) {
+      toast.warning("Тест с такой темой уже существует!");
+      return;
+    }
+    
+    const newSettings: TestSettings = {
+      subject: newSubject.trim(),
+      timer_minutes: 45,
+      question_count: 20,
+      base_elo: 1000,
+    };
+
+    try {
+      await testingApi.updateSettingsAdmin(newSettings);
+      toast.success("Новый тест успешно создан!");
+      setNewSubject("");
+      setShowAddSubject(false);
+      
+      const res = await testingApi.getSettingsAdmin();
+      setSettingsList(res);
+      
+      const newlyCreated = res.find((x) => x.subject === newSettings.subject);
+      if (newlyCreated) {
+        setEditingSettings({ ...newlyCreated });
+      } else {
+        setEditingSettings({ ...newSettings });
+      }
+    } catch (err: any) {
+      toast.error("Ошибка создания теста: " + err.message);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in text-foreground">
       {/* Tactical Sub-tabs Navigation */}
@@ -800,7 +840,46 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
               {editingSettings && (
                 <form onSubmit={handleSaveSettings} className="space-y-5 font-mono text-xs">
                   <div>
-                    <label className="text-muted-foreground uppercase block mb-1">Настройка для темы</label>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-muted-foreground uppercase">Настройка для темы</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddSubject(!showAddSubject)}
+                        className="bg-tactical-panel hover:bg-tactical-border text-gold border border-gold/20 px-2 py-0.5 flex items-center gap-1 font-bold text-[10px]"
+                      >
+                        <Icon name="Plus" size={10} /> Создать новый тест
+                      </button>
+                    </div>
+
+                    {showAddSubject && (
+                      <div className="flex gap-2 mb-3 bg-tactical-panel/30 p-2.5 border border-tactical-border/40">
+                        <input
+                          type="text"
+                          placeholder="Название нового теста..."
+                          value={newSubject}
+                          onChange={(e) => setNewSubject(e.target.value)}
+                          className="flex-1 bg-tactical-panel border border-tactical-border text-foreground p-1.5 focus:outline-none focus:border-primary font-bold"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleCreateSubject}
+                          className="bg-primary hover:bg-primary/90 text-primary-foreground px-3 py-1 font-bold font-mono text-[10px]"
+                        >
+                          Добавить
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAddSubject(false);
+                            setNewSubject("");
+                          }}
+                          className="bg-tactical-panel hover:bg-tactical-border text-muted-foreground border border-tactical-border/40 px-2.5 py-1 font-bold font-mono text-[10px]"
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                    )}
+
                     <select
                       value={editingSettings.subject}
                       onChange={(e) => {
