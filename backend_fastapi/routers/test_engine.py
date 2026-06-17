@@ -37,18 +37,7 @@ async def get_test_settings(db: AsyncSession, subject: str) -> dict:
 
 async def get_attempt_subject(db: AsyncSession, attempt_id: int) -> str:
     try:
-        ans_stmt = (
-            select(TestQuestion.subject)
-            .join(TestAnswer, TestAnswer.question_id == TestQuestion.id)
-            .where(TestAnswer.attempt_id == attempt_id)
-            .limit(1)
-        )
-        res = await db.execute(ans_stmt)
-        subj = res.scalar_one_or_none()
-        if subj:
-            return subj
-            
-        stmt = select(TestQuestion.subject).limit(1)
+        stmt = select(TestAttempt.subject).where(TestAttempt.id == attempt_id)
         res = await db.execute(stmt)
         subj = res.scalar_one_or_none()
         if subj:
@@ -211,6 +200,7 @@ async def start_test(
     
     attempt = TestAttempt(
         user_id=user.id,
+        subject=payload.subject,
         status="in_progress",
         difficulty=payload.difficulty,
         start_elo=start_elo,

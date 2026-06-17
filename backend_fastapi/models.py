@@ -53,6 +53,7 @@ class TestAttempt(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="CASCADE"), nullable=False)
+    subject = Column(String(255), nullable=False, default="Тест по ФЗ ФСВНГ и уставу ФСВНГ")
     status = Column(String(50), nullable=False, default="in_progress") # in_progress, completed, aborted
     difficulty = Column(Integer, nullable=False, default=5)
     start_elo = Column(Integer, nullable=False, default=1000)

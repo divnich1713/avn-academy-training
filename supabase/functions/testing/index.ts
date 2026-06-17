@@ -247,18 +247,12 @@ async function getTestSettings(client: Client, subject: string) {
 
 async function getAttemptSubject(client: Client, attemptId: number): Promise<string> {
   try {
-    const ansRow = await client.queryArray(
-      `SELECT q.subject FROM ${SCHEMA}.test_answers a JOIN ${SCHEMA}.test_questions q ON q.id = a.question_id WHERE a.attempt_id = $1 LIMIT 1`,
+    const attRow = await client.queryArray(
+      `SELECT subject FROM ${SCHEMA}.test_attempts WHERE id = $1`,
       [attemptId]
     );
-    if (ansRow.rows.length > 0) {
-      return ansRow.rows[0][0] as string;
-    }
-    const qRow = await client.queryArray(
-      `SELECT subject FROM ${SCHEMA}.test_questions LIMIT 1`
-    );
-    if (qRow.rows.length > 0) {
-      return qRow.rows[0][0] as string;
+    if (attRow.rows.length > 0 && attRow.rows[0][0]) {
+      return attRow.rows[0][0] as string;
     }
   } catch (err) {
     console.error("Error getting attempt subject: ", err);
@@ -381,10 +375,10 @@ Deno.serve(async (req) => {
 
       const expiresAt = new Date(Date.now() + settingsData.timer_minutes * 60 * 1000);
       const insertRes = await client.queryObject<any>(
-        `INSERT INTO ${SCHEMA}.test_attempts (user_id, status, difficulty, start_elo, expires_at)
-         VALUES ($1, 'in_progress', $2, $3, $4)
+        `INSERT INTO ${SCHEMA}.test_attempts (user_id, subject, status, difficulty, start_elo, expires_at)
+         VALUES ($1, $2, 'in_progress', $3, $4, $5)
          RETURNING id, expires_at`,
-        [user.id, difficulty, startElo, expiresAt.toISOString()]
+        [user.id, subject, difficulty, startElo, expiresAt.toISOString()]
       );
 
       return new Response(
