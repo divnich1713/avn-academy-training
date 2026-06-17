@@ -472,3 +472,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/promotions/deno.json"
 entrypoint = "./functions/promotions/index.ts"
+
+[functions.testing]
+enabled = true
+verify_jwt = false
+import_map = "./functions/testing/deno.json"
+entrypoint = "./functions/testing/index.ts"
