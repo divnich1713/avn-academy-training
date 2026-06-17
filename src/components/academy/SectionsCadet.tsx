@@ -1039,7 +1039,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
         </>
       )}
 
-      {displayUser.id === authUser.id && (
+      {displayUser.id === authUser.id && authUser.role === "head_avng" && (
         <div className="bg-tactical-card border border-tactical-border/60 p-5 mt-6 animate-fade-in">
           <h4 className="font-oswald text-xs tracking-widest uppercase text-muted-foreground mb-3 flex items-center gap-1.5 border-b border-tactical-border/40 pb-2">
             <Icon name="Settings" size={13} className="text-primary" />
