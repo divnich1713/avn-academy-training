@@ -654,7 +654,7 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
                               <span
                                 className={`px-2 py-0.5 border text-[10px] uppercase font-bold ${
                                   att.status === "completed"
-                                    ? "bg-primary/10 border-primary text-primary"
+                                    ? "bg-green-500/10 border-green-500/30 text-green-400"
                                     : att.status === "aborted"
                                     ? "bg-destructive/10 border-destructive text-destructive"
                                     : "bg-gold/10 border-gold text-gold"
