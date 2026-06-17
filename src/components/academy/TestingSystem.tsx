@@ -279,32 +279,24 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
     return (
       <div className="space-y-6 max-w-3xl mx-auto animate-fade-in">
         {/* Test status bar */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-tactical-panel border border-tactical-border p-4">
-          <div className="text-center md:text-left">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-tactical-panel border border-tactical-border p-4 text-center">
+          <div>
             <span className="text-muted-foreground text-[10px] uppercase font-mono block">Прогресс</span>
             <span className="text-sm font-semibold font-mono text-foreground">
               {question.progress} из {question.total_questions}
             </span>
           </div>
-          <div className="text-center">
+          <div>
             <span className="text-muted-foreground text-[10px] uppercase font-mono block">Таймер</span>
             <span className="text-sm font-semibold font-mono text-gold flex items-center justify-center gap-1.5">
               <Icon name="Clock" size={14} /> {timerString}
             </span>
           </div>
-          <div className="text-center">
+          <div>
             <span className="text-muted-foreground text-[10px] uppercase font-mono block">Предупреждения</span>
             <span className={`text-sm font-semibold font-mono flex items-center justify-center gap-1.5 ${warnings > 0 ? "text-destructive" : "text-muted-foreground"}`}>
               <Icon name="AlertTriangle" size={14} /> {warnings} / 3
             </span>
-          </div>
-          <div className="text-center md:text-right">
-            <button
-              onClick={handleFreeze}
-              className="text-xs font-mono uppercase bg-tactical-card hover:bg-tactical-border text-gold border border-gold/30 px-3 py-1 transition-all"
-            >
-              Заморозить
-            </button>
           </div>
         </div>
 
