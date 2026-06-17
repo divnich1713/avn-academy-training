@@ -99,25 +99,89 @@ export async function sendDismissalReportDiscord({
   }, "dismissal");
 }
 
+function fmtStaticId(id: string | null | undefined): string {
+  if (!id) return "—";
+  const clean = id.replace(/\D/g, "").slice(0, 6);
+  if (clean.length > 3) {
+    return `${clean.slice(0, 3)}-${clean.slice(3)}`;
+  }
+  return clean;
+}
+
 // 2. Promotion report notification (Green)
 export async function sendPromotionReportDiscord({
   name,
   rank,
   staticId,
+  promotionType,
   promotionTypeLabel,
 }: {
   name: string;
   rank: string;
   staticId: string;
+  promotionType: "junior_sergeant" | "sergeant";
   promotionTypeLabel: string;
 }) {
+  const isSergeant = promotionType === "sergeant";
+  
+  const attachments = isSergeant 
+    ? [
+        "• Отчёт о патрулировании прилегающей территорий;",
+        "• Наряд на КПП-1;",
+        "• Наряд на КПП-2 (Внутренний пост);",
+        "• Участие в государственной поставке в количестве 4-ёх шт. В сопровождение инструктора АВНГ | СС;",
+        "• Принять участие в досмотровых мероприятиях на двух собеседованиях;",
+        "• Отчёт о прослушанных лекциях \"УК, ПК, КоАП\";",
+        "• Лекция: О ФЗ закрытых территорий;",
+        "• Отчёт о прохождений практического экзамена \"Штраф, Задержание, Арест\";",
+        "• Отчёт о сдаче тестов УК/ПК/КоАП;"
+      ]
+    : [
+        "• Вступительная лекция;",
+        "• Лекция ФЗ о ФСВНГ и Уставу;",
+        "• Строевая подготовка;",
+        "• Физическая подготовка (нормативы);",
+        "• Тренировка по оружию;",
+        "• Присяга;",
+        "• Вышка — 30 мин (доклад каждые 10 мин);",
+        "• Патруль по территории — 30 мин (доклад каждые 10 мин);",
+        "• Заполнение личного дела;",
+        "• Тест: ФЗ о ФСВНГ и Внутреннему Уставу;"
+      ];
+
+  const dateStr = new Date().toLocaleDateString("ru-RU");
+  const signature = name.split(" ")[0] || "";
+  const formattedStaticId = fmtStaticId(staticId);
+
+  const reportText = `**ФЕДЕРАЛЬНАЯ СЛУЖБА ВОЙСК НАЦИОНАЛЬНОЙ ГВАРДИИ**
+**РОССИЙСКОЙ ФЕДЕРАЦИИ (ФСВНГ России)**
+**Академия Войск Национальной Гвардии (АВНГ)**
+
+Начальнику Академии Войск Национальной Гвардии
+подполковнику — Нач.АВНГ | Артем Панарин
+
+Копия:
+Заместителю начальника АВНГ — Зам.Нач.АВНГ | Данила Моралис
+Заместителю начальника АВНГ — Зам.Нач.АВНГ | Илья Росса
+Заместителю начальника АВНГ — Зам.Нач.АВНГ | Иван Андрейченко
+
+От курсанта: ${name}
+Табельный номер: ${formattedStaticId}
+Звание: ${rank}
+
+**РАПОРТ**
+Прошу Вашего ходатайства перед вышестоящим командованием о присвоении мне очередного воинского звания «${promotionTypeLabel}».
+
+К рапорту прилагаю:
+${attachments.join("\n")}
+
+Дата: ${dateStr}
+Подпись: *${signature}*`;
+
   await sendDiscordEmbed({
     title: "🟢 Подан рапорт на повышение в звании",
+    description: reportText,
     color: 5763719, // Green
-    fields: [
-      { name: "Курсант", value: `${rank} ${name} (${staticId})`, inline: true },
-      { name: "Желаемое звание", value: promotionTypeLabel, inline: true },
-    ],
   }, "promotion");
 }
 

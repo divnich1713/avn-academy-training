@@ -177,6 +177,7 @@ export function PromotionSection({ authUser }: { authUser: User }) {
         name: authUser.name,
         rank: authUser.rank,
         staticId: authUser.static_id,
+        promotionType: selected,
         promotionTypeLabel: PROMOTION_LABELS[selected],
       }).catch(err => console.error("Discord error:", err));
 
