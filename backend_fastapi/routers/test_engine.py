@@ -350,14 +350,7 @@ async def get_next_question(
         pool = fallback_res.scalars().all()
         
         if not pool:
-            # Absolute fallback: any subject
-            abs_fallback_stmt = select(TestQuestion).where(
-                ~TestQuestion.id.in_(answered_ids) if answered_ids else True
-            )
-            abs_fallback_res = await db.execute(abs_fallback_stmt)
-            pool = abs_fallback_res.scalars().all()
-            if not pool:
-                return {"completed": True}
+            return {"completed": True}
 
     # Sort by proximity to current ELO rating, pick randomly from top 5 closest
     pool.sort(key=lambda q: abs(q.elo_rating - current_elo))

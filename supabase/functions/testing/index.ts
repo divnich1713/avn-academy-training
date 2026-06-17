@@ -531,15 +531,15 @@ Deno.serve(async (req) => {
       let pool = poolRes.rows;
       if (pool.length === 0) {
         const fallRes = await client.queryObject<any>(
-          `SELECT id, subject, type, question_text, options, elo_rating FROM ${SCHEMA}.test_questions WHERE subject = $1`,
+          `SELECT id, subject, type, question_text, options, elo_rating FROM ${SCHEMA}.test_questions 
+           WHERE subject = $1 ${answeredIds.length > 0 ? "AND id NOT IN (SELECT question_id FROM " + SCHEMA + ".test_answers WHERE attempt_id = " + attemptId + ")" : ""}`,
           [subject]
         );
         pool = fallRes.rows;
         if (pool.length === 0) {
-          const absoluteFall = await client.queryObject<any>(
-            `SELECT id, subject, type, question_text, options, elo_rating FROM ${SCHEMA}.test_questions`
-          );
-          pool = absoluteFall.rows;
+          return new Response(JSON.stringify({ completed: true }), {
+            headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+          });
         }
       }
 
