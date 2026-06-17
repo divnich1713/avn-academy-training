@@ -142,6 +142,7 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
               { icon: "Wrench", target: "practices" as const, title: "Практики", desc: "Практические задания" },
               { icon: "FileText", target: "reports" as const, title: "Отчеты", desc: "Рапорты об обучении" },
               { icon: "ClipboardList", target: "exams" as const, title: "Экзамены", desc: "Сдача тестов и нормативов" },
+              { icon: "Target", target: "testing" as const, title: "Пройти тест", desc: "Онлайн-тестирование" },
             ].map((act, idx) => (
               <button
                 key={idx}
