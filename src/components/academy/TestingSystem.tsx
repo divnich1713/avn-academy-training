@@ -234,7 +234,13 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
         await loadNextQuestion(activeSession.attempt_id);
       }
     } catch (err: any) {
-      toast.error("Ошибка отправки ответа: " + err.message);
+      const errMsg = String(err.message || "");
+      if (errMsg.toLowerCase().includes("ответили") || errMsg.toLowerCase().includes("already answered")) {
+        toast.info("Ответ уже был записан ранее. Загружаем следующий вопрос...");
+        await loadNextQuestion(activeSession.attempt_id);
+      } else {
+        toast.error("Ошибка отправки ответа: " + err.message);
+      }
     } finally {
       setIsSubmitting(false);
     }
