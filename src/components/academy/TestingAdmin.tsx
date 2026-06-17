@@ -829,11 +829,25 @@ export function TestingAdmin() {
                                       });
                                       const isPassed = att.score_percent >= 80;
                                       const gradeVal = att.score_percent >= 90 ? 5 : att.score_percent >= 80 ? 4 : att.score_percent >= 60 ? 3 : 2;
-                                      const discordText = `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
+                                      const qCount = settingsList.find((s) => s.subject === att.subject)?.question_count || 30;
+                                      const correctCount = Math.round((att.score_percent / 100) * qCount);
+                                      
+                                      const discordText = isPassed
+                                        ? `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
 **Курсант:** ${att.cadet_name} | ${fmtStaticId(att.static_id)}
 **Звание:** ${att.rank || "—"}
 **Подразделение:** ${att.unit || "—"}
-**Результат:** ${isPassed ? "🟢 СДАН" : "🔴 НЕ СДАН"}
+**Тема:** ${att.subject}
+**Результат:** 🟢 СДАН
+**Оценка:** ${gradeVal}
+**Верные ответы:** ${correctCount} из ${qCount} (${att.score_percent}%)
+**Дата сдачи:** ${completedDate}
+**Ссылка на систему:** ${window.location.origin}`
+                                        : `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
+**Курсант:** ${att.cadet_name} | ${fmtStaticId(att.static_id)}
+**Звание:** ${att.rank || "—"}
+**Подразделение:** ${att.unit || "—"}
+**Результат:** 🔴 НЕ СДАН
 **Оценка:** ${gradeVal}
 **Процент верных:** ${att.score_percent}%
 **Дата сдачи:** ${completedDate}

@@ -214,7 +214,6 @@ export async function sendTestCompletedDiscord({
   passed: boolean;
 }) {
   const formattedStaticId = fmtStaticId(staticId);
-  const statusEmoji = passed ? "🟢 СДАН" : "🔴 НЕ СДАН";
 
   // Date formatting: 18 июня 2026 г. в 01:20
   const dateObj = new Date();
@@ -238,14 +237,24 @@ export async function sendTestCompletedDiscord({
   const systemUrl = typeof window !== "undefined" ? window.location.origin : "https://avn-academy-training-netlify-app.ru";
   const formattedPercent = typeof percent === "number" ? (percent % 1 === 0 ? percent.toString() : percent.toFixed(2)) : percent;
 
-  const reportText = `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
+  const reportText = passed
+    ? `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
 **Курсант:** ${name} | ${formattedStaticId}
 **Звание:** ${rank}
 **Подразделение:** ${unit || "АВНГ"}
 **Тема:** ${subject}
-**Результат:** ${statusEmoji}
+**Результат:** 🟢 СДАН
 **Оценка:** ${grade !== undefined ? grade : "—"}
 **Верные ответы:** ${score} из ${totalQuestions} (${formattedPercent}%)
+**Дата сдачи:** ${fullDateStr}
+**Ссылка на систему:** ${systemUrl}`
+    : `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
+**Курсант:** ${name} | ${formattedStaticId}
+**Звание:** ${rank}
+**Подразделение:** ${unit || "АВНГ"}
+**Результат:** 🔴 НЕ СДАН
+**Оценка:** ${grade !== undefined ? grade : "—"}
+**Процент верных:** ${formattedPercent}%
 **Дата сдачи:** ${fullDateStr}
 **Ссылка на систему:** ${systemUrl}`;
 

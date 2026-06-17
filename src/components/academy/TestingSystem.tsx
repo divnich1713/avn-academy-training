@@ -604,14 +604,24 @@ export function TestingSystem() {
                   hour: "2-digit",
                   minute: "2-digit"
                 });
-                const discordText = `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
+                const discordText = certificate.passed
+                  ? `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
 **Курсант:** ${certificate.cadet_name} | ${fmtStaticId(certificate.static_id)}
 **Звание:** ${certificate.rank || "—"}
 **Подразделение:** ${certificate.unit || "—"}
 **Тема:** ${certificate.subject}
-**Результат:** ${certificate.passed ? "🟢 СДАН" : "🔴 НЕ СДАН"}
+**Результат:** 🟢 СДАН
 **Оценка:** ${certificate.grade}
 **Верные ответы:** ${certificate.correct_answers_count} из ${certificate.total_questions} (${certificate.percentage}%)
+**Дата сдачи:** ${completedDate}
+**Ссылка на систему:** ${window.location.origin}`
+                  : `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
+**Курсант:** ${certificate.cadet_name} | ${fmtStaticId(certificate.static_id)}
+**Звание:** ${certificate.rank || "—"}
+**Подразделение:** ${certificate.unit || "—"}
+**Результат:** 🔴 НЕ СДАН
+**Оценка:** ${certificate.grade}
+**Процент верных:** ${certificate.percentage}%
 **Дата сдачи:** ${completedDate}
 **Ссылка на систему:** ${window.location.origin}`;
                 
