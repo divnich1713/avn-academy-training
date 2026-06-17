@@ -49,6 +49,7 @@ export interface ActiveSession {
 
 export interface CadetAttempt {
   id: number;
+  subject: string;
   difficulty: number;
   status: "in_progress" | "completed" | "aborted";
   start_elo: number;
@@ -69,6 +70,7 @@ export interface CadetDashboard {
 
 export interface AdminAttempt {
   attempt_id: number;
+  subject: string;
   cadet_name: string;
   static_id: string;
   rank: string;
@@ -220,7 +222,24 @@ export const testingApi = {
       body: JSON.stringify(payload),
     });
   },
+
+  async getAttemptDetails(attemptId: number): Promise<{ questions: AttemptDetailQuestion[] }> {
+    return request(`/api/tests/attempt-details?attempt_id=${attemptId}`);
+  },
 };
+
+export interface AttemptDetailQuestion {
+  id: number;
+  question_text: string;
+  type: "choice" | "multichoice" | "matching" | "essay";
+  options: any;
+  correct_answer: any;
+  explanation: string | null;
+  student_answer: any;
+  is_correct: boolean | null;
+  grade: number | null;
+  feedback: string | null;
+}
 
 export interface TestSettings {
   id?: number;

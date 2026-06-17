@@ -820,7 +820,7 @@ Deno.serve(async (req) => {
     if (path === "/api/stats/cadet/dashboard" && req.method === "GET") {
       // Fetch History
       const attemptsRes = await client.queryObject<any>(
-        `SELECT id, difficulty, status, start_elo, end_elo, warnings_count, started_at, completed_at
+        `SELECT id, subject, difficulty, status, start_elo, end_elo, warnings_count, started_at, completed_at
          FROM ${SCHEMA}.test_attempts
          WHERE user_id = $1
          ORDER BY started_at DESC`,
@@ -838,6 +838,7 @@ Deno.serve(async (req) => {
 
         attemptsHistory.push({
           id: att.id,
+          subject: att.subject,
           difficulty: att.difficulty,
           status: att.status,
           start_elo: att.start_elo,
@@ -899,6 +900,63 @@ Deno.serve(async (req) => {
     }
 
     // ==========================================
+    // GET /api/tests/attempt-details
+    // ==========================================
+    if (path === "/api/tests/attempt-details" && req.method === "GET") {
+      const attemptId = Number(url.searchParams.get("attempt_id"));
+      if (isNaN(attemptId)) {
+        return new Response(JSON.stringify({ error: "Invalid attempt_id" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
+
+      // Check access: instructors/admins can see all, cadets only their own
+      const attemptRes = await client.queryArray(
+        `SELECT user_id FROM ${SCHEMA}.test_attempts WHERE id = $1`,
+        [attemptId]
+      );
+      if (attemptRes.rows.length === 0) {
+        return new Response(JSON.stringify({ error: "Attempt not found" }), {
+          status: 404,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
+
+      const ownerId = attemptRes.rows[0][0] as number;
+      const isInstructor = ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(user.role);
+      if (user.id !== ownerId && !isInstructor) {
+        return new Response(JSON.stringify({ error: "Доступ запрещен" }), {
+          status: 403,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
+
+      const ansRes = await client.queryObject<any>(
+        `SELECT 
+          a.student_answer, 
+          a.is_correct, 
+          a.grade, 
+          a.feedback, 
+          q.id, 
+          q.question_text, 
+          q.type, 
+          q.options, 
+          q.correct_answer, 
+          q.explanation
+         FROM ${SCHEMA}.test_answers a
+         JOIN ${SCHEMA}.test_questions q ON q.id = a.question_id
+         WHERE a.attempt_id = $1
+         ORDER BY a.id ASC`,
+        [attemptId]
+      );
+
+      return new Response(JSON.stringify({ questions: ansRes.rows }), {
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
+
+    // ==========================================
     // 9. GET /api/stats/admin/dashboard
     // ==========================================
     if (path === "/api/stats/admin/dashboard" && req.method === "GET") {
@@ -910,7 +968,7 @@ Deno.serve(async (req) => {
       }
 
       const attemptsRes = await client.queryObject<any>(
-        `SELECT a.id, a.difficulty, a.status, a.start_elo, a.end_elo, a.started_at, a.completed_at, u.name, u.static_id, u.rank, u.unit
+        `SELECT a.id, a.subject, a.difficulty, a.status, a.start_elo, a.end_elo, a.started_at, a.completed_at, u.name, u.static_id, u.rank, u.unit
          FROM ${SCHEMA}.test_attempts a
          JOIN ${SCHEMA}.users u ON u.id = a.user_id
          ORDER BY a.started_at DESC`
@@ -927,6 +985,7 @@ Deno.serve(async (req) => {
 
         adminAttempts.push({
           attempt_id: row.id,
+          subject: row.subject,
           cadet_name: row.name,
           static_id: row.static_id,
           rank: row.rank,

@@ -718,6 +718,62 @@ async def delete_question_admin(
     await db.commit()
     return {"success": True}
 
+@router.get("/attempt-details")
+async def get_attempt_details(
+    attempt_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # Check access: instructors/admin or the cadet who started the attempt
+    stmt_owner = select(TestAttempt.user_id).where(TestAttempt.id == attempt_id)
+    res_owner = await db.execute(stmt_owner)
+    owner_id = res_owner.scalar_one_or_none()
+    
+    if owner_id is None:
+        raise HTTPException(status_code=404, detail="Попытка не найдена")
+        
+    is_instructor = user.role in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head")
+    if user.id != owner_id and not is_instructor:
+        raise HTTPException(status_code=403, detail="Доступ запрещен")
+        
+    stmt = (
+        select(
+            TestAnswer.student_answer,
+            TestAnswer.is_correct,
+            TestAnswer.grade,
+            TestAnswer.feedback,
+            TestQuestion.id,
+            TestQuestion.question_text,
+            TestQuestion.type,
+            TestQuestion.options,
+            TestQuestion.correct_answer,
+            TestQuestion.explanation
+        )
+        .join(TestQuestion, TestQuestion.id == TestAnswer.question_id)
+        .where(TestAnswer.attempt_id == attempt_id)
+        .order_by(TestAnswer.id.asc())
+    )
+    
+    res = await db.execute(stmt)
+    rows = res.all()
+    
+    questions = []
+    for r in rows:
+        questions.append({
+            "student_answer": r[0],
+            "is_correct": r[1],
+            "grade": float(r[2]) if r[2] is not None else None,
+            "feedback": r[3],
+            "id": r[4],
+            "question_text": r[5],
+            "type": r[6],
+            "options": r[7],
+            "correct_answer": r[8],
+            "explanation": r[9]
+        })
+        
+    return {"questions": questions}
+
 @router.get("/settings-admin")
 async def get_settings_admin(
     user: User = Depends(get_current_user),

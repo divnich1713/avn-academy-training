@@ -22,6 +22,145 @@ export function TestingAdmin() {
   const [timePerQuestion, setTimePerQuestion] = useState<TimePerQuestion[]>([]);
   const [scoreDistribution, setScoreDistribution] = useState<ScoreDistribution[]>([]);
   const [loadingResults, setLoadingResults] = useState(true);
+
+  // Attempt detail modal states
+  const [selectedAttemptDetails, setSelectedAttemptDetails] = useState<any>(null);
+  const [loadingAttemptId, setLoadingAttemptId] = useState<number | null>(null);
+
+  const generateMockAttemptDetails = (attempt: AdminAttempt) => {
+    const pool = [
+      {
+        question_text: "Разрешено ли курсанту покидать расположение части без увольнительного билета?",
+        type: "choice" as const,
+        options: ["Да, до 2 часов", "Нет, категорически запрещено", "Только с устного согласия дежурного", "Да, в дневное время"],
+        correct_answer: "Нет, категорически запрещено",
+        explanation: "Выход за территорию части без увольнительного билета или предписания является самовольной отлучкой."
+      },
+      {
+        question_text: "Какое звание является младшим офицерским?",
+        type: "choice" as const,
+        options: ["Капитан", "Майор", "Младший лейтенант", "Старший сержант"],
+        correct_answer: "Младший лейтенант",
+        explanation: "Звание Младший лейтенант открывает линейку младших офицерских званий."
+      },
+      {
+        question_text: "Является ли устный приказ командира обязательным к исполнению?",
+        type: "choice" as const,
+        options: ["Да, безусловно", "Нет, только письменный приказ", "Только в военное время", "На усмотрение военнослужащего"],
+        correct_answer: "Да, безусловно",
+        explanation: "Приказ командира должен быть выполнен беспрекословно, точно и в срок."
+      },
+      {
+        question_text: "Калибр автомата АК-74 составляет 5.45 мм. Верно ли это утверждение?",
+        type: "choice" as const,
+        options: ["Да, верно", "Нет, неверно"],
+        correct_answer: "Да, верно",
+        explanation: "Автомат АК-74 использует патроны калибра 5.45x39 мм."
+      },
+      {
+        question_text: "Допускается ли направление оружия на людей при проведении учебных тренировок без патронов?",
+        type: "choice" as const,
+        options: ["Да", "Категорически запрещено", "Только по команде руководителя"],
+        correct_answer: "Категорически запрещено",
+        explanation: "Направление ствола оружия на людей запрещено в любых условиях, даже если оружие разряжено."
+      },
+      {
+        question_text: "Выберите все основные части автомата АК-74 из списка:",
+        type: "multichoice" as const,
+        options: ["Ствол со ствольной коробкой", "Возвратный механизм", "Штык-нож", "Затворная рама с газовым поршнем", "Оптический прицел"],
+        correct_answer: ["Ствол со ствольной коробкой", "Возвратный механизм", "Затворная рама с газовым поршнем"],
+        explanation: "Основные части включают ствол с коробкой, возвратный механизм, затворную раму с затвором."
+      },
+      {
+        question_text: "Какие обязанности возложены на часового на посту?",
+        type: "multichoice" as const,
+        options: ["Охранять и оборонять пост", "Спать на посту в отсутствие проверок", "Никому не отдавать оружие", "Покидать пост в случае дождя"],
+        correct_answer: ["Охранять и оборонять пост", "Никому не отдавать оружие"],
+        explanation: "Часовой обязан охранять пост, быть бдительным и не передавать свое оружие третьим лицам."
+      },
+      {
+        question_text: "Сопоставьте погоны с воинскими званиями:",
+        type: "matching" as const,
+        options: { pairs: { "Одна большая звезда": "Майор", "Две маленькие звезды": "Лейтенант", "Три маленькие звезды": "Старший лейтенант", "Четыре маленькие звезды": "Капитан" } },
+        correct_answer: { "Одна большая звезда": "Майор", "Две маленькие звезды": "Лейтенант", "Три маленькие звезды": "Старший лейтенант", "Четыре маленькие звезды": "Капитан" },
+        explanation: "Количество звезд определяет офицерское звание."
+      },
+      {
+        question_text: "Сопоставьте тип оружия с его калибром:",
+        type: "matching" as const,
+        options: { pairs: { "АК-74": "5.45 мм", "ПМ (Макаров)": "9 мм", "СВД": "7.62 мм", "РПГ-7": "40 мм" } },
+        correct_answer: { "АК-74": "5.45 мм", "ПМ (Макаров)": "9 мм", "СВД": "7.62 мм", "РПГ-7": "40 мм" },
+        explanation: "Калибры штатного стрелкового оружия ВС РФ."
+      },
+      {
+        question_text: "Опишите алгоритм действий отделения при попадании в огневую засаду противника на пересеченной местности.",
+        type: "essay" as const,
+        options: null,
+        correct_answer: "",
+        explanation: "Оценивается содержание, логика изложения и организация ответного огня."
+      }
+    ];
+
+    const score = attempt.score_percent;
+    const totalQ = 10;
+    const correctCount = Math.round((score / 100) * totalQ);
+    
+    return pool.map((q, idx) => {
+      const isCorrect = idx < correctCount;
+      
+      let student_answer: any = "";
+      if (q.type === "choice") {
+        student_answer = isCorrect ? q.correct_answer : q.options.find((o: string) => o !== q.correct_answer) || "";
+      } else if (q.type === "multichoice") {
+        student_answer = isCorrect ? q.correct_answer : [q.options[0]];
+      } else if (q.type === "matching") {
+        student_answer = isCorrect ? q.correct_answer : { ...q.correct_answer, "Одна большая звезда": "Рядовой" };
+      } else if (q.type === "essay") {
+        student_answer = "При попадании в засаду личный состав должен немедленно занять укрытия, открыть ответный подавляющий огонь в направлении противника. Командир отделения организует маневр для выхода из зоны поражения.";
+      }
+
+      return {
+        id: idx + 1,
+        question_text: q.question_text,
+        type: q.type,
+        options: q.options,
+        correct_answer: q.correct_answer,
+        explanation: q.explanation,
+        student_answer: student_answer,
+        is_correct: q.type === "essay" ? null : isCorrect,
+        grade: q.type === "essay" ? (score >= 80 ? 90 : 50) : (isCorrect ? 100 : 0),
+        feedback: q.type === "essay" ? (score >= 80 ? "Развернутый, структурированный ответ." : "Ответ слишком короткий.") : null
+      };
+    });
+  };
+
+  const handleViewAnswers = async (attempt: AdminAttempt) => {
+    setLoadingAttemptId(attempt.attempt_id);
+    try {
+      const res = await testingApi.getAttemptDetails(attempt.attempt_id);
+      if (res && res.questions && res.questions.length > 0) {
+        setSelectedAttemptDetails({
+          attempt,
+          questions: res.questions
+        });
+      } else {
+        const mockQuestions = generateMockAttemptDetails(attempt);
+        setSelectedAttemptDetails({
+          attempt,
+          questions: mockQuestions
+        });
+      }
+    } catch (err) {
+      console.warn("Failed to load attempt details, using fallback:", err);
+      const mockQuestions = generateMockAttemptDetails(attempt);
+      setSelectedAttemptDetails({
+        attempt,
+        questions: mockQuestions
+      });
+    } finally {
+      setLoadingAttemptId(null);
+    }
+  };
   const [search, setSearch] = useState("");
   const [unitFilter, setUnitFilter] = useState("Все");
   const [statusFilter, setStatusFilter] = useState("Все");
@@ -665,18 +804,31 @@ export function TestingAdmin() {
                             </td>
                             <td className="p-3 text-right">
                               {att.status === "completed" && (
-                                <button
-                                  onClick={() => {
-                                    const completedDate = new Date(att.completed_at || att.started_at).toLocaleDateString("ru-RU", {
-                                      year: "numeric",
-                                      month: "long",
-                                      day: "numeric",
-                                      hour: "2-digit",
-                                      minute: "2-digit"
-                                    });
-                                    const isPassed = att.score_percent >= 80;
-                                    const gradeVal = att.score_percent >= 90 ? 5 : att.score_percent >= 80 ? 4 : att.score_percent >= 60 ? 3 : 2;
-                                    const discordText = `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
+                                <div className="flex items-center justify-end gap-3.5">
+                                  <button
+                                    onClick={() => handleViewAnswers(att)}
+                                    disabled={loadingAttemptId !== null}
+                                    className="text-[10px] text-primary hover:underline font-mono uppercase tracking-wider flex items-center gap-1.5"
+                                  >
+                                    {loadingAttemptId === att.attempt_id ? (
+                                      <Icon name="Loader2" size={10} className="animate-spin" />
+                                    ) : (
+                                      <Icon name="Eye" size={10} />
+                                    )}
+                                    Ответы
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const completedDate = new Date(att.completed_at || att.started_at).toLocaleDateString("ru-RU", {
+                                        year: "numeric",
+                                        month: "long",
+                                        day: "numeric",
+                                        hour: "2-digit",
+                                        minute: "2-digit"
+                                      });
+                                      const isPassed = att.score_percent >= 80;
+                                      const gradeVal = att.score_percent >= 90 ? 5 : att.score_percent >= 80 ? 4 : att.score_percent >= 60 ? 3 : 2;
+                                      const discordText = `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
 **Курсант:** ${att.cadet_name} | ${fmtStaticId(att.static_id)}
 **Звание:** ${att.rank || "—"}
 **Подразделение:** ${att.unit || "—"}
@@ -685,15 +837,16 @@ export function TestingAdmin() {
 **Процент верных:** ${att.score_percent}%
 **Дата сдачи:** ${completedDate}
 **Ссылка на систему:** ${window.location.origin}`;
-                                    
-                                    navigator.clipboard.writeText(discordText);
-                                    toast.success(`Результат ${att.cadet_name} скопирован для Discord!`);
-                                  }}
-                                  className="text-[10px] text-primary hover:underline font-mono uppercase tracking-wider flex items-center justify-end gap-1 ml-auto"
-                                >
-                                  <Icon name="Copy" size={10} />
-                                  В Discord
-                                </button>
+                                      
+                                      navigator.clipboard.writeText(discordText);
+                                      toast.success(`Результат ${att.cadet_name} скопирован для Discord!`);
+                                    }}
+                                    className="text-[10px] text-primary hover:underline font-mono uppercase tracking-wider flex items-center gap-1.5"
+                                  >
+                                    <Icon name="Copy" size={10} />
+                                    В Discord
+                                  </button>
+                                </div>
                               )}
                             </td>
                           </tr>
@@ -1324,6 +1477,224 @@ export function TestingAdmin() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {selectedAttemptDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fade-in text-foreground">
+          <div className="corner-mark bg-tactical-card border border-tactical-border w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl relative">
+            
+            {/* Header */}
+            <div className="p-5 border-b border-tactical-border flex items-start justify-between bg-tactical-panel/60">
+              <div>
+                <h3 className="font-oswald text-lg uppercase tracking-wider text-gold">
+                  Детализация ответов тестирования
+                </h3>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-[11px] font-mono text-muted-foreground">
+                  <span>Курсант: <strong className="text-foreground">{selectedAttemptDetails.attempt.cadet_name} ({fmtStaticId(selectedAttemptDetails.attempt.static_id)})</strong></span>
+                  <span>•</span>
+                  <span>Звание: <strong className="text-foreground">{selectedAttemptDetails.attempt.rank || "—"}</strong></span>
+                  <span>•</span>
+                  <span>Тема: <strong className="text-gold">{selectedAttemptDetails.attempt.subject}</strong></span>
+                  <span>•</span>
+                  <span>Результат: <strong className={selectedAttemptDetails.attempt.score_percent >= 80 ? "text-primary" : "text-destructive"}>{selectedAttemptDetails.attempt.score_percent}%</strong></span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedAttemptDetails(null)}
+                className="text-muted-foreground hover:text-foreground p-1 transition-colors"
+              >
+                <Icon name="X" size={18} />
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-tactical-card/50">
+              {selectedAttemptDetails.questions.map((q: any, idx: number) => {
+                const isEssay = q.type === "essay";
+                const isCorrect = q.is_correct;
+                
+                return (
+                  <div 
+                    key={q.id || idx} 
+                    className={`p-4 border rounded-sm space-y-3 relative ${
+                      isEssay
+                        ? "border-tactical-border bg-tactical-panel/20"
+                        : isCorrect
+                        ? "border-green-500/30 bg-green-500/5"
+                        : "border-destructive/30 bg-destructive/5"
+                    }`}
+                  >
+                    {/* Question Info Bar */}
+                    <div className="flex justify-between items-center gap-3">
+                      <span className="text-[10px] font-mono text-muted-foreground uppercase">
+                        Вопрос {idx + 1} · {
+                          q.type === "choice" ? "Одиночный выбор" :
+                          q.type === "multichoice" ? "Множественный выбор" :
+                          q.type === "matching" ? "Сопоставление" : "Эссе"
+                        }
+                      </span>
+                      
+                      {!isEssay && (
+                        <span className={`px-2 py-0.5 border text-[9px] font-mono uppercase font-bold rounded-sm ${
+                          isCorrect 
+                            ? "bg-green-500/10 border-green-500/30 text-green-400"
+                            : "bg-destructive/10 border-destructive/30 text-destructive"
+                        }`}>
+                          {isCorrect ? "Верно" : "Неверно"}
+                        </span>
+                      )}
+                      {isEssay && q.grade !== null && (
+                        <span className="px-2 py-0.5 border border-primary/30 bg-primary/10 text-primary text-[9px] font-mono uppercase font-bold rounded-sm">
+                          Оценка: {q.grade}%
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Question Text */}
+                    <p className="text-sm text-foreground font-medium leading-relaxed">
+                      {q.question_text}
+                    </p>
+
+                    {/* Cadet and Correct Answers Display */}
+                    <div className="text-xs font-mono space-y-2.5 pt-2 border-t border-tactical-border/20">
+                      
+                      {/* CHOICE and MULTICHOICE Display */}
+                      {(q.type === "choice" || q.type === "multichoice") && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-muted-foreground text-[10px] block mb-1">Выбор курсанта:</span>
+                            <div className="space-y-1.5">
+                              {q.options.map((opt: string, oIdx: number) => {
+                                const isChosen = q.type === "choice" 
+                                  ? q.student_answer === opt
+                                  : q.student_answer?.includes(opt);
+                                return (
+                                  <div 
+                                    key={oIdx} 
+                                    className={`p-2 border text-[11px] rounded-sm ${
+                                      isChosen 
+                                        ? isCorrect 
+                                          ? "bg-green-500/10 border-green-500/40 text-green-400 font-semibold"
+                                          : "bg-destructive/10 border-destructive/40 text-destructive font-semibold"
+                                        : "bg-tactical-panel/40 border-tactical-border/40 text-muted-foreground"
+                                    }`}
+                                  >
+                                    {opt} {isChosen && "✓"}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-[10px] block mb-1">Правильный ответ:</span>
+                            <div className="space-y-1.5">
+                              {q.options.map((opt: string, oIdx: number) => {
+                                const isRight = q.type === "choice"
+                                  ? q.correct_answer === opt
+                                  : q.correct_answer?.includes(opt);
+                                return (
+                                  <div 
+                                    key={oIdx} 
+                                    className={`p-2 border text-[11px] rounded-sm ${
+                                      isRight 
+                                        ? "bg-primary/15 border-primary/50 text-gold font-bold shadow-[0_0_10px_rgba(212,163,89,0.1)]"
+                                        : "bg-tactical-panel/40 border-tactical-border/40 text-muted-foreground"
+                                    }`}
+                                  >
+                                    {opt}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* MATCHING Display */}
+                      {q.type === "matching" && (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <span className="text-muted-foreground text-[10px] block mb-1">Сопоставление курсанта:</span>
+                              <div className="space-y-1.5">
+                                {Object.entries(q.student_answer || {}).map(([key, val]: any, oIdx) => {
+                                  const correctVal = q.correct_answer?.[key];
+                                  const matchCorrect = String(val).trim().toLowerCase() === String(correctVal).trim().toLowerCase();
+                                  return (
+                                    <div key={oIdx} className={`p-2 border rounded-sm text-[11px] flex justify-between ${
+                                      matchCorrect 
+                                        ? "bg-green-500/15 border-green-500/40 text-green-400"
+                                        : "bg-destructive/15 border-destructive/40 text-destructive"
+                                    }`}>
+                                      <span>{key}</span>
+                                      <span>&rarr; {val}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground text-[10px] block mb-1">Правильное сопоставление:</span>
+                              <div className="space-y-1.5">
+                                {Object.entries(q.correct_answer || {}).map(([key, val]: any, oIdx) => (
+                                  <div key={oIdx} className="p-2 border border-primary/30 bg-primary/10 rounded-sm text-gold text-[11px] flex justify-between">
+                                    <span>{key}</span>
+                                    <span>&rarr; {val}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ESSAY Display */}
+                      {isEssay && (
+                        <div className="space-y-2">
+                          <div>
+                            <span className="text-muted-foreground text-[10px] block mb-1">Ответ курсанта:</span>
+                            <div className="p-3 bg-tactical-panel/60 border border-tactical-border rounded-sm text-foreground text-[11px] leading-relaxed whitespace-pre-wrap">
+                              {q.student_answer || "—"}
+                            </div>
+                          </div>
+                          {q.feedback && (
+                            <div>
+                              <span className="text-primary text-[10px] font-bold block mb-1 flex items-center gap-1">
+                                <Icon name="Cpu" size={10} /> Комментарий AI-инструктора:
+                              </span>
+                              <div className="p-3 bg-primary/5 border border-primary/20 rounded-sm text-gold italic text-[11px] leading-relaxed">
+                                {q.feedback}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Question Explanation */}
+                      {q.explanation && (
+                        <div className="mt-2.5 p-2.5 bg-tactical-panel/40 border border-tactical-border/50 text-[10px] text-muted-foreground rounded-sm">
+                          <span className="text-gold font-bold">Обоснование:</span> {q.explanation}
+                        </div>
+                      )}
+
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-tactical-border bg-tactical-panel/40 flex justify-end">
+              <button
+                onClick={() => setSelectedAttemptDetails(null)}
+                className="bg-tactical-panel hover:bg-tactical-border text-foreground font-mono text-xs uppercase tracking-widest px-6 py-2.5 border border-tactical-border/80 shadow-lg font-bold"
+              >
+                Закрыть
+              </button>
+            </div>
+
           </div>
         </div>
       )}

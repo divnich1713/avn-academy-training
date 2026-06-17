@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
-import { apiLogout } from "@/lib/api";
+import { apiLogout, apiMe, fetchRequests, createRequest, TrainingRequest, User } from "@/lib/api";
 import { testingApi, Question, ActiveSession } from "@/lib/testingApi";
 import { toast } from "sonner";
 import { fmtStaticId } from "./SectionsShared";
@@ -18,6 +18,13 @@ export function TestingSystem() {
   // Current test state
   const [question, setQuestion] = useState<Question | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<any>(null);
+
+  // Access and Attempts States
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [attemptsCount, setAttemptsCount] = useState<number>(0);
+  const [hasApproval, setHasApproval] = useState<boolean>(false);
+  const [pendingRequest, setPendingRequest] = useState<TrainingRequest | null>(null);
+  const [checkingAccess, setCheckingAccess] = useState<boolean>(true);
   const [timerString, setTimerString] = useState("00:00");
   const [warnings, setWarnings] = useState(0);
   const [isAnnulling, setIsAnnulling] = useState(false);
@@ -58,11 +65,15 @@ export function TestingSystem() {
       if (timerRef.current) clearInterval(timerRef.current);
       if (questionTimerRef.current) clearInterval(questionTimerRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadSession = async () => {
     setLoading(true);
     try {
+      const me = await apiMe();
+      setAuthUser(me);
+
       const session = await testingApi.getActiveSession();
       setActiveSession(session);
       if (session.active && session.attempt_id) {
@@ -76,6 +87,9 @@ export function TestingSystem() {
         if (subjs && subjs.length > 0) {
           setSubjectsList(subjs);
           setSubject(subjs[0]);
+          if (me) {
+            await checkAccess(subjs[0], me);
+          }
         }
       }
     } catch (err: any) {
@@ -84,6 +98,13 @@ export function TestingSystem() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (authUser && subject && (!activeSession || !activeSession.active)) {
+      checkAccess(subject);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subject, authUser, activeSession]);
 
   // 2. Load next question
   const loadNextQuestion = async (attemptId: number, timeLimit?: number) => {
@@ -192,11 +213,118 @@ export function TestingSystem() {
     };
   }, [activeSession, warnings, isAnnulling]);
 
+  async function checkAccess(selectedSubject: string, userOverride?: any) {
+    const user = userOverride || authUser;
+    if (!user) return;
+    
+    setCheckingAccess(true);
+    try {
+      const dashboard = await testingApi.getCadetDashboard();
+      const finishedAttempts = (dashboard.attempts || []).filter(
+        (a) => a.subject === selectedSubject && a.status !== "in_progress"
+      );
+      
+      const localCount = Number(localStorage.getItem(`attempts_count_${user.static_id}_${selectedSubject}`) || 0);
+      const finalAttemptCount = Math.max(finishedAttempts.length, localCount);
+      setAttemptsCount(finalAttemptCount);
+      
+      const reqs = await fetchRequests();
+      const matchingReqs = reqs.filter(
+        (r) => r.type === "exam" && r.subject.includes(selectedSubject)
+      );
+      matchingReqs.sort((a, b) => b.id - a.id);
+      
+      const latestReq = matchingReqs[0] || null;
+      setPendingRequest(latestReq && latestReq.status === "pending" ? latestReq : null);
+      
+      if (latestReq && latestReq.status === "approved") {
+        const consumedList: number[] = JSON.parse(
+          localStorage.getItem("avng_consumed_test_requests") || "[]"
+        );
+        if (!consumedList.includes(latestReq.id)) {
+          setHasApproval(true);
+        } else {
+          setHasApproval(false);
+        }
+      } else {
+        setHasApproval(false);
+      }
+    } catch (err: any) {
+      console.error("Error checking access:", err);
+    } finally {
+      setCheckingAccess(false);
+    }
+  }
+
+  async function handleRequestAccess() {
+    if (!authUser) return;
+    try {
+      await createRequest({
+        type: "exam",
+        subject: `Допуск к тесту: ${subject}`,
+        description: `Прошу выдать допуск к прохождению тестирования по теме: ${subject}`
+      });
+      toast.success("Запрос на допуск успешно отправлен инструктору!");
+      checkAccess(subject);
+    } catch (err: any) {
+      toast.error("Не удалось отправить запрос: " + err.message);
+    }
+  }
+
   // 5. Start Test handler
   const handleStartTest = async () => {
+    if (!authUser) return;
+
+    // Check rank restrictions
+    const rankLower = authUser.rank?.toLowerCase() || "";
+    const subjectLower = subject.toLowerCase();
+    const isCharterOrLaw = subjectLower.includes("фз") || subjectLower.includes("устав");
+    const isPenalOrAdmin = subjectLower.includes("ук") || subjectLower.includes("пк") || subjectLower.includes("коап");
+
+    const isRyadovoy = rankLower === "рядовой";
+    const isSergeant = rankLower.includes("сержант");
+
+    if (isCharterOrLaw && !isRyadovoy) {
+      toast.error("Доступ заблокирован. Этот тест предназначен только для Рядовых.");
+      return;
+    }
+    if (isPenalOrAdmin && !isSergeant) {
+      toast.error("Доступ заблокирован. Этот тест предназначен только для Младших Сержантов.");
+      return;
+    }
+
+    if (attemptsCount >= 3) {
+      toast.error("Достигнут лимит попыток (3/3)!");
+      return;
+    }
+
+    if (!hasApproval) {
+      toast.error("Требуется одобрение допуска инструктором!");
+      return;
+    }
+
     try {
+      // Consume request
+      const reqs = await fetchRequests();
+      const matchingReqs = reqs.filter(
+        (r) => r.type === "exam" && r.subject.includes(subject) && r.status === "approved"
+      );
+      matchingReqs.sort((a, b) => b.id - a.id);
+      const latestApprovedReq = matchingReqs[0];
+      
+      if (latestApprovedReq) {
+        const consumedList = JSON.parse(localStorage.getItem("avng_consumed_test_requests") || "[]");
+        consumedList.push(latestApprovedReq.id);
+        localStorage.setItem("avng_consumed_test_requests", JSON.stringify(consumedList));
+      }
+
       await testingApi.startTest(subject, difficulty, timerMinutes);
       toast.success("Тест начат!");
+
+      // Increment local count
+      const currentLocalCount = Number(localStorage.getItem(`attempts_count_${authUser.static_id}_${subject}`) || 0);
+      localStorage.setItem(`attempts_count_${authUser.static_id}_${subject}`, String(currentLocalCount + 1));
+
       loadSession();
     } catch (err: any) {
       toast.error("Не удалось начать тест: " + err.message);
@@ -367,6 +495,7 @@ export function TestingSystem() {
     return () => {
       if (questionTimerRef.current) clearInterval(questionTimerRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questionSecondsLeft]);
 
   // Rendering Helpers
@@ -700,6 +829,23 @@ export function TestingSystem() {
   }
 
   // C. Start Screen (No active session)
+  const rankLower = authUser?.rank?.toLowerCase() || "";
+  const subjectLower = subject.toLowerCase();
+  const isCharterOrLaw = subjectLower.includes("фз") || subjectLower.includes("устав");
+  const isPenalOrAdmin = subjectLower.includes("ук") || subjectLower.includes("пк") || subjectLower.includes("коап");
+
+  const isRyadovoy = rankLower === "рядовой";
+  const isSergeant = rankLower.includes("сержант");
+
+  let rankLockMessage = "";
+  if (isCharterOrLaw && !isRyadovoy) {
+    rankLockMessage = "Этот тест предназначен только для Рядовых.";
+  } else if (isPenalOrAdmin && !isSergeant) {
+    rankLockMessage = "Этот тест предназначен только для Младших Сержантов.";
+  }
+
+  const isAttemptsExceeded = attemptsCount >= 3;
+
   return (
     <div className="max-w-md mx-auto space-y-6 animate-fade-in">
       <div className="corner-mark bg-tactical-card border border-tactical-border p-6 space-y-6 card-glow">
@@ -720,14 +866,77 @@ export function TestingSystem() {
               ))}
             </select>
           </div>
+
+          {checkingAccess ? (
+            <div className="flex items-center justify-center py-4 gap-2 text-xs font-mono text-muted-foreground">
+              <Icon name="Loader2" className="animate-spin text-primary" size={14} />
+              Проверка прав доступа...
+            </div>
+          ) : (
+            <div className="space-y-3 font-mono text-xs">
+              <div className="flex justify-between border-b border-tactical-border/30 pb-2">
+                <span className="text-muted-foreground">Использовано попыток:</span>
+                <span className={isAttemptsExceeded ? "text-destructive font-bold" : "text-foreground"}>
+                  {attemptsCount} из 3
+                </span>
+              </div>
+
+              {rankLockMessage ? (
+                <div className="bg-destructive/10 border border-destructive/30 p-3 text-destructive rounded-sm text-center leading-relaxed">
+                  <Icon name="ShieldAlert" className="mx-auto mb-1 text-destructive animate-pulse" size={18} />
+                  {rankLockMessage}
+                </div>
+              ) : isAttemptsExceeded ? (
+                <div className="bg-destructive/10 border border-destructive/30 p-3 text-destructive rounded-sm text-center leading-relaxed">
+                  <Icon name="AlertTriangle" className="mx-auto mb-1 text-destructive animate-pulse" size={18} />
+                  Достигнут лимит попыток (3/3). Прохождение теста заблокировано.
+                </div>
+              ) : hasApproval ? (
+                <div className="bg-primary/10 border border-primary/30 p-3 text-primary rounded-sm text-center leading-relaxed">
+                  <Icon name="Unlock" className="mx-auto mb-1 text-primary animate-pulse" size={18} />
+                  Допуск получен. Тест разблокирован для прохождения.
+                </div>
+              ) : pendingRequest ? (
+                <div className="bg-gold/10 border border-gold/30 p-3 text-gold rounded-sm text-center leading-relaxed">
+                  <Icon name="Clock" className="mx-auto mb-1 text-gold animate-pulse" size={18} />
+                  Допуск на рассмотрении у инструктора. Ожидайте одобрения.
+                </div>
+              ) : (
+                <div className="bg-tactical-panel/80 border border-tactical-border p-3 text-muted-foreground rounded-sm text-center leading-relaxed">
+                  <Icon name="Lock" className="mx-auto mb-1 text-muted-foreground" size={18} />
+                  Доступ закрыт. Для прохождения теста необходимо запросить допуск.
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        <button
-          onClick={handleStartTest}
-          className="w-full bg-primary text-primary-foreground hover:bg-primary/95 py-3 font-mono text-xs uppercase tracking-wider transition-colors border border-primary/20 flex items-center justify-center gap-2"
-        >
-          Начать тестирование <Icon name="Play" size={12} />
-        </button>
+        {!checkingAccess && !rankLockMessage && !isAttemptsExceeded && (
+          <>
+            {hasApproval ? (
+              <button
+                onClick={handleStartTest}
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/95 py-3 font-mono text-xs uppercase tracking-wider transition-colors border border-primary/20 flex items-center justify-center gap-2"
+              >
+                Начать тестирование <Icon name="Play" size={12} />
+              </button>
+            ) : pendingRequest ? (
+              <button
+                disabled
+                className="w-full bg-tactical-panel border border-tactical-border/50 text-muted-foreground py-3 font-mono text-xs uppercase tracking-wider cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                Допуск на рассмотрении <Icon name="Clock" size={12} />
+              </button>
+            ) : (
+              <button
+                onClick={handleRequestAccess}
+                className="w-full bg-gold text-gold-foreground hover:bg-gold/90 py-3 font-mono text-xs uppercase tracking-wider transition-colors border border-gold/20 flex items-center justify-center gap-2 font-bold animate-pulse"
+              >
+                Запросить допуск у инструктора <Icon name="Send" size={12} />
+              </button>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

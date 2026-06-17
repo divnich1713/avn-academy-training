@@ -42,6 +42,7 @@ async def get_cadet_dashboard(
 
         attempts_history.append({
             "id": att.id,
+            "subject": att.subject,
             "difficulty": att.difficulty,
             "status": att.status,
             "start_elo": att.start_elo,
@@ -133,6 +134,7 @@ async def get_admin_dashboard(
 
         admin_attempts.append({
             "attempt_id": att.id,
+            "subject": att.subject,
             "cadet_name": name,
             "static_id": static_id,
             "rank": rank,
