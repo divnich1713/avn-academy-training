@@ -11,6 +11,7 @@ import {
 } from "@/lib/testingApi";
 import { TestingD3Stats } from "./TestingD3Stats";
 import { toast } from "sonner";
+import { fmtStaticId } from "./SectionsShared";
 
 interface AdminProps {
   onNavigate?: (tab: string) => void;
@@ -637,7 +638,7 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
                       ) : (
                         filteredAttempts.map((att) => (
                           <tr key={att.attempt_id} className="border-b border-tactical-border/50 hover:bg-tactical-panel/20">
-                            <td className="p-3 font-semibold">{att.static_id}</td>
+                            <td className="p-3 font-semibold">{fmtStaticId(att.static_id)}</td>
                             <td className="p-3">{att.cadet_name}</td>
                             <td className="p-3 text-muted-foreground">
                               {att.rank} <span className="text-gold">/</span> {att.unit}
@@ -678,7 +679,7 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
                                     const isPassed = att.score_percent >= 80;
                                     const gradeVal = att.score_percent >= 90 ? 5 : att.score_percent >= 80 ? 4 : att.score_percent >= 60 ? 3 : 2;
                                     const discordText = `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
-**Курсант:** ${att.cadet_name} (ID: ${att.static_id})
+**Курсант:** ${att.cadet_name} (ID: ${fmtStaticId(att.static_id)})
 **Звание:** ${att.rank || "—"}
 **Подразделение:** ${att.unit || "—"}
 **Результат:** ${isPassed ? "🟢 СДАН" : "🔴 НЕ СДАН"}

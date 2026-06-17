@@ -3,6 +3,7 @@ import Icon from "@/components/ui/icon";
 import { apiLogout } from "@/lib/api";
 import { testingApi, Question, ActiveSession } from "@/lib/testingApi";
 import { toast } from "sonner";
+import { fmtStaticId } from "./SectionsShared";
 
 interface TestingSystemProps {
   onNavigate?: (tab: string) => void;
@@ -405,7 +406,7 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
               {certificate.cadet_name}
             </h3>
             <div className="flex justify-center gap-3 text-[10px] font-mono text-muted-foreground mt-2">
-              <span>ID: <strong className="text-foreground">{certificate.static_id}</strong></span>
+              <span>ID: <strong className="text-foreground">{fmtStaticId(certificate.static_id)}</strong></span>
               <span>•</span>
               <span>Звание: <strong className="text-foreground">{certificate.rank}</strong></span>
               <span>•</span>
@@ -464,7 +465,7 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
                   minute: "2-digit"
                 });
                 const discordText = `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
-**Курсант:** ${certificate.cadet_name} (ID: ${certificate.static_id})
+**Курсант:** ${certificate.cadet_name} (ID: ${fmtStaticId(certificate.static_id)})
 **Звание:** ${certificate.rank || "—"}
 **Подразделение:** ${certificate.unit || "—"}
 **Тема:** ${certificate.subject}
