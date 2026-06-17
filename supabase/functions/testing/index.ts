@@ -1155,16 +1155,16 @@ Deno.serve(async (req) => {
       // GET /api/tests/settings-admin
       if (req.method === "GET") {
         let settingsRes = await client.queryObject<any>(
-          `SELECT id, subject, timer_minutes, question_count, base_elo FROM ${SCHEMA}.test_settings ORDER BY id ASC`
+          `SELECT id, subject, timer_minutes, question_count, base_elo, time_limit_per_question, passing_score_percent FROM ${SCHEMA}.test_settings ORDER BY id ASC`
         );
         
         if (settingsRes.rows.length === 0) {
           await client.queryArray(
-            `INSERT INTO ${SCHEMA}.test_settings (subject, timer_minutes, question_count, base_elo)
-             VALUES ('Тест по ФЗ ФСВНГ и уставу ФСВНГ', 45, 30, 1000)`
+            `INSERT INTO ${SCHEMA}.test_settings (subject, timer_minutes, question_count, base_elo, time_limit_per_question, passing_score_percent)
+             VALUES ('Тест по ФЗ ФСВНГ и уставу ФСВНГ', 45, 30, 1000, 0, 80)`
           );
           settingsRes = await client.queryObject<any>(
-            `SELECT id, subject, timer_minutes, question_count, base_elo FROM ${SCHEMA}.test_settings ORDER BY id ASC`
+            `SELECT id, subject, timer_minutes, question_count, base_elo, time_limit_per_question, passing_score_percent FROM ${SCHEMA}.test_settings ORDER BY id ASC`
           );
         }
         
@@ -1176,7 +1176,7 @@ Deno.serve(async (req) => {
       // PUT /api/tests/settings-admin
       if (req.method === "PUT") {
         const body = await req.json();
-        const { subject, timer_minutes, question_count, base_elo } = body;
+        const { subject, timer_minutes, question_count, base_elo, time_limit_per_question, passing_score_percent } = body;
         
         const checkRes = await client.queryArray(
           `SELECT id FROM ${SCHEMA}.test_settings WHERE subject = $1`,
@@ -1186,17 +1186,17 @@ Deno.serve(async (req) => {
         let settingsRow;
         if (checkRes.rows.length === 0) {
           const insertRes = await client.queryObject<any>(
-            `INSERT INTO ${SCHEMA}.test_settings (subject, timer_minutes, question_count, base_elo)
-             VALUES ($1, $2, $3, $4) RETURNING *`,
-            [subject, timer_minutes, question_count, base_elo]
+            `INSERT INTO ${SCHEMA}.test_settings (subject, timer_minutes, question_count, base_elo, time_limit_per_question, passing_score_percent)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+            [subject, timer_minutes, question_count, base_elo, time_limit_per_question ?? 0, passing_score_percent ?? 80]
           );
           settingsRow = insertRes.rows[0];
         } else {
           const updateRes = await client.queryObject<any>(
             `UPDATE ${SCHEMA}.test_settings 
-             SET timer_minutes = $1, question_count = $2, base_elo = $3 
-             WHERE subject = $4 RETURNING *`,
-            [timer_minutes, question_count, base_elo, subject]
+             SET timer_minutes = $1, question_count = $2, base_elo = $3, time_limit_per_question = $4, passing_score_percent = $5 
+             WHERE subject = $6 RETURNING *`,
+            [timer_minutes, question_count, base_elo, time_limit_per_question ?? 0, passing_score_percent ?? 80, subject]
           );
           settingsRow = updateRes.rows[0];
         }
