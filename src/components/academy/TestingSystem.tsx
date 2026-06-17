@@ -23,6 +23,7 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
   const [timerString, setTimerString] = useState("00:00");
   const [warnings, setWarnings] = useState(0);
   const [isAnnulling, setIsAnnulling] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -197,7 +198,7 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
 
   // 8. Submit Answer Handler
   const handleSubmitAnswer = async () => {
-    if (!activeSession || !activeSession.attempt_id || !question) return;
+    if (!activeSession || !activeSession.attempt_id || !question || isSubmitting) return;
 
     // Validate matching
     if (question.type === "matching") {
@@ -223,16 +224,19 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const res = await testingApi.submitAnswer(activeSession.attempt_id, question.question_id, selectedAnswer);
       if (res.completed) {
         toast.success("Тестирование успешно завершено!");
         loadSession();
       } else {
-        loadNextQuestion(activeSession.attempt_id);
+        await loadNextQuestion(activeSession.attempt_id);
       }
     } catch (err: any) {
       toast.error("Ошибка отправки ответа: " + err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -408,9 +412,14 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
           <div className="flex justify-end pt-4 border-t border-tactical-border/40">
             <button
               onClick={handleSubmitAnswer}
-              className="bg-primary hover:bg-primary/95 text-primary-foreground font-mono text-xs uppercase tracking-wider px-5 py-2.5 border border-primary/20 flex items-center gap-2 shadow-lg"
+              disabled={isSubmitting}
+              className="bg-primary hover:bg-primary/95 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground font-mono text-xs uppercase tracking-wider px-5 py-2.5 border border-primary/20 flex items-center gap-2 shadow-lg"
             >
-              Ответить <Icon name="CornerDownLeft" size={12} />
+              {isSubmitting ? (
+                <>Отправка... <Icon name="Loader2" size={12} className="animate-spin" /></>
+              ) : (
+                <>Ответить <Icon name="CornerDownLeft" size={12} /></>
+              )}
             </button>
           </div>
         </div>
