@@ -343,7 +343,7 @@ export async function sendRequestReviewedDiscord({
   const isApproved = status === "approved";
   const title = isApproved 
     ? (isExam ? "🎓 Экзамен разрешен (Запрос одобрен)" : "✅ Запрос одобрен")
-    : (isExam ? "❌ Экзамен не разрешен (Запрос отклонен)" : "❌ Запрос отклонен");
+    : (isExam ? "🎓 Экзамен запрещен (Запрос отклонен)" : "❌ Запрос отклонен");
   const color = isApproved ? 5763719 : 15548997; // Green for approved, Red for rejected
 
   await sendDiscordEmbed({
