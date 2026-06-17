@@ -194,30 +194,65 @@ export async function sendTestCompletedDiscord({
   name,
   rank,
   staticId,
+  unit,
   subject,
   score,
   totalQuestions,
   percent,
+  grade,
   passed,
 }: {
   name: string;
   rank: string;
   staticId: string;
+  unit?: string;
   subject: string;
   score: number;
   totalQuestions: number;
   percent: number;
+  grade?: number;
   passed: boolean;
 }) {
+  const formattedStaticId = fmtStaticId(staticId);
+  const statusEmoji = passed ? "🟢 СДАН" : "🔴 НЕ СДАН";
+
+  // Date formatting: 18 июня 2026 г. в 01:20
+  const dateObj = new Date();
+  const options: Intl.DateTimeFormatOptions = {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  };
+  const dateFormatted = dateObj.toLocaleDateString("ru-RU", options);
+  const timeFormatted = dateObj.toLocaleTimeString("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  
+  let baseDate = dateFormatted;
+  if (!baseDate.includes("г.")) {
+    baseDate = `${baseDate} г.`;
+  }
+  const fullDateStr = `${baseDate} в ${timeFormatted}`;
+
+  const systemUrl = typeof window !== "undefined" ? window.location.origin : "https://avn-academy-training-netlify-app.ru";
+  const formattedPercent = typeof percent === "number" ? (percent % 1 === 0 ? percent.toString() : percent.toFixed(2)) : percent;
+
+  const reportText = `**[РЕЗУЛЬТАТ ТЕСТИРОВАНИЯ АВНГ]**
+**Курсант:** ${name} | ${formattedStaticId}
+**Звание:** ${rank}
+**Подразделение:** ${unit || "АВНГ"}
+**Тема:** ${subject}
+**Результат:** ${statusEmoji}
+**Оценка:** ${grade !== undefined ? grade : "—"}
+**Верные ответы:** ${score} из ${totalQuestions} (${formattedPercent}%)
+**Дата сдачи:** ${fullDateStr}
+**Ссылка на систему:** ${systemUrl}`;
+
   await sendDiscordEmbed({
-    title: passed ? "🎓 Тест успешно сдан!" : "❌ Тест не сдан",
+    title: "🎓 Результат тестирования АВНГ",
+    description: reportText,
     color: passed ? 3447003 : 10038562, // Blue for passed, Dark Red for failed
-    fields: [
-      { name: "Курсант", value: `${rank} ${name} (${staticId})`, inline: true },
-      { name: "Дисциплина", value: subject, inline: true },
-      { name: "Результат", value: `${score}/${totalQuestions} правильных ответов (${percent}%)`, inline: false },
-      { name: "Статус аттестации", value: passed ? "Зачтено" : "Не зачтено (требуется пересдача)", inline: true },
-    ],
   }, "test");
 }
 

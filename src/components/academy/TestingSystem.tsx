@@ -257,10 +257,12 @@ export function TestingSystem() {
             name: res.certificate.cadet_name,
             rank: res.certificate.rank,
             staticId: res.certificate.static_id,
+            unit: res.certificate.unit,
             subject: res.certificate.subject,
             score: res.certificate.correct_answers_count,
             totalQuestions: res.certificate.total_questions,
             percent: res.certificate.percentage,
+            grade: res.certificate.grade,
             passed: res.certificate.passed
           }).catch(err => console.error("Discord error:", err));
         } else {
@@ -315,10 +317,12 @@ export function TestingSystem() {
             name: res.certificate.cadet_name,
             rank: res.certificate.rank,
             staticId: res.certificate.static_id,
+            unit: res.certificate.unit,
             subject: res.certificate.subject,
             score: res.certificate.correct_answers_count,
             totalQuestions: res.certificate.total_questions,
             percent: res.certificate.percentage,
+            grade: res.certificate.grade,
             passed: res.certificate.passed
           }).catch(err => console.error("Discord error:", err));
         } else {
