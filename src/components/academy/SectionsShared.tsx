@@ -151,12 +151,14 @@ export function RequestCard({
 }
 
 export function RequestForm({
+  authUser,
   type,
   subjectOptions,
   onSubmit,
   onClose,
   completedSubjects = [],
 }: {
+  authUser: User;
   type: "lecture" | "practice" | "exam" | "report";
   subjectOptions: string[];
   onSubmit: () => void;
@@ -177,6 +179,14 @@ export function RequestForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // States for dismissal report
+  const [dismissalName, setDismissalName] = useState(authUser?.name || "");
+  const [dismissalPassport, setDismissalPassport] = useState("");
+  const [dismissalRank, setDismissalRank] = useState(authUser?.rank || "Рядовой");
+  const [dismissalReason, setDismissalReason] = useState("ПСЖ");
+  const [dismissalTag, setDismissalTag] = useState("Начальник АВНГ Заместитель начальника АВНГ");
+  const [dismissalPhotoUrl, setDismissalPhotoUrl] = useState("");
+
   // Update initial subject if the list updates or disabled options change
   useEffect(() => {
     if (subject && subjectOptions.includes(subject) && !isOptionDisabled(subject)) {
@@ -192,6 +202,20 @@ export function RequestForm({
       setError("Нет доступных для выбора тем");
       return;
     }
+    if (subject === "Рапорт на увольнение из академии") {
+      if (!dismissalName.trim()) {
+        setError("Имя и Фамилия обязательны!");
+        return;
+      }
+      if (!dismissalPassport.trim()) {
+        setError("Номер паспорта обязателен!");
+        return;
+      }
+      if (!dismissalPhotoUrl.trim()) {
+        setError("Ссылка на фотокарточку удостоверения обязательна!");
+        return;
+      }
+    }
     setError("");
     setLoading(true);
     try {
@@ -205,7 +229,13 @@ export function RequestForm({
       }
       
       let finalDescription = description;
-      if (proofUrls.length > 0) {
+      if (subject === "Рапорт на увольнение из академии") {
+        finalDescription = `${dismissalName.trim()} | ${dismissalPassport.trim()}
+Звание: ${dismissalRank.trim()}
+Причина: ${dismissalReason.trim()}
+Тег руководства: ${dismissalTag.trim()}
+Фотокарточка удостоверения (боди-камера): ${dismissalPhotoUrl.trim()}`;
+      } else if (proofUrls.length > 0) {
         const labelsMap: Record<string, string[]> = {
           "Вышка — 30 мин": ["Начало", "10 мин", "20 мин", "30 мин", "Конец"],
           "Патруль по территории — 30 мин": ["Начало", "10 мин", "20 мин", "30 мин", "Конец"],
@@ -372,16 +402,107 @@ export function RequestForm({
         return null;
       })()}
 
-      <div>
-        <label className="rank-badge text-muted-foreground block mb-1">Пояснение (необязательно)</label>
-        <textarea
-          className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary transition-colors resize-none"
-          rows={2}
-          placeholder="Опишите цель..."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-      </div>
+      {subject === "Рапорт на увольнение из академии" && (
+        <div className="bg-tactical-panel border border-tactical-border p-4 space-y-3">
+          <p className="rank-badge text-primary block border-b border-tactical-border/60 pb-1.5 uppercase font-semibold">
+            Форма рапорта на увольнение
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="rank-badge text-muted-foreground block mb-1">Имя Фамилия</label>
+              <input
+                type="text"
+                required
+                className="w-full bg-tactical-card border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary"
+                value={dismissalName}
+                onChange={(e) => setDismissalName(e.target.value)}
+                placeholder="Иван Иванов"
+              />
+            </div>
+            
+            <div>
+              <label className="rank-badge text-muted-foreground block mb-1">Номер паспорта (ОБЯЗАТЕЛЬНО)</label>
+              <input
+                type="text"
+                required
+                className="w-full bg-tactical-card border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary"
+                value={dismissalPassport}
+                onChange={(e) => setDismissalPassport(e.target.value)}
+                placeholder="323-565"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="rank-badge text-muted-foreground block mb-1">Звание</label>
+              <input
+                type="text"
+                required
+                className="w-full bg-tactical-card border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary"
+                value={dismissalRank}
+                onChange={(e) => setDismissalRank(e.target.value)}
+                placeholder="Рядовой"
+              />
+            </div>
+
+            <div>
+              <label className="rank-badge text-muted-foreground block mb-1">Причина</label>
+              <input
+                type="text"
+                required
+                className="w-full bg-tactical-card border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary"
+                value={dismissalReason}
+                onChange={(e) => setDismissalReason(e.target.value)}
+                placeholder="ПСЖ"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="rank-badge text-muted-foreground block mb-1">Тег своего руководства подразделения</label>
+            <input
+              type="text"
+              required
+              className="w-full bg-tactical-card border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary"
+              value={dismissalTag}
+              onChange={(e) => setDismissalTag(e.target.value)}
+              placeholder="Начальник АВНГ Заместитель начальника АВНГ"
+            />
+            <span className="text-[10px] text-destructive font-mono block mt-1">
+              ⚠️ При указании тега Старшего состава (СС) в рапорте будет отказано!
+            </span>
+          </div>
+
+          <div>
+            <label className="rank-badge text-muted-foreground block mb-1">
+              Фотокарточка удостоверения с боди-камерой (ОБЯЗАТЕЛЬНО, Полная без обрезаний!)
+            </label>
+            <input
+              type="url"
+              required
+              className="w-full bg-tactical-card border border-tactical-border px-3 py-2 text-xs text-foreground font-mono focus:outline-none focus:border-primary"
+              value={dismissalPhotoUrl}
+              onChange={(e) => setDismissalPhotoUrl(e.target.value)}
+              placeholder="https://i.imgur.com/... (ссылка на скриншот)"
+            />
+          </div>
+        </div>
+      )}
+
+      {subject !== "Рапорт на увольнение из академии" && (
+        <div>
+          <label className="rank-badge text-muted-foreground block mb-1">Пояснение (необязательно)</label>
+          <textarea
+            className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary transition-colors resize-none"
+            rows={2}
+            placeholder="Опишите цель..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </div>
+      )}
       {error && (
         <div className="flex items-center gap-2 bg-red-900/20 border border-red-800 px-3 py-2">
           <Icon name="AlertTriangle" size={13} className="text-red-400" />
@@ -463,6 +584,7 @@ export function RequestSection({
       </div>
       {!isInstructor && showForm && (
         <RequestForm
+          authUser={authUser}
           type={type}
           subjectOptions={subjectOptions}
           completedSubjects={completedSubjects}
