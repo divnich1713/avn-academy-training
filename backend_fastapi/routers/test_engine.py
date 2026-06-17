@@ -544,10 +544,10 @@ async def submit_answer(
 
     return {
         "type": question.type,
-        "is_correct": is_correct,
-        "grade": grade,
-        "correct_answer": question.correct_answer if question.type != "essay" else None,
-        "explanation": question.explanation if question.type != "essay" else "Развернутый ответ оценивается по 5 критериям",
+        "is_correct": None,
+        "grade": None,
+        "correct_answer": None,
+        "explanation": None,
         "new_rating": new_student_elo,
         "completed": completed
     }

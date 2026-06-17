@@ -718,10 +718,10 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           type: question.type,
-          is_correct: isCorrect,
-          grade: question.type !== "essay" ? grade : null,
-          correct_answer: question.type !== "essay" ? question.correct_answer : null,
-          explanation: question.type !== "essay" ? question.explanation : "Развернутый ответ оценивается по 5 критериям",
+          is_correct: null,
+          grade: null,
+          correct_answer: null,
+          explanation: null,
           new_rating: newStudentElo,
           completed: completed,
         }),

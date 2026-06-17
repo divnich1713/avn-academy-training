@@ -17,17 +17,13 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
   const [difficulty, setDifficulty] = useState(5);
   const [timerMinutes, setTimerMinutes] = useState(45);
   const [subjectsList, setSubjectsList] = useState<string[]>(["Тест по ФЗ ФСВНГ и уставу ФСВНГ"]);
-  
   // Current test state
   const [question, setQuestion] = useState<Question | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<any>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [feedbackData, setFeedbackData] = useState<any>(null);
   const [timerString, setTimerString] = useState("00:00");
   const [warnings, setWarnings] = useState(0);
   const [isAnnulling, setIsAnnulling] = useState(false);
 
-  
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 1. Check active session on load
@@ -85,8 +81,6 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
           setSelectedAnswer(initPairs);
         }
         else if (q.type === "essay") setSelectedAnswer("");
-        setShowFeedback(false);
-        setFeedbackData(null);
       }
     } catch (err: any) {
       toast.error("Ошибка загрузки вопроса: " + err.message);
@@ -335,8 +329,7 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
                   type="radio"
                   name="choice-ans"
                   checked={selectedAnswer === opt}
-                  onChange={() => !showFeedback && setSelectedAnswer(opt)}
-                  disabled={showFeedback}
+                  onChange={() => setSelectedAnswer(opt)}
                   className="accent-primary w-4 h-4"
                 />
                 <span className="text-sm font-mono">{opt}</span>
@@ -357,13 +350,11 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
                   type="checkbox"
                   checked={selectedAnswer?.includes(opt) || false}
                   onChange={() => {
-                    if (showFeedback) return;
                     const nextList = selectedAnswer?.includes(opt)
                       ? selectedAnswer.filter((x: string) => x !== opt)
                       : [...(selectedAnswer || []), opt];
                     setSelectedAnswer(nextList);
                   }}
-                  disabled={showFeedback}
                   className="accent-primary w-4 h-4"
                 />
                 <span className="text-sm font-mono">{opt}</span>
@@ -379,13 +370,11 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
                     <select
                       value={selectedAnswer?.[k] || ""}
                       onChange={(e) => {
-                        if (showFeedback) return;
                         setSelectedAnswer({
                           ...selectedAnswer,
                           [k]: e.target.value
                         });
                       }}
-                      disabled={showFeedback}
                       className="bg-tactical-card border border-tactical-border text-foreground text-xs font-mono p-2 focus:outline-none focus:border-primary sm:w-1/2"
                     >
                       <option value="">-- Выберите сопоставление --</option>
@@ -403,8 +392,7 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
               <div className="space-y-3">
                 <textarea
                   value={selectedAnswer || ""}
-                  onChange={(e) => !showFeedback && setSelectedAnswer(e.target.value)}
-                  disabled={showFeedback}
+                  onChange={(e) => setSelectedAnswer(e.target.value)}
                   placeholder="Введите развернутый текстовый ответ..."
                   className="w-full min-h-[160px] bg-tactical-panel border border-tactical-border p-4 text-sm font-mono focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 text-foreground resize-y"
                 />
@@ -416,43 +404,14 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
             )}
           </div>
 
-          {/* Feedback Screen */}
-          {showFeedback && feedbackData && (
-            <div className={`p-4 border ${feedbackData.is_correct === false ? "bg-destructive/5 border-destructive/30 text-destructive-foreground" : feedbackData.type === "essay" ? "bg-primary/5 border-primary/30" : "bg-primary/5 border-primary/30 text-primary-foreground"} space-y-3 animate-fade-in`}>
-              <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider font-semibold">
-                <Icon name={feedbackData.is_correct === false ? "XCircle" : "CheckCircle"} size={16} />
-                {feedbackData.type === "essay" ? "Ответ отправлен" : feedbackData.is_correct ? "Правильно!" : "Неверный ответ"}
-              </div>
-              {feedbackData.type !== "essay" && feedbackData.is_correct === false && (
-                <div className="text-xs font-mono text-muted-foreground border-t border-tactical-border/30 pt-2">
-                  <span className="text-gold block">Правильный ответ:</span>
-                  <span className="block mt-1 font-semibold text-foreground">
-                    {typeof feedbackData.correct_answer === "object"
-                      ? JSON.stringify(feedbackData.correct_answer, null, 2)
-                      : String(feedbackData.correct_answer)}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Action button */}
           <div className="flex justify-end pt-4 border-t border-tactical-border/40">
-            {!showFeedback ? (
-              <button
-                onClick={handleSubmitAnswer}
-                className="bg-primary hover:bg-primary/95 text-primary-foreground font-mono text-xs uppercase tracking-wider px-5 py-2.5 border border-primary/20 flex items-center gap-2 shadow-lg"
-              >
-                Ответить <Icon name="CornerDownLeft" size={12} />
-              </button>
-            ) : (
-              <button
-                onClick={() => loadNextQuestion(activeSession.attempt_id!)}
-                className="bg-gold hover:bg-gold/90 text-gold-foreground font-mono text-xs uppercase tracking-wider px-5 py-2.5 border border-gold/20 flex items-center gap-2 shadow-lg"
-              >
-                Далее <Icon name="ArrowRight" size={12} />
-              </button>
-            )}
+            <button
+              onClick={handleSubmitAnswer}
+              className="bg-primary hover:bg-primary/95 text-primary-foreground font-mono text-xs uppercase tracking-wider px-5 py-2.5 border border-primary/20 flex items-center gap-2 shadow-lg"
+            >
+              Ответить <Icon name="CornerDownLeft" size={12} />
+            </button>
           </div>
         </div>
       </div>
