@@ -310,7 +310,14 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
     } else {
       // Create mode
       setEditingQuestion(null);
-      setQSubject(settingsList.length > 0 ? settingsList[0].subject : "Тест по ФЗ ФСВНГ и уставу ФСВНГ");
+      
+      let initialSubject = "Тест по ФЗ ФСВНГ и уставу ФСВНГ";
+      if (qSubjectFilter && qSubjectFilter !== "Все") {
+        initialSubject = qSubjectFilter;
+      } else if (settingsList.length > 0) {
+        initialSubject = settingsList[0].subject;
+      }
+      setQSubject(initialSubject);
       setQType("choice");
       setQText("");
       setQElo(1000);
