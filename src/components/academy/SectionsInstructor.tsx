@@ -245,7 +245,15 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       reviewer_name: null,
     }));
 
-  const allRequestsPlusDismissals = [...requests, ...dismissalRequests].filter((r) => r.type !== "report");
+  // Map cadet-submitted dismissal reports from type 'report' to 'dismissal' so they are not filtered out and show up under 'dismissal' tab
+  const mappedRequests = requests.map((r) => {
+    if (r.type === "report" && r.subject === "Рапорт на увольнение из академии") {
+      return { ...r, type: "dismissal" as any };
+    }
+    return r;
+  });
+
+  const allRequestsPlusDismissals = [...mappedRequests, ...dismissalRequests].filter((r) => r.type !== "report");
 
   const reqDates = useMemo(() => {
     const dates = new Set<string>();
