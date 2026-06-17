@@ -318,7 +318,7 @@ export async function sendGeneralRequestDiscord({
 // 5. Request Reviewed Notification (Green / Red)
 export async function sendRequestReviewedDiscord({
   name,
-  rank: _rank,
+  rank,
   staticId,
   typeLabel,
   subject,
@@ -348,10 +348,9 @@ export async function sendRequestReviewedDiscord({
 
   await sendDiscordEmbed({
     title,
+    description: `**Курсант:** ${name} | ${fmtStaticId(staticId)}\n**Звание:** ${rank || "—"}\n**Категория:** ${typeLabel}`,
     color,
     fields: [
-      { name: "Курсант", value: `**Курсант:** ${name} | ${fmtStaticId(staticId)}`, inline: true },
-      { name: "Категория", value: typeLabel, inline: true },
       { name: "Тема / Занятие", value: subject, inline: false },
       { name: "Проверил", value: reviewerName, inline: true },
       { name: "Статус", value: isApproved ? "Зачтено / Выполнено" : "Отклонено", inline: true },
