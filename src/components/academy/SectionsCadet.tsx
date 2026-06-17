@@ -113,6 +113,29 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
         </div>
       </div>
 
+      {/* Call to Action Banner - Memos reading guidance */}
+      <div className="relative overflow-hidden border border-yellow-600/40 bg-yellow-950/10 p-4 corner-mark flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in">
+        <div className="flex items-start gap-3.5">
+          <div className="w-10 h-10 border border-yellow-600/30 bg-yellow-950/35 flex items-center justify-center text-yellow-500 shrink-0 self-center">
+            <Icon name="ShieldAlert" size={20} />
+          </div>
+          <div>
+            <h4 className="font-oswald text-sm font-semibold tracking-wider text-yellow-500 uppercase">
+              ВАЖНОЕ ПРЕДУПРЕЖДЕНИЕ ДЛЯ КУРСАНТОВ
+            </h4>
+            <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5 max-w-3xl">
+              Перед подачей рапортов и сдачей экзаменов обязательно изучите **Памятки обучения**. В них содержатся все ключевые правила, регламенты задержания, ареста и проведения досмотра.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => onNavigate?.("materials")}
+          className="w-full md:w-auto border border-yellow-600/50 bg-yellow-950/20 text-yellow-500 hover:bg-yellow-600 hover:text-black font-oswald text-xs tracking-wider uppercase px-5 py-2.5 transition-all duration-200 shrink-0 cursor-pointer corner-mark"
+        >
+          Изучить памятки
+        </button>
+      </div>
+
       {/* Combined Quick Actions + Stats Section */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {/* Left: Small red quick action buttons (col-span-3) */}
