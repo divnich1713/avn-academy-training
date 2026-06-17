@@ -566,6 +566,14 @@ export async function createPromotionReport(promotion_type: import("./api").Prom
   const user = USERS.find(u => u.id === (currentUserId || 1));
   if (!user) throw new Error("Пользователь не найден");
 
+  // Enforce rank constraint: Sergeant requires Junior Sergeant rank
+  if (promotion_type === "sergeant") {
+    const isMlSergeant = user.rank && (user.rank.toLowerCase().includes("мл.") || user.rank.toLowerCase().includes("младший"));
+    if (!isMlSergeant) {
+      throw new Error("Подача рапорта на звание Сержант доступна только в звании Мл. Сержант");
+    }
+  }
+
   // Verify requirements
   const check = await checkPromotionRequirements(promotion_type, user.id);
   if (!check.all_completed) {

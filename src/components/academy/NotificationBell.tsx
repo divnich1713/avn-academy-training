@@ -81,6 +81,21 @@ function getNotifStyles(n: Notification) {
       bgColor: isUnread ? "bg-purple-950/20 hover:bg-purple-950/30" : "hover:bg-purple-950/10"
     };
   }
+  if (
+    n.type === "promotion_request" ||
+    n.type === "promotion_reviewed" ||
+    msg.includes("повышен") ||
+    title.includes("повышен") ||
+    msg.includes("повышение") ||
+    title.includes("повышение")
+  ) {
+    return {
+      iconColor: isUnread ? "text-green-400" : "text-green-800/60",
+      dotColor: "bg-green-500",
+      borderColor: "border-l-2 border-l-green-500/50",
+      bgColor: isUnread ? "bg-green-950/20 hover:bg-green-950/30" : "hover:bg-green-950/10"
+    };
+  }
   // Default to yellow for general requests/notifications
   return {
     iconColor: isUnread ? "text-yellow-400" : "text-muted-foreground",

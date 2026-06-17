@@ -211,15 +211,30 @@ export function PromotionSection({ authUser }: { authUser: User }) {
           {(["junior_sergeant", "sergeant"] as PromotionType[]).map((type) => {
             const isSelected = selected === type;
             const hasPending = hasPendingReport(type);
+            const isMlSergeant = authUser.rank && (authUser.rank.toLowerCase().includes("мл.") || authUser.rank.toLowerCase().includes("младший"));
+            const isLocked = type === "sergeant" && !isMlSergeant;
+
             return (
               <button
                 key={type}
-                onClick={() => !isInstructor && handleSelect(type)}
+                onClick={() => {
+                  if (isInstructor) return;
+                  if (isLocked) {
+                    setError("Подача рапорта на звание Сержант доступна только в звании Мл. Сержант");
+                    setSuccess("");
+                    setSelected(null);
+                    setCheckResult(null);
+                    return;
+                  }
+                  handleSelect(type);
+                }}
                 disabled={isInstructor}
                 className={`corner-mark bg-tactical-card border p-6 text-left transition-all group ${
                   isSelected
                     ? "border-primary card-glow"
-                    : "border-tactical-border hover:border-primary/40"
+                    : isLocked
+                      ? "border-tactical-border/60 opacity-40 cursor-not-allowed"
+                      : "border-tactical-border hover:border-primary/40"
                 } ${isInstructor ? "opacity-60 cursor-not-allowed" : ""}`}
               >
                 <div className="flex items-center gap-4">
@@ -227,10 +242,12 @@ export function PromotionSection({ authUser }: { authUser: User }) {
                     className={`w-14 h-14 border-2 flex items-center justify-center transition-colors ${
                       isSelected
                         ? "bg-primary/20 border-primary"
-                        : "bg-primary/10 border-primary/20 group-hover:bg-primary/15"
+                        : isLocked
+                          ? "bg-red-950/20 border-red-500/20"
+                          : "bg-primary/10 border-primary/20 group-hover:bg-primary/15"
                     }`}
                   >
-                    <Icon name="Medal" size={28} className="text-primary" />
+                    <Icon name={isLocked ? "Lock" : "Medal"} size={28} className={isLocked ? "text-red-500" : "text-primary"} />
                   </div>
                   <div>
                     <h3 className="font-oswald text-lg tracking-wide text-foreground">
@@ -239,16 +256,29 @@ export function PromotionSection({ authUser }: { authUser: User }) {
                     <p className="text-xs text-muted-foreground font-mono mt-0.5">
                       Рапорт на повышение в звании
                     </p>
-                    {hasPending && (
+                    {isLocked ? (
+                      <span className="inline-flex items-center gap-1 mt-1 text-xs text-red-400 font-mono">
+                        <Icon name="Lock" size={11} /> Требуется звание Мл. Сержант
+                      </span>
+                    ) : hasPending ? (
                       <span className="inline-flex items-center gap-1 mt-1 text-xs text-yellow-400 font-mono">
                         <Icon name="Clock" size={11} /> На рассмотрении
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
-                <div className="mt-3 flex items-center gap-1 text-xs text-primary font-mono">
-                  <Icon name={isSelected ? "ChevronUp" : "ChevronDown"} size={12} />
-                  {isSelected ? "Скрыть требования" : "Показать требования"}
+                <div className="mt-3 flex items-center gap-1 text-xs font-mono">
+                  {isLocked ? (
+                    <>
+                      <Icon name="Lock" size={12} className="text-red-400" />
+                      <span className="text-red-400">Недоступно</span>
+                    </>
+                  ) : (
+                    <>
+                      <Icon name={isSelected ? "ChevronUp" : "ChevronDown"} size={12} className="text-primary" />
+                      <span className="text-primary">{isSelected ? "Скрыть требования" : "Показать требования"}</span>
+                    </>
+                  )}
                 </div>
               </button>
             );
@@ -444,15 +474,15 @@ export function PromotionSection({ authUser }: { authUser: User }) {
             {reports.map((r) => (
               <div
                 key={r.id}
-                className="bg-tactical-card border border-tactical-border p-4 hover:border-primary/30 transition-colors"
+                className="bg-green-950/20 border border-green-500/80 shadow-[0_0_10px_rgba(34,197,94,0.15)] p-4 transition-colors"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Icon name="Medal" size={14} className="text-primary" />
+                    <div className="w-8 h-8 bg-green-950 border border-green-500 text-green-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Icon name="Medal" size={14} />
                     </div>
                     <div>
-                      <h4 className="font-ibm text-sm font-medium text-foreground">
+                      <h4 className="font-ibm text-sm font-medium text-green-200">
                         Повышение до {PROMOTION_LABELS[r.promotion_type]}
                       </h4>
                       <p className="text-xs text-muted-foreground font-mono mt-0.5">
@@ -666,11 +696,11 @@ export function PromotionInstructorTab({
             const check = checkResults[r.id];
             const isLoading = checkLoading[r.id];
 
-            return (
+             return (
               <div
                 key={r.id}
-                className={`bg-tactical-card border transition-colors ${
-                  isExpanded ? "border-primary" : "border-tactical-border hover:border-primary/30"
+                className={`bg-green-950/20 border transition-colors ${
+                  isExpanded ? "border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.2)]" : "border-green-500/30 hover:border-green-500/60"
                 }`}
               >
                 {/* Header */}
@@ -679,15 +709,15 @@ export function PromotionInstructorTab({
                   onClick={() => handleExpand(r)}
                 >
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Icon name="Medal" size={14} className="text-primary" />
+                    <div className="w-8 h-8 bg-green-950 border border-green-500 text-green-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Icon name="Medal" size={14} />
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-ibm text-sm font-medium text-foreground">
+                        <h4 className="font-ibm text-sm font-medium text-green-200">
                           {r.cadet_rank} {r.cadet_name}
                         </h4>
-                        <span className="rank-badge text-muted-foreground bg-tactical-panel px-1.5 py-0.5">
+                        <span className="rank-badge text-green-400 border border-green-800 bg-green-950/40 px-1.5 py-0.5">
                           → {PROMOTION_LABELS[r.promotion_type]}
                         </span>
                       </div>
