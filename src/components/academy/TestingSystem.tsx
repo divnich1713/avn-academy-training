@@ -419,9 +419,6 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
                 <Icon name={feedbackData.is_correct === false ? "XCircle" : "CheckCircle"} size={16} />
                 {feedbackData.type === "essay" ? "Ответ отправлен" : feedbackData.is_correct ? "Правильно!" : "Неверный ответ"}
               </div>
-              <p className="text-sm leading-relaxed text-foreground/90">
-                {feedbackData.explanation}
-              </p>
               {feedbackData.type !== "essay" && feedbackData.is_correct === false && (
                 <div className="text-xs font-mono text-muted-foreground border-t border-tactical-border/30 pt-2">
                   <span className="text-gold block">Правильный ответ:</span>
