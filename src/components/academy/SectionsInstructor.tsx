@@ -126,6 +126,25 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
     } else {
       const req = requests.find((r) => r.id === id);
       await reviewRequest(id, status, reviewComment[id] || "").catch(() => {});
+      
+      if (req) {
+        try {
+          const { sendRequestReviewedDiscord } = await import("@/lib/discord");
+          await sendRequestReviewedDiscord({
+            name: req.cadet_name || "Курсант",
+            rank: req.cadet_rank || "",
+            staticId: req.cadet_static_id || "",
+            typeLabel: TYPE_LABEL[req.type] || req.type,
+            subject: req.subject,
+            status: status,
+            reviewerName: `${authUser.rank} ${authUser.name}`,
+            comment: reviewComment[id]
+          });
+        } catch (err) {
+          console.error("Failed to send review to Discord:", err);
+        }
+      }
+
       if (status === "approved" && req && req.subject === "Рапорт на увольнение из академии") {
         try {
           const { adminUpdateUser } = await import("@/lib/api");

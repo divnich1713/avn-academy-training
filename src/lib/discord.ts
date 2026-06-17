@@ -153,7 +153,7 @@ export async function sendTestCompletedDiscord({
   }, "test");
 }
 
-// 4. General Cadet Request Notification (Yellow / Blue)
+// 4. General Cadet Request Notification (Yellow / Blue / Purple)
 export async function sendGeneralRequestDiscord({
   name,
   rank,
@@ -171,10 +171,28 @@ export async function sendGeneralRequestDiscord({
   preferredDate: string;
   details?: string;
 }) {
-  const isPractice = typeLabel.toLowerCase().includes("практик");
+  const typeLower = typeLabel.toLowerCase();
+  const subjectLower = subject.toLowerCase();
+  
+  const isExam = typeLower.includes("экзамен") || subjectLower.includes("экзамен");
+  const isPractice = typeLower.includes("практик") || typeLower === "практика";
+  
+  let title = "💛 Подан запрос на лекцию";
+  let color = 15844367; // Yellow for lecture
+  let targetType: "request" | "test" = "request";
+
+  if (isExam) {
+    title = "📋 Подан запрос на экзамен";
+    color = 10181046; // Purple
+    targetType = "test";
+  } else if (isPractice) {
+    title = "🔧 Подан запрос на практику";
+    color = 3447003; // Blue
+  }
+
   await sendDiscordEmbed({
-    title: isPractice ? "🔧 Подан запрос на практику" : "💛 Подан запрос на лекцию",
-    color: isPractice ? 3447003 : 15844367, // Blue for practice, Yellow for lecture
+    title,
+    color,
     fields: [
       { name: "Курсант", value: `${rank} ${name} (${staticId})`, inline: true },
       { name: "Категория", value: typeLabel, inline: true },
@@ -182,5 +200,50 @@ export async function sendGeneralRequestDiscord({
       { name: "Желаемая дата", value: preferredDate, inline: true },
       ...(details ? [{ name: "Дополнительно / Доказательства", value: details.substring(0, 1024), inline: false }] : []),
     ],
-  }, "request");
+  }, targetType);
+}
+
+// 5. Request Reviewed Notification (Green / Red)
+export async function sendRequestReviewedDiscord({
+  name,
+  rank,
+  staticId,
+  typeLabel,
+  subject,
+  status,
+  reviewerName,
+  comment,
+}: {
+  name: string;
+  rank: string;
+  staticId: string;
+  typeLabel: string;
+  subject: string;
+  status: "approved" | "rejected";
+  reviewerName: string;
+  comment?: string;
+}) {
+  const typeLower = typeLabel.toLowerCase();
+  const subjectLower = subject.toLowerCase();
+  const isExam = typeLower.includes("экзамен") || subjectLower.includes("экзамен");
+  const targetType = isExam ? "test" : "request";
+
+  const isApproved = status === "approved";
+  const title = isApproved 
+    ? (isExam ? "🎓 Экзамен сдан (Запрос одобрен)" : "✅ Запрос одобрен")
+    : (isExam ? "❌ Экзамен не сдан (Запрос отклонен)" : "❌ Запрос отклонен");
+  const color = isApproved ? 5763719 : 15548997; // Green for approved, Red for rejected
+
+  await sendDiscordEmbed({
+    title,
+    color,
+    fields: [
+      { name: "Курсант", value: `${rank} ${name} (${staticId})`, inline: true },
+      { name: "Категория", value: typeLabel, inline: true },
+      { name: "Тема / Занятие", value: subject, inline: false },
+      { name: "Проверил", value: reviewerName, inline: true },
+      { name: "Статус", value: isApproved ? "Зачтено / Выполнено" : "Отклонено", inline: true },
+      ...(comment ? [{ name: "Комментарий инструктора", value: comment.substring(0, 1024), inline: false }] : []),
+    ],
+  }, targetType);
 }
