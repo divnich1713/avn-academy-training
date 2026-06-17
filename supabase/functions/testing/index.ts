@@ -260,6 +260,17 @@ async function getAttemptSubject(client: Client, attemptId: number): Promise<str
   return "Тест по ФЗ ФСВНГ и уставу ФСВНГ";
 }
 
+function getSubSubjects(subject: string): string[] {
+  const s = subject.toLowerCase();
+  const list = [subject];
+  if (s.includes("фз") || s.includes("устав")) {
+    list.push("Уставы", "Основы службы");
+  } else if (s.includes("ук") || s.includes("пк") || s.includes("коап")) {
+    list.push("Огневая подготовка", "Тактика", "Физическая подготовка");
+  }
+  return list;
+}
+
 // Serve Edge Function
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -510,7 +521,7 @@ Deno.serve(async (req) => {
       const answeredIds = ansRes.rows.map((r) => r[0] as number);
       const answeredCount = answeredIds.length;
 
-      const subject = await getAttemptSubject(client, attemptId);
+      const subject = attempt.subject;
       const settingsData = await getTestSettings(client, subject);
       const qLimit = settingsData.question_count;
 
@@ -532,19 +543,20 @@ Deno.serve(async (req) => {
       const currentElo = attempt.end_elo !== null ? attempt.end_elo : attempt.start_elo;
 
       // Question Pool
+      const subSubjects = getSubSubjects(subject);
       const poolRes = await client.queryObject<any>(
         `SELECT id, subject, type, question_text, options, elo_rating
          FROM ${SCHEMA}.test_questions
-         WHERE subject = $1 AND type = ANY($2) ${answeredIds.length > 0 ? "AND id NOT IN (SELECT question_id FROM " + SCHEMA + ".test_answers WHERE attempt_id = " + attemptId + ")" : ""}`,
-        [subject, qTypes]
+         WHERE subject = ANY($1) AND type = ANY($2) ${answeredIds.length > 0 ? "AND id NOT IN (SELECT question_id FROM " + SCHEMA + ".test_answers WHERE attempt_id = " + attemptId + ")" : ""}`,
+        [subSubjects, qTypes]
       );
 
       let pool = poolRes.rows;
       if (pool.length === 0) {
         const fallRes = await client.queryObject<any>(
           `SELECT id, subject, type, question_text, options, elo_rating FROM ${SCHEMA}.test_questions 
-           WHERE subject = $1 ${answeredIds.length > 0 ? "AND id NOT IN (SELECT question_id FROM " + SCHEMA + ".test_answers WHERE attempt_id = " + attemptId + ")" : ""}`,
-          [subject]
+           WHERE subject = ANY($1) ${answeredIds.length > 0 ? "AND id NOT IN (SELECT question_id FROM " + SCHEMA + ".test_answers WHERE attempt_id = " + attemptId + ")" : ""}`,
+          [subSubjects]
         );
         pool = fallRes.rows;
         if (pool.length === 0) {
@@ -596,7 +608,7 @@ Deno.serve(async (req) => {
       const { attempt_id, question_id, answer } = body;
 
       const attemptRes = await client.queryObject<any>(
-        `SELECT id, start_elo, end_elo, expires_at, remaining_seconds FROM ${SCHEMA}.test_attempts WHERE id = $1 AND user_id = $2 AND status = 'in_progress'`,
+        `SELECT id, start_elo, end_elo, expires_at, remaining_seconds, subject FROM ${SCHEMA}.test_attempts WHERE id = $1 AND user_id = $2 AND status = 'in_progress'`,
         [attempt_id, user.id]
       );
 
@@ -709,7 +721,7 @@ Deno.serve(async (req) => {
         [attempt_id]
       );
       const answeredCount = Number(ansCountRes.rows[0][0]);
-      const settingsData = await getTestSettings(client, question.subject);
+      const settingsData = await getTestSettings(client, attempt.subject);
       const completed = answeredCount >= settingsData.question_count;
 
       let certificateData = null;
@@ -725,7 +737,7 @@ Deno.serve(async (req) => {
            VALUES ($1, $2, $3, NOW())
            ON CONFLICT (user_id, subject) DO UPDATE
            SET elo_rating = EXCLUDED.elo_rating, updated_at = NOW()`,
-          [user.id, question.subject, newStudentElo]
+          [user.id, attempt.subject, newStudentElo]
         );
 
         // Get completed_at timestamp
@@ -756,7 +768,7 @@ Deno.serve(async (req) => {
           static_id: user.static_id,
           rank: user.rank,
           unit: user.unit,
-          subject: question.subject,
+          subject: attempt.subject,
           completed_at: completedAt,
           correct_answers_count: correctCount,
           total_questions: totalQ,

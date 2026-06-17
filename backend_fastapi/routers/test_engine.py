@@ -52,6 +52,16 @@ async def get_attempt_subject(db: AsyncSession, attempt_id: int) -> str:
     return "Тест по ФЗ ФСВНГ и уставу ФСВНГ"
 
 
+def get_sub_subjects(subject: str) -> list[str]:
+    s = subject.lower()
+    lst = [subject]
+    if "фз" in s or "устав" in s:
+        lst.extend(["Уставы", "Основы службы"])
+    elif "ук" in s or "пк" in s or "коап" in s:
+        lst.extend(["Огневая подготовка", "Тактика", "Физическая подготовка"])
+    return lst
+
+
 # Pydantic Request Schemas
 class StartTestRequest(BaseModel):
     subject: str
@@ -333,9 +343,10 @@ async def get_next_question(
     current_elo = attempt.end_elo if attempt.end_elo is not None else attempt.start_elo
 
     # Fetch pool of questions not yet answered, in matching types and subject
+    sub_subjects = get_sub_subjects(subject)
     q_stmt = select(TestQuestion).where(
         and_(
-            TestQuestion.subject == subject,
+            TestQuestion.subject.in_(sub_subjects),
             TestQuestion.type.in_(q_types),
             ~TestQuestion.id.in_(answered_ids) if answered_ids else True
         )
@@ -347,7 +358,7 @@ async def get_next_question(
         # Fallback if specific pool exhausted (try same subject, any type)
         fallback_stmt = select(TestQuestion).where(
             and_(
-                TestQuestion.subject == subject,
+                TestQuestion.subject.in_(sub_subjects),
                 ~TestQuestion.id.in_(answered_ids) if answered_ids else True
             )
         )
@@ -514,7 +525,7 @@ async def submit_answer(
     answered_count = len(ans_res.scalars().all())
 
     # Get settings for subject
-    settings_data = await get_test_settings(db, question.subject)
+    settings_data = await get_test_settings(db, attempt.subject)
     q_limit = settings_data["question_count"]
     completed = answered_count >= q_limit
 
@@ -526,7 +537,7 @@ async def submit_answer(
         
         # Save ELO rating to student_elo profile table
         save_elo_stmt = select(StudentElo).where(
-            and_(StudentElo.user_id == user.id, StudentElo.subject == question.subject)
+            and_(StudentElo.user_id == user.id, StudentElo.subject == attempt.subject)
         )
         save_elo_res = await db.execute(save_elo_stmt)
         student_elo_row = save_elo_res.scalar_one_or_none()
@@ -537,7 +548,7 @@ async def submit_answer(
         else:
             db.add(StudentElo(
                 user_id=user.id,
-                subject=question.subject,
+                subject=attempt.subject,
                 elo_rating=new_student_elo
             ))
         
@@ -567,7 +578,7 @@ async def submit_answer(
             "static_id": user.static_id,
             "rank": user.rank,
             "unit": user.unit,
-            "subject": question.subject,
+            "subject": attempt.subject,
             "completed_at": attempt.completed_at.isoformat() if attempt.completed_at else datetime.utcnow().isoformat(),
             "correct_answers_count": correct_count,
             "total_questions": q_limit,
