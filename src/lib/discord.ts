@@ -12,14 +12,30 @@ export async function sendDiscordEmbed(payload: {
   description?: string;
   color: number; // Decimal color code
   fields?: DiscordEmbedField[];
-}) {
-  const webhookUrl = 
-    import.meta.env.VITE_DISCORD_WEBHOOK_URL || 
-    localStorage.getItem("avng_discord_webhook_url") || 
-    (window as any).VITE_DISCORD_WEBHOOK_URL;
+}, targetType?: "dismissal" | "promotion" | "test" | "request") {
+  let webhookUrl = "";
+
+  // Try to find target-specific webhook URL
+  if (targetType === "dismissal") {
+    webhookUrl = import.meta.env.VITE_DISCORD_DISMISSAL_WEBHOOK_URL || localStorage.getItem("avng_discord_dismissal_webhook_url") || "";
+  } else if (targetType === "promotion") {
+    webhookUrl = import.meta.env.VITE_DISCORD_PROMOTION_WEBHOOK_URL || localStorage.getItem("avng_discord_promotion_webhook_url") || "";
+  } else if (targetType === "test") {
+    webhookUrl = import.meta.env.VITE_DISCORD_TEST_WEBHOOK_URL || localStorage.getItem("avng_discord_test_webhook_url") || "";
+  } else if (targetType === "request") {
+    webhookUrl = import.meta.env.VITE_DISCORD_REQUEST_WEBHOOK_URL || localStorage.getItem("avng_discord_request_webhook_url") || "";
+  }
+
+  // Fallback to general webhook URL
+  if (!webhookUrl) {
+    webhookUrl = 
+      import.meta.env.VITE_DISCORD_WEBHOOK_URL || 
+      localStorage.getItem("avng_discord_webhook_url") || 
+      (window as any).VITE_DISCORD_WEBHOOK_URL;
+  }
 
   if (!webhookUrl || !webhookUrl.startsWith("https://discord.com/api/webhooks/")) {
-    console.log("Discord Webhook URL не задан или некорректен. Пропустили отправку.");
+    console.log(`Discord Webhook URL для ${targetType || "general"} не задан или некорректен. Пропустили отправку.`);
     return;
   }
 
@@ -80,7 +96,7 @@ export async function sendDismissalReportDiscord({
       { name: "Причина", value: reason, inline: false },
       { name: "Ссылка на фотокарточку (удостоверение)", value: photoUrl, inline: false },
     ],
-  });
+  }, "dismissal");
 }
 
 // 2. Promotion report notification (Green)
@@ -102,7 +118,7 @@ export async function sendPromotionReportDiscord({
       { name: "Курсант", value: `${rank} ${name} (${staticId})`, inline: true },
       { name: "Желаемое звание", value: promotionTypeLabel, inline: true },
     ],
-  });
+  }, "promotion");
 }
 
 // 3. Test completed notification (Blue / Purple)
@@ -134,7 +150,7 @@ export async function sendTestCompletedDiscord({
       { name: "Результат", value: `${score}/${totalQuestions} правильных ответов (${percent}%)`, inline: false },
       { name: "Статус аттестации", value: passed ? "Зачтено" : "Не зачтено (требуется пересдача)", inline: true },
     ],
-  });
+  }, "test");
 }
 
 // 4. General Cadet Request Notification (Yellow / Blue)
@@ -166,5 +182,5 @@ export async function sendGeneralRequestDiscord({
       { name: "Желаемая дата", value: preferredDate, inline: true },
       ...(details ? [{ name: "Дополнительно / Доказательства", value: details.substring(0, 1024), inline: false }] : []),
     ],
-  });
+  }, "request");
 }

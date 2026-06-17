@@ -579,6 +579,10 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
   const [tab, setTab] = useState<"requests" | "grades">("requests");
   const [actTimeframe, setActTimeframe] = useState<"daily" | "weekly" | "monthly" | "yearly">("weekly");
   const [webhookInput, setWebhookInput] = useState(() => localStorage.getItem("avng_discord_webhook_url") || "");
+  const [dismissalWebhook, setDismissalWebhook] = useState(() => localStorage.getItem("avng_discord_dismissal_webhook_url") || "");
+  const [promotionWebhook, setPromotionWebhook] = useState(() => localStorage.getItem("avng_discord_promotion_webhook_url") || "");
+  const [testWebhook, setTestWebhook] = useState(() => localStorage.getItem("avng_discord_test_webhook_url") || "");
+  const [requestWebhook, setRequestWebhook] = useState(() => localStorage.getItem("avng_discord_request_webhook_url") || "");
 
   const [discordProfile, setDiscordProfile] = useState<{
     username: string;
@@ -1036,41 +1040,120 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
       )}
 
       {displayUser.id === authUser.id && (
-        <div className="bg-tactical-card border border-tactical-border/60 p-4 mt-6 animate-fade-in">
-          <h4 className="font-oswald text-xs tracking-widest uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+        <div className="bg-tactical-card border border-tactical-border/60 p-5 mt-6 animate-fade-in">
+          <h4 className="font-oswald text-xs tracking-widest uppercase text-muted-foreground mb-3 flex items-center gap-1.5 border-b border-tactical-border/40 pb-2">
             <Icon name="Settings" size={13} className="text-primary" />
-            Настройки интеграции Discord Webhook
+            Настройки интеграции Discord Webhooks
           </h4>
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
-            Укажите URL вебхука Discord, чтобы сообщения о ваших действиях (тесты, рапорты) автоматически присылались в чат. Уведомления отсылаются прямо из браузера клиента.
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-4">
+            Вы можете разделить отправку уведомлений по разным каналам Discord. Если ссылка для конкретного канала не указана, отправка будет идти в <strong>Общий канал</strong> (если он задан). Уведомления отправляются прямо из вашего браузера при выполнении действий.
           </p>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="https://discord.com/api/webhooks/..."
-              value={webhookInput}
-              onChange={(e) => setWebhookInput(e.target.value.trim())}
-              className="bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-mono focus:outline-none focus:border-primary transition-colors flex-1"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                if (webhookInput) {
-                  if (webhookInput.startsWith("https://discord.com/api/webhooks/")) {
-                    localStorage.setItem("avng_discord_webhook_url", webhookInput);
-                    toast.success("Вебхук Discord успешно сохранен!");
-                  } else {
-                    toast.error("Некорректная ссылка на вебхук Discord!");
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-ibm uppercase tracking-wider text-muted-foreground mb-1">
+                Общий канал (Основной)
+              </label>
+              <input
+                type="text"
+                placeholder="https://discord.com/api/webhooks/... (Общий резервный канал)"
+                value={webhookInput}
+                onChange={(e) => setWebhookInput(e.target.value.trim())}
+                className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-mono focus:outline-none focus:border-primary transition-colors"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-ibm uppercase tracking-wider text-muted-foreground mb-1">
+                  Рапорты на увольнение
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://discord.com/api/webhooks/... (или пусто для общего)"
+                  value={dismissalWebhook}
+                  onChange={(e) => setDismissalWebhook(e.target.value.trim())}
+                  className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-mono focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-ibm uppercase tracking-wider text-muted-foreground mb-1">
+                  Рапорты на повышение
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://discord.com/api/webhooks/... (или пусто для общего)"
+                  value={promotionWebhook}
+                  onChange={(e) => setPromotionWebhook(e.target.value.trim())}
+                  className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-mono focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-ibm uppercase tracking-wider text-muted-foreground mb-1">
+                  Результаты тестов
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://discord.com/api/webhooks/... (или пусто для общего)"
+                  value={testWebhook}
+                  onChange={(e) => setTestWebhook(e.target.value.trim())}
+                  className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-mono focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-ibm uppercase tracking-wider text-muted-foreground mb-1">
+                  Запросы на лекции / практики
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://discord.com/api/webhooks/... (или пусто для общего)"
+                  value={requestWebhook}
+                  onChange={(e) => setRequestWebhook(e.target.value.trim())}
+                  className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-mono focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const items = [
+                    { key: "avng_discord_webhook_url", value: webhookInput, label: "Общий канал" },
+                    { key: "avng_discord_dismissal_webhook_url", value: dismissalWebhook, label: "Рапорты на увольнение" },
+                    { key: "avng_discord_promotion_webhook_url", value: promotionWebhook, label: "Рапорты на повышение" },
+                    { key: "avng_discord_test_webhook_url", value: testWebhook, label: "Результаты тестов" },
+                    { key: "avng_discord_request_webhook_url", value: requestWebhook, label: "Запросы на лекции/практики" }
+                  ];
+
+                  let hasError = false;
+                  
+                  for (const item of items) {
+                    if (item.value && !item.value.startsWith("https://discord.com/api/webhooks/")) {
+                      toast.error(`Некорректная ссылка на вебхук Discord в поле "${item.label}"!`);
+                      hasError = true;
+                    }
                   }
-                } else {
-                  localStorage.removeItem("avng_discord_webhook_url");
-                  toast.success("Вебхук Discord сброшен!");
-                }
-              }}
-              className="bg-primary text-primary-foreground font-oswald text-xs tracking-wider uppercase px-4 py-1.5 hover:bg-primary/90 transition-colors"
-            >
-              Сохранить
-            </button>
+
+                  if (!hasError) {
+                    items.forEach(item => {
+                      if (item.value) {
+                        localStorage.setItem(item.key, item.value);
+                      } else {
+                        localStorage.removeItem(item.key);
+                      }
+                    });
+                    toast.success("Все настройки интеграции Discord успешно сохранены!");
+                  }
+                }}
+                className="bg-primary text-primary-foreground font-oswald text-xs tracking-wider uppercase px-6 py-2 hover:bg-primary/90 transition-colors cursor-pointer"
+              >
+                Сохранить настройки
+              </button>
+            </div>
           </div>
         </div>
       )}
