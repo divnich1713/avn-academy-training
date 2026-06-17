@@ -100,7 +100,7 @@ export const NAV_ITEMS: {
     id: "testing-admin",
     label: "Результаты тестов",
     icon: "LineChart",
-    roles: ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "cadet"],
+    roles: ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"],
   },
 ];
 
