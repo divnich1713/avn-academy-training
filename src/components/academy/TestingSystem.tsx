@@ -16,6 +16,7 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
   const [subject, setSubject] = useState("Тест по ФЗ ФСВНГ и уставу ФСВНГ");
   const [difficulty, setDifficulty] = useState(5);
   const [timerMinutes, setTimerMinutes] = useState(45);
+  const [subjectsList, setSubjectsList] = useState<string[]>(["Тест по ФЗ ФСВНГ и уставу ФСВНГ"]);
   
   // Current test state
   const [question, setQuestion] = useState<Question | null>(null);
@@ -25,6 +26,7 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
   const [timerString, setTimerString] = useState("00:00");
   const [warnings, setWarnings] = useState(0);
   const [isAnnulling, setIsAnnulling] = useState(false);
+
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -46,6 +48,12 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
         if (!session.is_frozen) {
           loadNextQuestion(session.attempt_id);
           startTimer(session.remaining_seconds || 2700, session.attempt_id);
+        }
+      } else {
+        const subjs = await testingApi.getSubjects();
+        if (subjs && subjs.length > 0) {
+          setSubjectsList(subjs);
+          setSubject(subjs[0]);
         }
       }
     } catch (err: any) {
@@ -466,7 +474,9 @@ export function TestingSystem({ onNavigate }: TestingSystemProps) {
               onChange={(e) => setSubject(e.target.value)}
               className="w-full bg-tactical-panel border border-tactical-border text-foreground font-mono text-xs p-2.5 focus:outline-none focus:border-primary"
             >
-              <option value="Тест по ФЗ ФСВНГ и уставу ФСВНГ">Тест по ФЗ ФСВНГ и уставу ФСВНГ</option>
+              {subjectsList.map((subj, idx) => (
+                <option key={idx} value={subj}>{subj}</option>
+              ))}
             </select>
           </div>
         </div>

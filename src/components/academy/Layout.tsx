@@ -102,7 +102,7 @@ export function AppHeader({
                   {formatUserName(authUser.name)}
                 </p>
                 <p className="text-[9px] font-mono text-yellow-500 font-bold tracking-wide mt-1 leading-none">
-                  [{fmtStaticId(authUser.static_id)}]
+                  [{fmtStaticId(authUser.static_id)}] · {authUser.role.toUpperCase()}
                 </p>
               </div>
             </button>

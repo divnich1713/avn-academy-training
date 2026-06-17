@@ -102,6 +102,10 @@ export const testingApi = {
     return request("/api/tests/active-session");
   },
 
+  async getSubjects(): Promise<string[]> {
+    return request("/api/tests/subjects");
+  },
+
   async startTest(subject: string, difficulty: number, timerMinutes: number): Promise<{ attempt_id: number; start_elo: number; expires_at: string }> {
     return request("/api/tests/start", {
       method: "POST",
@@ -166,4 +170,60 @@ export const testingApi = {
   async getD3ScoreDistribution(): Promise<ScoreDistribution[]> {
     return request("/api/stats/d3/score-distribution");
   },
+
+  async getQuestionsAdmin(): Promise<QuestionAdmin[]> {
+    return request("/api/tests/questions-admin");
+  },
+
+  async createQuestionAdmin(payload: QuestionAdmin): Promise<QuestionAdmin> {
+    return request("/api/tests/questions-admin", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateQuestionAdmin(id: number, payload: Partial<QuestionAdmin>): Promise<QuestionAdmin> {
+    return request(`/api/tests/questions-admin/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteQuestionAdmin(id: number): Promise<{ success: boolean }> {
+    return request(`/api/tests/questions-admin/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getSettingsAdmin(): Promise<TestSettings[]> {
+    return request("/api/tests/settings-admin");
+  },
+
+  async updateSettingsAdmin(payload: TestSettings): Promise<TestSettings> {
+    return request("/api/tests/settings-admin", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
 };
+
+export interface TestSettings {
+  id?: number;
+  subject: string;
+  timer_minutes: number;
+  question_count: number;
+  base_elo: number;
+}
+
+export interface QuestionAdmin {
+  id?: number;
+  subject: string;
+  type: "choice" | "multichoice" | "matching" | "essay";
+  question_text: string;
+  options: any;
+  correct_answer: any;
+  explanation?: string;
+  elo_rating?: number;
+  criteria_matrix?: any;
+}
+

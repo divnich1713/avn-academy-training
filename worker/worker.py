@@ -185,14 +185,32 @@ def process_task(task_data: dict):
             all_grades = [float(row[0]) for row in cur.fetchall()]
             avg_grade = sum(all_grades) / len(all_grades) if all_grades else 0.0
             
-            # If all 30 questions are answered, finalize the attempt
+            # Fetch subject
+            cur.execute(
+                f"SELECT subject FROM {SCHEMA}.test_questions WHERE id = %s",
+                (question_id,)
+            )
+            subject = cur.fetchone()[0]
+
+            # Fetch question count limit from test_settings
+            try:
+                cur.execute(
+                    f"SELECT question_count FROM {SCHEMA}.test_settings WHERE subject = %s",
+                    (subject,)
+                )
+                settings_row = cur.fetchone()
+                q_limit = settings_row[0] if settings_row else 30
+            except Exception:
+                q_limit = 30
+
+            # If all questions are answered, finalize the attempt
             cur.execute(
                 f"SELECT count(id) FROM {SCHEMA}.test_answers WHERE attempt_id = %s",
                 (attempt_id,)
             )
             answered_count = cur.fetchone()[0]
             
-            if answered_count >= 30:
+            if answered_count >= q_limit:
                 cur.execute(
                     f"UPDATE {SCHEMA}.test_attempts SET status = 'completed', completed_at = NOW() WHERE id = %s",
                     (attempt_id,)
@@ -204,12 +222,7 @@ def process_task(task_data: dict):
                     (attempt_id,)
                 )
                 user_id, end_elo = cur.fetchone()
-                
-                cur.execute(
-                    f"SELECT subject FROM {SCHEMA}.test_questions WHERE id = %s",
-                    (question_id,)
-                )
-                subject = cur.fetchone()[0]
+
                 
                 # Update ELO profile
                 cur.execute(

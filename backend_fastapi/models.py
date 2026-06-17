@@ -93,3 +93,14 @@ class StudentElo(Base):
     updated_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")
+
+class TestSettings(Base):
+    __tablename__ = "test_settings"
+    __table_args__ = {"schema": settings.SCHEMA}
+
+    id = Column(Integer, primary_key=True, index=True)
+    subject = Column(String(255), unique=True, nullable=False)
+    timer_minutes = Column(Integer, nullable=False, default=45)
+    question_count = Column(Integer, nullable=False, default=30)
+    base_elo = Column(Integer, nullable=False, default=1000)
+

@@ -9,11 +9,55 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from database import get_db
-from models import User, Session, TestQuestion, TestAttempt, TestAnswer, StudentElo
+from models import User, Session, TestQuestion, TestAttempt, TestAnswer, StudentElo, TestSettings
 from elo import update_elo
 from redis_client import redis_client, check_rate_limit
 
 router = APIRouter(prefix="/api/tests", tags=["Test Engine"])
+
+async def get_test_settings(db: AsyncSession, subject: str) -> dict:
+    try:
+        stmt = select(TestSettings).where(TestSettings.subject == subject)
+        res = await db.execute(stmt)
+        settings_row = res.scalar_one_or_none()
+        if settings_row:
+            return {
+                "timer_minutes": settings_row.timer_minutes,
+                "question_count": settings_row.question_count,
+                "base_elo": settings_row.base_elo
+            }
+    except Exception as e:
+        print(f"Error querying test_settings: {e}")
+    
+    return {
+        "timer_minutes": 45,
+        "question_count": 30,
+        "base_elo": 1000
+    }
+
+async def get_attempt_subject(db: AsyncSession, attempt_id: int) -> str:
+    try:
+        ans_stmt = (
+            select(TestQuestion.subject)
+            .join(TestAnswer, TestAnswer.question_id == TestQuestion.id)
+            .where(TestAnswer.attempt_id == attempt_id)
+            .limit(1)
+        )
+        res = await db.execute(ans_stmt)
+        subj = res.scalar_one_or_none()
+        if subj:
+            return subj
+            
+        stmt = select(TestQuestion.subject).limit(1)
+        res = await db.execute(stmt)
+        subj = res.scalar_one_or_none()
+        if subj:
+            return subj
+    except Exception as e:
+        print(f"Error determining attempt subject: {e}")
+        
+    return "Тест по ФЗ ФСВНГ и уставу ФСВНГ"
+
 
 # Pydantic Request Schemas
 class StartTestRequest(BaseModel):
@@ -108,17 +152,31 @@ async def get_active_session(
     ans_res = await db.execute(ans_stmt)
     answered_ids = [r for r in ans_res.scalars()]
 
+    subject = await get_attempt_subject(db, attempt.id)
+    settings_data = await get_test_settings(db, subject)
+
     return {
         "active": True,
         "attempt_id": attempt.id,
-        "subject": "Тестирование",  # Placeholder
+        "subject": subject,
         "difficulty": attempt.difficulty,
         "warnings_count": attempt.warnings_count,
         "remaining_seconds": rem_seconds,
         "is_frozen": attempt.remaining_seconds is not None,
         "answered_count": len(answered_ids),
-        "total_questions": 30
+        "total_questions": settings_data["question_count"]
     }
+
+@router.get("/subjects")
+async def list_subjects(
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = select(TestQuestion.subject).distinct()
+    res = await db.execute(stmt)
+    subjects = [r for r in res.scalars()]
+    if not subjects:
+        subjects = ["Тест по ФЗ ФСВНГ и уставу ФСВНГ"]
+    return subjects
 
 @router.post("/start")
 async def start_test(
@@ -134,6 +192,8 @@ async def start_test(
     )
     await db.execute(abort_stmt)
 
+    settings_data = await get_test_settings(db, payload.subject)
+
     # Calculate baseline starting ELO
     # If they have a saved ELO in student_elo for this subject, use it!
     elo_stmt = select(StudentElo.elo_rating).where(
@@ -143,10 +203,11 @@ async def start_test(
     start_elo = elo_res.scalar_one_or_none()
     
     if not start_elo:
-        # Map slider (1-10) to initial ELO (550 - 1900)
-        start_elo = payload.difficulty * 150 + 400
+        # Map slider (1-10) to initial ELO around settings_data["base_elo"]
+        start_elo = settings_data["base_elo"] + (payload.difficulty - 5) * 150
 
-    expires_at = datetime.utcnow() + timedelta(minutes=payload.timer_minutes)
+    timer_min = settings_data["timer_minutes"]
+    expires_at = datetime.utcnow() + timedelta(minutes=timer_min)
     
     attempt = TestAttempt(
         user_id=user.id,
@@ -159,6 +220,7 @@ async def start_test(
     db.add(attempt)
     await db.commit()
     await db.refresh(attempt)
+
 
     return {
         "attempt_id": attempt.id,
@@ -244,26 +306,31 @@ async def get_next_question(
     answered_ids = [r for r in ans_res.scalars()]
 
     answered_count = len(answered_ids)
-    if answered_count >= 30:
+    subject = await get_attempt_subject(db, attempt_id)
+    settings_data = await get_test_settings(db, subject)
+    q_limit = settings_data["question_count"]
+
+    if answered_count >= q_limit:
         return {"completed": True}
 
-    # Decide current difficulty layer based on progress
-    if answered_count < 10:
-        # Base level: 10 questions (choice)
+    # Decide current difficulty layer based on progress (proportionate scale 10/30, 25/30)
+    layer1_limit = max(1, round(q_limit * 10 / 30))
+    layer2_limit = max(layer1_limit + 1, round(q_limit * 25 / 30))
+
+    if answered_count < layer1_limit:
         q_types = ["choice"]
-    elif answered_count < 25:
-        # Advanced level: 15 questions (multichoice, matching)
+    elif answered_count < layer2_limit:
         q_types = ["multichoice", "matching"]
     else:
-        # Bonus level: 5 essay questions
         q_types = ["essay"]
 
     # Calculate current ELO rating of attempt (if no answers yet, use start_elo)
     current_elo = attempt.end_elo if attempt.end_elo is not None else attempt.start_elo
 
-    # Fetch pool of questions not yet answered, in matching types
+    # Fetch pool of questions not yet answered, in matching types and subject
     q_stmt = select(TestQuestion).where(
         and_(
+            TestQuestion.subject == subject,
             TestQuestion.type.in_(q_types),
             ~TestQuestion.id.in_(answered_ids) if answered_ids else True
         )
@@ -272,14 +339,25 @@ async def get_next_question(
     pool = q_res.scalars().all()
 
     if not pool:
-        # Fallback if specific pool exhausted
+        # Fallback if specific pool exhausted (try same subject, any type)
         fallback_stmt = select(TestQuestion).where(
-            ~TestQuestion.id.in_(answered_ids) if answered_ids else True
+            and_(
+                TestQuestion.subject == subject,
+                ~TestQuestion.id.in_(answered_ids) if answered_ids else True
+            )
         )
         fallback_res = await db.execute(fallback_stmt)
         pool = fallback_res.scalars().all()
+        
         if not pool:
-            return {"completed": True}
+            # Absolute fallback: any subject
+            abs_fallback_stmt = select(TestQuestion).where(
+                ~TestQuestion.id.in_(answered_ids) if answered_ids else True
+            )
+            abs_fallback_res = await db.execute(abs_fallback_stmt)
+            pool = abs_fallback_res.scalars().all()
+            if not pool:
+                return {"completed": True}
 
     # Sort by proximity to current ELO rating, pick randomly from top 5 closest
     pool.sort(key=lambda q: abs(q.elo_rating - current_elo))
@@ -302,8 +380,9 @@ async def get_next_question(
         "options": options,
         "subject": selected_question.subject,
         "progress": answered_count + 1,
-        "total_questions": 30
+        "total_questions": q_limit
     }
+
 
 @router.post("/submit-answer")
 async def submit_answer(
@@ -434,8 +513,13 @@ async def submit_answer(
     ans_res = await db.execute(ans_stmt)
     answered_count = len(ans_res.scalars().all())
 
-    # Complete test if progress hits 30 questions
-    if answered_count >= 30:
+    # Get settings for subject
+    settings_data = await get_test_settings(db, question.subject)
+    q_limit = settings_data["question_count"]
+    completed = answered_count >= q_limit
+
+    # Complete test if progress hits dynamic question count limit
+    if completed:
         attempt.status = "completed"
         attempt.completed_at = datetime.utcnow()
         
@@ -465,8 +549,9 @@ async def submit_answer(
         "correct_answer": question.correct_answer if question.type != "essay" else None,
         "explanation": question.explanation if question.type != "essay" else "Развернутый ответ оценивается по 5 критериям",
         "new_rating": new_student_elo,
-        "completed": answered_count >= 30
+        "completed": completed
     }
+
 
 @router.post("/warn")
 async def update_warnings(
@@ -492,3 +577,159 @@ async def update_warnings(
 
     await db.commit()
     return {"warnings_count": attempt.warnings_count, "aborted": aborted}
+
+# Admin CRUD Schemas
+class QuestionAdminCreate(BaseModel):
+    subject: str
+    type: str
+    question_text: str
+    options: Optional[Any] = None
+    correct_answer: Any
+    explanation: Optional[str] = None
+    elo_rating: Optional[int] = 1000
+    criteria_matrix: Optional[Any] = None
+
+class QuestionAdminUpdate(BaseModel):
+    subject: Optional[str] = None
+    type: Optional[str] = None
+    question_text: Optional[str] = None
+    options: Optional[Any] = None
+    correct_answer: Optional[Any] = None
+    explanation: Optional[str] = None
+    elo_rating: Optional[int] = None
+    criteria_matrix: Optional[Any] = None
+
+class TestSettingsUpdate(BaseModel):
+    subject: str
+    timer_minutes: int
+    question_count: int
+    base_elo: int
+
+def check_admin_access(user: User):
+    if user.role not in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "cadet"):
+        raise HTTPException(status_code=403, detail="Доступ разрешен только администраторам и инструкторам")
+
+# Admin CRUD endpoints
+@router.get("/questions-admin")
+async def list_questions_admin(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    check_admin_access(user)
+    stmt = select(TestQuestion).order_by(TestQuestion.id.desc())
+    res = await db.execute(stmt)
+    questions = res.scalars().all()
+    return questions
+
+@router.post("/questions-admin")
+async def create_question_admin(
+    payload: QuestionAdminCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    check_admin_access(user)
+    question = TestQuestion(
+        subject=payload.subject,
+        type=payload.type,
+        question_text=payload.question_text,
+        options=payload.options,
+        correct_answer=payload.correct_answer,
+        explanation=payload.explanation,
+        elo_rating=payload.elo_rating or 1000,
+        criteria_matrix=payload.criteria_matrix
+    )
+    db.add(question)
+    await db.commit()
+    await db.refresh(question)
+    return question
+
+@router.put("/questions-admin/{question_id}")
+async def update_question_admin(
+    question_id: int,
+    payload: QuestionAdminUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    check_admin_access(user)
+    stmt = select(TestQuestion).where(TestQuestion.id == question_id)
+    res = await db.execute(stmt)
+    question = res.scalar_one_or_none()
+    if not question:
+        raise HTTPException(status_code=404, detail="Вопрос не найден")
+        
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(question, field, value)
+        
+    await db.commit()
+    await db.refresh(question)
+    return question
+
+@router.delete("/questions-admin/{question_id}")
+async def delete_question_admin(
+    question_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    check_admin_access(user)
+    stmt = select(TestQuestion).where(TestQuestion.id == question_id)
+    res = await db.execute(stmt)
+    question = res.scalar_one_or_none()
+    if not question:
+        raise HTTPException(status_code=404, detail="Вопрос не найден")
+        
+    await db.delete(question)
+    await db.commit()
+    return {"success": True}
+
+@router.get("/settings-admin")
+async def get_settings_admin(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    check_admin_access(user)
+    stmt = select(TestSettings).order_by(TestSettings.id.asc())
+    res = await db.execute(stmt)
+    settings_list = res.scalars().all()
+    
+    if not settings_list:
+        default_settings = TestSettings(
+            subject="Тест по ФЗ ФСВНГ и уставу ФСВНГ",
+            timer_minutes=45,
+            question_count=30,
+            base_elo=1000
+        )
+        db.add(default_settings)
+        await db.commit()
+        await db.refresh(default_settings)
+        settings_list = [default_settings]
+        
+    return settings_list
+
+@router.put("/settings-admin")
+async def update_settings_admin(
+    payload: TestSettingsUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    check_admin_access(user)
+    stmt = select(TestSettings).where(TestSettings.subject == payload.subject)
+    res = await db.execute(stmt)
+    settings_row = res.scalar_one_or_none()
+    
+    if not settings_row:
+        settings_row = TestSettings(
+            subject=payload.subject,
+            timer_minutes=payload.timer_minutes,
+            question_count=payload.question_count,
+            base_elo=payload.base_elo
+        )
+        db.add(settings_row)
+    else:
+        settings_row.timer_minutes = payload.timer_minutes
+        settings_row.question_count = payload.question_count
+        settings_row.base_elo = payload.base_elo
+        
+    await db.commit()
+    await db.refresh(settings_row)
+    return settings_row
+

@@ -182,13 +182,25 @@ async function gradeEssayInBackground(
     );
     const [attemptId, questionId] = ansRow.rows[0] as [number, number];
 
+    const qRow = await client.queryArray(
+      `SELECT subject FROM ${SCHEMA}.test_questions WHERE id = $1`,
+      [questionId]
+    );
+    const subject = qRow.rows[0][0] as string;
+
+    const settingsRes = await client.queryObject<any>(
+      `SELECT question_count FROM ${SCHEMA}.test_settings WHERE subject = $1`,
+      [subject]
+    );
+    const qLimit = settingsRes.rows.length > 0 ? settingsRes.rows[0].question_count : 30;
+
     const allAns = await client.queryArray(
       `SELECT count(id) FROM ${SCHEMA}.test_answers WHERE attempt_id = $1`,
       [attemptId]
     );
     const answeredCount = Number(allAns.rows[0][0]);
 
-    if (answeredCount >= 30) {
+    if (answeredCount >= qLimit) {
       await client.queryArray(
         `UPDATE ${SCHEMA}.test_attempts SET status = 'completed', completed_at = NOW() WHERE id = $1`,
         [attemptId]
@@ -200,11 +212,6 @@ async function gradeEssayInBackground(
       );
       const [userId, endElo] = attRow.rows[0] as [number, number];
 
-      const qRow = await client.queryArray(
-        `SELECT subject FROM ${SCHEMA}.test_questions WHERE id = $1`,
-        [questionId]
-      );
-      const subject = qRow.rows[0][0] as string;
 
       await client.queryArray(
         `INSERT INTO ${SCHEMA}.student_elo (user_id, subject, elo_rating, updated_at)
@@ -221,6 +228,42 @@ async function gradeEssayInBackground(
       await client.end().catch(console.error);
     }
   }
+}
+
+async function getTestSettings(client: Client, subject: string) {
+  try {
+    const res = await client.queryObject<any>(
+      `SELECT timer_minutes, question_count, base_elo FROM ${SCHEMA}.test_settings WHERE subject = $1`,
+      [subject]
+    );
+    if (res.rows.length > 0) {
+      return res.rows[0];
+    }
+  } catch (err) {
+    console.error("Error fetching test settings, using defaults: ", err);
+  }
+  return { timer_minutes: 45, question_count: 30, base_elo: 1000 };
+}
+
+async function getAttemptSubject(client: Client, attemptId: number): Promise<string> {
+  try {
+    const ansRow = await client.queryArray(
+      `SELECT q.subject FROM ${SCHEMA}.test_answers a JOIN ${SCHEMA}.test_questions q ON q.id = a.question_id WHERE a.attempt_id = $1 LIMIT 1`,
+      [attemptId]
+    );
+    if (ansRow.rows.length > 0) {
+      return ansRow.rows[0][0] as string;
+    }
+    const qRow = await client.queryArray(
+      `SELECT subject FROM ${SCHEMA}.test_questions LIMIT 1`
+    );
+    if (qRow.rows.length > 0) {
+      return qRow.rows[0][0] as string;
+    }
+  } catch (err) {
+    console.error("Error getting attempt subject: ", err);
+  }
+  return "Тест по ФЗ ФСВНГ и уставу ФСВНГ";
 }
 
 // Serve Edge Function
@@ -277,29 +320,45 @@ Deno.serve(async (req) => {
         [attempt.id]
       );
       const answeredCount = Number(ansCountRes.rows[0][0]);
+      const subject = await getAttemptSubject(client, attempt.id);
+      const settingsData = await getTestSettings(client, subject);
 
       return new Response(
         JSON.stringify({
           active: true,
           attempt_id: attempt.id,
-          subject: "Тестирование",
+          subject: subject,
           difficulty: attempt.difficulty,
           warnings_count: attempt.warnings_count,
           remaining_seconds: remSeconds,
           is_frozen: attempt.remaining_seconds !== null,
           answered_count: answeredCount,
-          total_questions: 30,
+          total_questions: settingsData.question_count,
         }),
         { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
       );
     }
+
+    if (path === "/api/tests/subjects" && req.method === "GET") {
+      const subRes = await client.queryArray(
+        `SELECT DISTINCT subject FROM ${SCHEMA}.test_questions`
+      );
+      let subjects = subRes.rows.map((r) => r[0] as string);
+      if (subjects.length === 0) {
+        subjects = ["Тест по ФЗ ФСВНГ и уставу ФСВНГ"];
+      }
+      return new Response(JSON.stringify(subjects), {
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
+
 
     // ==========================================
     // 2. POST /api/tests/start
     // ==========================================
     if (path === "/api/tests/start" && req.method === "POST") {
       const body = await req.json();
-      const { subject, difficulty, timer_minutes } = body;
+      const { subject, difficulty } = body;
 
       // Abort old attempts
       await client.queryArray(
@@ -308,6 +367,8 @@ Deno.serve(async (req) => {
         [user.id]
       );
 
+      const settingsData = await getTestSettings(client, subject);
+
       // Baseline ELO check
       const eloRes = await client.queryArray(
         `SELECT elo_rating FROM ${SCHEMA}.student_elo WHERE user_id = $1 AND subject = $2`,
@@ -315,10 +376,10 @@ Deno.serve(async (req) => {
       );
       let startElo = eloRes.rows.length > 0 ? (eloRes.rows[0][0] as number) : null;
       if (startElo === null) {
-        startElo = difficulty * 150 + 400;
+        startElo = settingsData.base_elo + (difficulty - 5) * 150;
       }
 
-      const expiresAt = new Date(Date.now() + timer_minutes * 60 * 1000);
+      const expiresAt = new Date(Date.now() + settingsData.timer_minutes * 60 * 1000);
       const insertRes = await client.queryObject<any>(
         `INSERT INTO ${SCHEMA}.test_attempts (user_id, status, difficulty, start_elo, expires_at)
          VALUES ($1, 'in_progress', $2, $3, $4)
@@ -335,6 +396,7 @@ Deno.serve(async (req) => {
         { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
       );
     }
+
 
     // ==========================================
     // 3. POST /api/tests/freeze
@@ -437,16 +499,23 @@ Deno.serve(async (req) => {
       const answeredIds = ansRes.rows.map((r) => r[0] as number);
       const answeredCount = answeredIds.length;
 
-      if (answeredCount >= 30) {
+      const subject = await getAttemptSubject(client, attemptId);
+      const settingsData = await getTestSettings(client, subject);
+      const qLimit = settingsData.question_count;
+
+      if (answeredCount >= qLimit) {
         return new Response(JSON.stringify({ completed: true }), {
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
         });
       }
 
-      // Layer selection
+      // Layer selection proportionately
+      const layer1Limit = Math.max(1, Math.round(qLimit * 10 / 30));
+      const layer2Limit = Math.max(layer1Limit + 1, Math.round(qLimit * 25 / 30));
+
       let qTypes: string[] = [];
-      if (answeredCount < 10) qTypes = ["choice"];
-      else if (answeredCount < 25) qTypes = ["multichoice", "matching"];
+      if (answeredCount < layer1Limit) qTypes = ["choice"];
+      else if (answeredCount < layer2Limit) qTypes = ["multichoice", "matching"];
       else qTypes = ["essay"];
 
       const currentElo = attempt.end_elo !== null ? attempt.end_elo : attempt.start_elo;
@@ -455,16 +524,23 @@ Deno.serve(async (req) => {
       const poolRes = await client.queryObject<any>(
         `SELECT id, subject, type, question_text, options, elo_rating
          FROM ${SCHEMA}.test_questions
-         WHERE type = ANY($1) ${answeredIds.length > 0 ? "AND id NOT IN (SELECT question_id FROM " + SCHEMA + ".test_answers WHERE attempt_id = " + attemptId + ")" : ""}`,
-        [qTypes]
+         WHERE subject = $1 AND type = ANY($2) ${answeredIds.length > 0 ? "AND id NOT IN (SELECT question_id FROM " + SCHEMA + ".test_answers WHERE attempt_id = " + attemptId + ")" : ""}`,
+        [subject, qTypes]
       );
 
       let pool = poolRes.rows;
       if (pool.length === 0) {
         const fallRes = await client.queryObject<any>(
-          `SELECT id, subject, type, question_text, options, elo_rating FROM ${SCHEMA}.test_questions`
+          `SELECT id, subject, type, question_text, options, elo_rating FROM ${SCHEMA}.test_questions WHERE subject = $1`,
+          [subject]
         );
         pool = fallRes.rows;
+        if (pool.length === 0) {
+          const absoluteFall = await client.queryObject<any>(
+            `SELECT id, subject, type, question_text, options, elo_rating FROM ${SCHEMA}.test_questions`
+          );
+          pool = absoluteFall.rows;
+        }
       }
 
       // Proximity selection
@@ -492,11 +568,12 @@ Deno.serve(async (req) => {
           options: options,
           subject: selected.subject,
           progress: answeredCount + 1,
-          total_questions: 30,
+          total_questions: qLimit,
         }),
         { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
       );
     }
+
 
     // ==========================================
     // 6. POST /api/tests/submit-answer
@@ -619,7 +696,8 @@ Deno.serve(async (req) => {
         [attempt_id]
       );
       const answeredCount = Number(ansCountRes.rows[0][0]);
-      const completed = answeredCount >= 30;
+      const settingsData = await getTestSettings(client, question.subject);
+      const completed = answeredCount >= settingsData.question_count;
 
       if (completed) {
         await client.queryArray(
@@ -909,6 +987,172 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify(result), {
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       });
+    }
+
+    // ==========================================
+    // 13. Admin CRUD: /api/tests/questions-admin
+    // ==========================================
+    if (path.startsWith("/api/tests/questions-admin")) {
+      const checkAdminAccess = (usr: any) => {
+        const allowed = ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "cadet"];
+        if (!allowed.includes(usr.role)) {
+          throw new Error("Доступ разрешен только администраторам и инструкторам");
+        }
+      };
+      
+      checkAdminAccess(user);
+
+      // GET /api/tests/questions-admin — list all
+      if (req.method === "GET" && path === "/api/tests/questions-admin") {
+        const qRes = await client.queryObject<any>(
+          `SELECT id, subject, type, question_text, options, correct_answer, explanation, elo_rating, criteria_matrix, created_at
+           FROM ${SCHEMA}.test_questions
+           ORDER BY id DESC`
+        );
+        return new Response(JSON.stringify(qRes.rows), {
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
+
+      // POST /api/tests/questions-admin — create
+      if (req.method === "POST" && path === "/api/tests/questions-admin") {
+        const body = await req.json();
+        const { subject, type, question_text, options, correct_answer, explanation, elo_rating, criteria_matrix } = body;
+        
+        const qRes = await client.queryObject<any>(
+          `INSERT INTO ${SCHEMA}.test_questions (subject, type, question_text, options, correct_answer, explanation, elo_rating, criteria_matrix)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           RETURNING *`,
+          [subject, type, question_text, options ? JSON.stringify(options) : null, JSON.stringify(correct_answer), explanation, elo_rating || 1000, criteria_matrix ? JSON.stringify(criteria_matrix) : null]
+        );
+        return new Response(JSON.stringify(qRes.rows[0]), {
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
+
+      // PUT /api/tests/questions-admin/{id} — update
+      if (req.method === "PUT") {
+        const id = Number(path.split("/").pop());
+        if (isNaN(id)) {
+          return new Response(JSON.stringify({ error: "Invalid ID" }), {
+            status: 400,
+            headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+          });
+        }
+        const body = await req.json();
+        const fields = [];
+        const values = [];
+        let idx = 1;
+        
+        for (const [k, v] of Object.entries(body)) {
+          if (["subject", "type", "question_text", "options", "correct_answer", "explanation", "elo_rating", "criteria_matrix"].includes(k)) {
+            fields.push(`${k} = $${idx++}`);
+            values.push(k === "options" || k === "correct_answer" || k === "criteria_matrix" ? JSON.stringify(v) : v);
+          }
+        }
+        
+        if (fields.length === 0) {
+          return new Response(JSON.stringify({ error: "No fields to update" }), {
+            status: 400,
+            headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+          });
+        }
+        
+        values.push(id);
+        const qRes = await client.queryObject<any>(
+          `UPDATE ${SCHEMA}.test_questions SET ${fields.join(", ")} WHERE id = $${idx} RETURNING *`,
+          values
+        );
+        return new Response(JSON.stringify(qRes.rows[0]), {
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
+
+      // DELETE /api/tests/questions-admin/{id} — delete
+      if (req.method === "DELETE") {
+        const id = Number(path.split("/").pop());
+        if (isNaN(id)) {
+          return new Response(JSON.stringify({ error: "Invalid ID" }), {
+            status: 400,
+            headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+          });
+        }
+        await client.queryArray(
+          `DELETE FROM ${SCHEMA}.test_questions WHERE id = $1`,
+          [id]
+        );
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // ==========================================
+    // 14. Admin Settings: /api/tests/settings-admin
+    // ==========================================
+    if (path === "/api/tests/settings-admin") {
+      const checkAdminAccess = (usr: any) => {
+        const allowed = ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "cadet"];
+        if (!allowed.includes(usr.role)) {
+          throw new Error("Доступ разрешен только администраторам и инструкторам");
+        }
+      };
+      
+      checkAdminAccess(user);
+
+      // GET /api/tests/settings-admin
+      if (req.method === "GET") {
+        let settingsRes = await client.queryObject<any>(
+          `SELECT id, subject, timer_minutes, question_count, base_elo FROM ${SCHEMA}.test_settings ORDER BY id ASC`
+        );
+        
+        if (settingsRes.rows.length === 0) {
+          await client.queryArray(
+            `INSERT INTO ${SCHEMA}.test_settings (subject, timer_minutes, question_count, base_elo)
+             VALUES ('Тест по ФЗ ФСВНГ и уставу ФСВНГ', 45, 30, 1000)`
+          );
+          settingsRes = await client.queryObject<any>(
+            `SELECT id, subject, timer_minutes, question_count, base_elo FROM ${SCHEMA}.test_settings ORDER BY id ASC`
+          );
+        }
+        
+        return new Response(JSON.stringify(settingsRes.rows), {
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
+
+      // PUT /api/tests/settings-admin
+      if (req.method === "PUT") {
+        const body = await req.json();
+        const { subject, timer_minutes, question_count, base_elo } = body;
+        
+        const checkRes = await client.queryArray(
+          `SELECT id FROM ${SCHEMA}.test_settings WHERE subject = $1`,
+          [subject]
+        );
+        
+        let settingsRow;
+        if (checkRes.rows.length === 0) {
+          const insertRes = await client.queryObject<any>(
+            `INSERT INTO ${SCHEMA}.test_settings (subject, timer_minutes, question_count, base_elo)
+             VALUES ($1, $2, $3, $4) RETURNING *`,
+            [subject, timer_minutes, question_count, base_elo]
+          );
+          settingsRow = insertRes.rows[0];
+        } else {
+          const updateRes = await client.queryObject<any>(
+            `UPDATE ${SCHEMA}.test_settings 
+             SET timer_minutes = $1, question_count = $2, base_elo = $3 
+             WHERE subject = $4 RETURNING *`,
+            [timer_minutes, question_count, base_elo, subject]
+          );
+          settingsRow = updateRes.rows[0];
+        }
+        
+        return new Response(JSON.stringify(settingsRow), {
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
     }
 
     return new Response(JSON.stringify({ error: "Not Found" }), {
