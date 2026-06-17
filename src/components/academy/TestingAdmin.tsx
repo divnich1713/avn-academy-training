@@ -1517,6 +1517,21 @@ export function TestingAdmin() {
                 const isEssay = q.type === "essay";
                 const isCorrect = q.is_correct;
                 
+                const safeParse = (val: any) => {
+                  if (typeof val === "string") {
+                    try {
+                      return JSON.parse(val);
+                    } catch {
+                      return val;
+                    }
+                  }
+                  return val;
+                };
+
+                const parsedOptions = safeParse(q.options);
+                const parsedStudentAnswer = safeParse(q.student_answer);
+                const parsedCorrectAnswer = safeParse(q.correct_answer);
+
                 return (
                   <div 
                     key={q.id || idx} 
@@ -1563,56 +1578,59 @@ export function TestingAdmin() {
                     <div className="text-xs font-mono space-y-2.5 pt-2 border-t border-tactical-border/20">
                       
                       {/* CHOICE and MULTICHOICE Display */}
-                      {(q.type === "choice" || q.type === "multichoice") && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <span className="text-muted-foreground text-[10px] block mb-1">Выбор курсанта:</span>
-                            <div className="space-y-1.5">
-                              {q.options.map((opt: string, oIdx: number) => {
-                                const isChosen = q.type === "choice" 
-                                  ? q.student_answer === opt
-                                  : q.student_answer?.includes(opt);
-                                return (
-                                  <div 
-                                    key={oIdx} 
-                                    className={`p-2 border text-[11px] rounded-sm ${
-                                      isChosen 
-                                        ? isCorrect 
-                                          ? "bg-green-500/10 border-green-500/40 text-green-400 font-semibold"
-                                          : "bg-destructive/10 border-destructive/40 text-destructive font-semibold"
-                                        : "bg-tactical-panel/40 border-tactical-border/40 text-muted-foreground"
-                                    }`}
-                                  >
-                                    {opt} {isChosen && "✓"}
-                                  </div>
-                                );
-                              })}
+                      {(q.type === "choice" || q.type === "multichoice") && (() => {
+                        const opts = Array.isArray(parsedOptions) ? parsedOptions : [];
+                        return (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <span className="text-muted-foreground text-[10px] block mb-1">Выбор курсанта:</span>
+                              <div className="space-y-1.5">
+                                {opts.map((opt: string, oIdx: number) => {
+                                  const isChosen = q.type === "choice" 
+                                    ? parsedStudentAnswer === opt
+                                    : Array.isArray(parsedStudentAnswer) && parsedStudentAnswer.includes(opt);
+                                  return (
+                                    <div 
+                                      key={oIdx} 
+                                      className={`p-2 border text-[11px] rounded-sm ${
+                                        isChosen 
+                                          ? isCorrect 
+                                            ? "bg-green-500/10 border-green-500/40 text-green-400 font-semibold"
+                                            : "bg-destructive/10 border-destructive/40 text-destructive font-semibold"
+                                          : "bg-tactical-panel/40 border-tactical-border/40 text-muted-foreground"
+                                      }`}
+                                    >
+                                      {opt} {isChosen && "✓"}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground text-[10px] block mb-1">Правильный ответ:</span>
+                              <div className="space-y-1.5">
+                                {opts.map((opt: string, oIdx: number) => {
+                                  const isRight = q.type === "choice"
+                                    ? parsedCorrectAnswer === opt
+                                    : Array.isArray(parsedCorrectAnswer) && parsedCorrectAnswer.includes(opt);
+                                  return (
+                                    <div 
+                                      key={oIdx} 
+                                      className={`p-2 border text-[11px] rounded-sm ${
+                                        isRight 
+                                          ? "bg-primary/15 border-primary/50 text-gold font-bold shadow-[0_0_10px_rgba(212,163,89,0.1)]"
+                                          : "bg-tactical-panel/40 border-tactical-border/40 text-muted-foreground"
+                                      }`}
+                                    >
+                                      {opt}
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
                           </div>
-                          <div>
-                            <span className="text-muted-foreground text-[10px] block mb-1">Правильный ответ:</span>
-                            <div className="space-y-1.5">
-                              {q.options.map((opt: string, oIdx: number) => {
-                                const isRight = q.type === "choice"
-                                  ? q.correct_answer === opt
-                                  : q.correct_answer?.includes(opt);
-                                return (
-                                  <div 
-                                    key={oIdx} 
-                                    className={`p-2 border text-[11px] rounded-sm ${
-                                      isRight 
-                                        ? "bg-primary/15 border-primary/50 text-gold font-bold shadow-[0_0_10px_rgba(212,163,89,0.1)]"
-                                        : "bg-tactical-panel/40 border-tactical-border/40 text-muted-foreground"
-                                    }`}
-                                  >
-                                    {opt}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       {/* MATCHING Display */}
                       {q.type === "matching" && (
@@ -1621,8 +1639,8 @@ export function TestingAdmin() {
                             <div>
                               <span className="text-muted-foreground text-[10px] block mb-1">Сопоставление курсанта:</span>
                               <div className="space-y-1.5">
-                                {Object.entries(q.student_answer || {}).map(([key, val]: any, oIdx) => {
-                                  const correctVal = q.correct_answer?.[key];
+                                {Object.entries(parsedStudentAnswer || {}).map(([key, val]: any, oIdx) => {
+                                  const correctVal = parsedCorrectAnswer?.[key];
                                   const matchCorrect = String(val).trim().toLowerCase() === String(correctVal).trim().toLowerCase();
                                   return (
                                     <div key={oIdx} className={`p-2 border rounded-sm text-[11px] flex justify-between ${
@@ -1640,7 +1658,7 @@ export function TestingAdmin() {
                             <div>
                               <span className="text-muted-foreground text-[10px] block mb-1">Правильное сопоставление:</span>
                               <div className="space-y-1.5">
-                                {Object.entries(q.correct_answer || {}).map(([key, val]: any, oIdx) => (
+                                {Object.entries(parsedCorrectAnswer || {}).map(([key, val]: any, oIdx) => (
                                   <div key={oIdx} className="p-2 border border-primary/30 bg-primary/10 rounded-sm text-gold text-[11px] flex justify-between">
                                     <span>{key}</span>
                                     <span>&rarr; {val}</span>
@@ -1658,7 +1676,7 @@ export function TestingAdmin() {
                           <div>
                             <span className="text-muted-foreground text-[10px] block mb-1">Ответ курсанта:</span>
                             <div className="p-3 bg-tactical-panel/60 border border-tactical-border rounded-sm text-foreground text-[11px] leading-relaxed whitespace-pre-wrap">
-                              {q.student_answer || "—"}
+                              {parsedStudentAnswer || "—"}
                             </div>
                           </div>
                           {q.feedback && (
