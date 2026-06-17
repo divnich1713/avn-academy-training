@@ -470,9 +470,6 @@ export function RequestForm({
               onChange={(e) => setDismissalTag(e.target.value)}
               placeholder="Начальник АВНГ Заместитель начальника АВНГ"
             />
-            <span className="text-[10px] text-destructive font-mono block mt-1">
-              ⚠️ При указании тега Старшего состава (СС) в рапорте будет отказано!
-            </span>
           </div>
 
           <div>
