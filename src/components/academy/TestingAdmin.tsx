@@ -142,7 +142,7 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
   });
 
   // Questions Tab Filtering
-  const qSubjects = ["Все", ...Array.from(new Set(questions.map((q) => q.subject).filter(Boolean)))];
+  const qSubjects = ["Все", ...Array.from(new Set([...questions.map((q) => q.subject), ...settingsList.map((s) => s.subject)].filter(Boolean)))];
   const filteredQuestions = questions.filter((q) => {
     const matchesSearch = q.question_text.toLowerCase().includes(qSearch.toLowerCase());
     const matchesType = qTypeFilter === "Все" || q.type === qTypeFilter;
@@ -310,7 +310,7 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
     } else {
       // Create mode
       setEditingQuestion(null);
-      setQSubject("Тест по ФЗ ФСВНГ и уставу ФСВНГ");
+      setQSubject(settingsList.length > 0 ? settingsList[0].subject : "Тест по ФЗ ФСВНГ и уставу ФСВНГ");
       setQType("choice");
       setQText("");
       setQElo(1000);
@@ -977,14 +977,17 @@ export function TestingAdmin({ onNavigate }: AdminProps) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-muted-foreground uppercase block mb-1">Тема тестирования</label>
-                  <input
-                    type="text"
+                  <select
                     value={qSubject}
                     onChange={(e) => setQSubject(e.target.value)}
-                    placeholder="Например, Основы службы"
-                    className="w-full bg-tactical-panel border border-tactical-border text-foreground p-2 focus:outline-none focus:border-primary"
+                    className="w-full bg-tactical-panel border border-tactical-border text-foreground p-2 focus:outline-none focus:border-primary font-bold"
                     required
-                  />
+                  >
+                    <option value="">-- Выберите тему --</option>
+                    {settingsList.map((item, idx) => (
+                      <option key={idx} value={item.subject}>{item.subject}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="text-muted-foreground uppercase block mb-1">Тип вопроса</label>
