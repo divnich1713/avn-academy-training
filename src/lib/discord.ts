@@ -299,6 +299,25 @@ export async function sendTestCompletedDiscord({
   }, "test");
 }
 
+const SKIPPED_SUBJECTS = [
+  "Заполнение личного дела",
+  "Вышка — 30 мин",
+  "Патруль по территории — 30 мин",
+  "Наряд на КПП-1 — 30 мин",
+  "Наряд на КПП-2 — 1 час",
+  "Участие в досмотровых мероприятиях",
+  "Участие в государственной поставке"
+];
+
+function shouldSkipDiscord(subject: string): boolean {
+  if (!subject) return false;
+  const s = subject.trim().toLowerCase();
+  return SKIPPED_SUBJECTS.some(skipped => {
+    const sk = skipped.trim().toLowerCase();
+    return s.includes(sk) || sk.includes(s);
+  });
+}
+
 // 4. General Cadet Request Notification (Yellow / Blue / Purple)
 export async function sendGeneralRequestDiscord({
   name,
@@ -319,6 +338,11 @@ export async function sendGeneralRequestDiscord({
   preferredDate: string;
   details?: string;
 }) {
+  if (shouldSkipDiscord(subject)) {
+    console.log(`Пропускаем отправку уведомления в Discord для темы: ${subject}`);
+    return;
+  }
+
   const typeLower = typeLabel.toLowerCase();
   const subjectLower = subject.toLowerCase();
   
@@ -375,6 +399,11 @@ export async function sendRequestReviewedDiscord({
   reviewerName: string;
   comment?: string;
 }) {
+  if (shouldSkipDiscord(subject)) {
+    console.log(`Пропускаем отправку уведомления в Discord для темы: ${subject}`);
+    return;
+  }
+
   const typeLower = typeLabel.toLowerCase();
   const subjectLower = subject.toLowerCase();
   const isExam = typeLower.includes("экзамен") || subjectLower.includes("экзамен");

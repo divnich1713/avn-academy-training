@@ -572,17 +572,6 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
             </div>
           ) : (
             <>
-              {/* Visual Stats Block */}
-              <div className="space-y-4">
-                <h4 className="font-oswald text-base tracking-wide uppercase text-gold">
-                  Аналитический дашборд успеваемости
-                </h4>
-                <TestingD3Stats
-                  timePerQuestion={timePerQuestion}
-                  scoreDistribution={scoreDistribution}
-                />
-              </div>
-
               {/* Control panel for filters & exports */}
               <div className="corner-mark bg-tactical-card border border-tactical-border p-4 card-glow space-y-4">
                 <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
