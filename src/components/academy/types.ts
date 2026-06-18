@@ -63,7 +63,7 @@ export const NAV_ITEMS: {
     id: "testing-history",
     label: "История тестов",
     icon: "History",
-    roles: ["cadet"],
+    roles: [],
   },
   {
     id: "promotions",
@@ -88,7 +88,7 @@ export const NAV_ITEMS: {
     id: "ratings",
     label: "Рейтинг инструкторов",
     icon: "Star",
-    roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"],
+    roles: ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"],
   },
   {
     id: "instructors",
