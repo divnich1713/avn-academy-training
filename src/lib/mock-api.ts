@@ -477,9 +477,7 @@ const MOCK_PROMOTION_REQUIREMENTS = {
     label: "Мл. Сержант",
     rank: "Мл. Сержант",
     items: [
-      { category: "Подготовка", label: "Строевая подготовка", type: "practice" as const, subject: "Строевая подготовка" },
-      { category: "Подготовка", label: "Физическая подготовка (нормативы)", type: "practice" as const, subject: "Физическая подготовка" },
-      { category: "Подготовка", label: "Тренировка по оружию", type: "practice" as const, subject: "Тренировка по оружию" },
+      { category: "Подготовка", label: "Строевая, физическая и огневая подготовка", type: "practice" as const, subject: "Строевая, физическая и огневая подготовка" },
       { category: "Подготовка", label: "Присяга", type: "practice" as const, subject: "Присяга" },
       { category: "Теория", label: "Вступительная лекция", type: "lecture" as const, subject: "Прослушать вступительную лекцию" },
       { category: "Теория", label: "Лекция ФЗ о ФСВНГ и Уставу", type: "lecture" as const, subject: "Лекция ФЗ о ФСВНГ и Внутреннему Уставу" },
@@ -527,7 +525,13 @@ export async function checkPromotionRequirements(type: import("./api").Promotion
   let completedCount = 0;
   const items = reqs.items.map((item) => {
     const key = `${item.type}::${item.subject}`;
-    const found = gradeMap.get(key);
+    let found = gradeMap.get(key);
+    if (!found && item.subject === "Строевая, физическая и огневая подготовка") {
+      found = gradeMap.get(`${item.type}::Строевая подготовка`) ||
+              gradeMap.get(`${item.type}::Физическая подготовка`) ||
+              gradeMap.get(`${item.type}::Тренировка по оружию`) ||
+              gradeMap.get(`${item.type}::Огневая подготовка`);
+    }
     const completed = !!found;
     if (completed) completedCount++;
     return {

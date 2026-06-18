@@ -16,9 +16,7 @@ const PROMOTION_REQUIREMENTS: Record<string, {
     label: "Мл. Сержант",
     rank: "Мл. Сержант",
     items: [
-      { category: "Подготовка", label: "Строевая подготовка", type: "practice", subject: "Строевая подготовка" },
-      { category: "Подготовка", label: "Физическая подготовка (нормативы)", type: "practice", subject: "Физическая подготовка" },
-      { category: "Подготовка", label: "Огневая подготовка", type: "practice", subject: "Огневая подготовка" },
+      { category: "Подготовка", label: "Строевая, физическая и огневая подготовка", type: "practice", subject: "Строевая, физическая и огневая подготовка" },
       { category: "Подготовка", label: "Присяга", type: "practice", subject: "Присяга" },
       { category: "Теория", label: "Вступительная лекция", type: "lecture", subject: "Прослушать вступительную лекцию" },
       { category: "Теория", label: "Лекция ФЗ о ФСВНГ и Уставу", type: "lecture", subject: "Лекция ФЗ о ФСВНГ и Внутреннему Уставу" },
@@ -135,7 +133,12 @@ async function checkRequirements(
   let completedCount = 0;
   const items = reqs.items.map((item) => {
     const isTest = item.type === "test";
-    const found = isTest ? testMap.get(item.subject) : gradeMap.get(`${item.type}::${item.subject}`);
+    let found = isTest ? testMap.get(item.subject) : gradeMap.get(`${item.type}::${item.subject}`);
+    if (!found && !isTest && item.subject === "Строевая, физическая и огневая подготовка") {
+      found = gradeMap.get(`${item.type}::Строевая подготовка`) ||
+              gradeMap.get(`${item.type}::Физическая подготовка`) ||
+              gradeMap.get(`${item.type}::Огневая подготовка`);
+    }
     const completed = !!found;
     if (completed) completedCount++;
     return {
