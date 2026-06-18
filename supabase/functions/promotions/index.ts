@@ -200,7 +200,7 @@ Deno.serve(async (req) => {
       let targetUserId = user.id;
       const cadetIdParam = url.searchParams.get("cadet_id");
       if (cadetIdParam) {
-        const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(r);
+        const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"].includes(r);
         if (!isInstructor(user.role)) {
           return new Response(JSON.stringify({ error: "Только для инструкторов" }), {
             status: 403,
@@ -227,7 +227,7 @@ Deno.serve(async (req) => {
     if (method === "GET" && !action) {
       let query = "";
       const params: any[] = [];
-      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(r);
+      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"].includes(r);
       if (isInstructor(user.role)) {
         query = `
           SELECT pr.id, pr.promotion_type, pr.status, pr.instructor_comment,
@@ -337,7 +337,7 @@ Deno.serve(async (req) => {
         `INSERT INTO ${SCHEMA}.notifications (user_id, type, title, message)
          SELECT id, 'promotion_request', $1, $2
          FROM ${SCHEMA}.users
-         WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head')`,
+         WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head', 'senior_ufsvng')`,
         [
           `Рапорт на повышение: ${reqs.label}`,
           `${user.rank} ${user.name} подал рапорт на повышение до ${reqs.label}.`
@@ -352,7 +352,7 @@ Deno.serve(async (req) => {
 
     // ===== PUT /promotions?action=review&id=N — инструктор рассматривает рапорт =====
     if (method === "PUT" && action === "review") {
-        const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(r);
+        const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"].includes(r);
         if (!isInstructor(user.role)) {
           return new Response(JSON.stringify({ error: "Только для инструкторов" }), {
             status: 403,

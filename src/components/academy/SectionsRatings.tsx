@@ -152,7 +152,7 @@ export function InstructorRatingView({ instructorId }: { instructorId?: number }
 // INSTRUCTOR RATINGS (Заглушка, так как курсанты больше не ставят оценки)
 // ═══════════════════════════════════════════════════════════════════════════════
 export function InstructorRatings({ authUser }: { authUser?: User }) {
-  const isInstructor = authUser && ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(authUser.role);
+  const isInstructor = authUser && ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"].includes(authUser.role);
   const instructorId = isInstructor ? authUser.id : undefined;
 
   return (

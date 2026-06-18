@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
         discord_id: string | null;
         avatar_url: string | null;
       }>(
-        `SELECT id, name, rank, unit, discord_id, avatar_url FROM ${SCHEMA}.users WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head')`
+        `SELECT id, name, rank, unit, discord_id, avatar_url FROM ${SCHEMA}.users WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head', 'senior_ufsvng')`
       );
 
       // Fetch points statistics for the timeframe

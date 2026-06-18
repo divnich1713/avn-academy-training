@@ -14,7 +14,7 @@ export type Section =
   | "testing"
   | "testing-history";
 
-export type UserRole = "head_avng" | "deputy_head" | "chief_instructor" | "senior_instructor" | "instructor" | "junior_instructor" | "cadet" | "dismissed";
+export type UserRole = "head_avng" | "deputy_head" | "chief_instructor" | "senior_instructor" | "instructor" | "junior_instructor" | "cadet" | "dismissed" | "senior_ufsvng";
 
 export const NAV_ITEMS: {
   id: Section;
@@ -32,7 +32,7 @@ export const NAV_ITEMS: {
     id: "materials",
     label: "Обучающие материалы",
     icon: "BookOpen",
-    roles: ["cadet", "instructor", "head_avng"],
+    roles: ["cadet", "instructor", "head_avng", "senior_ufsvng"],
   },
   {
     id: "lectures",
@@ -82,24 +82,24 @@ export const NAV_ITEMS: {
     icon: "BarChart3",
     roles: ["cadet"],
   },
-  { id: "profile", label: "Профиль курсанта", icon: "User", roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"] },
+  { id: "profile", label: "Профиль курсанта", icon: "User", roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"] },
   {
     id: "ratings",
     label: "Рейтинг инструкторов",
     icon: "Star",
-    roles: ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"],
+    roles: ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"],
   },
   {
     id: "instructors",
     label: "Инструкторы",
     icon: "ShieldAlert",
-    roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"],
+    roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"],
   },
   {
     id: "instructor",
     label: "Панель инструктора",
     icon: "Shield",
-    roles: ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"],
+    roles: ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"],
   },
 ];
 

@@ -9,11 +9,12 @@ import { InstructorRatingView } from "./SectionsRatings";
 import { PromotionInstructorTab } from "./Promotions";
 import { TestingAdmin } from "./TestingAdmin";
 
-type EditForm = { static_id: string; name: string; rank: string; unit: string; role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed"; password: string; created_at: string; discord_id: string; avatar_url: string };
+type EditForm = { static_id: string; name: string; rank: string; unit: string; role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed" | "senior_ufsvng"; password: string; created_at: string; discord_id: string; avatar_url: string };
 
 const ROLE_LABELS: Record<string, string> = {
   head_avng: "Нач.АВНГ",
   deputy_head: "Зам.Нач.АВНГ",
+  senior_ufsvng: "Ст.состав УФСВНГ",
   chief_instructor: "Гл.Инст.АВНГ",
   senior_instructor: "Ст.Инст.АВНГ",
   instructor: "Инст.АВНГ",
@@ -81,7 +82,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   // --- Whitelist tab ---
   const { data: wlUsers = [], isLoading: wlLoading } = useAdminUsers();
   const [showAddForm, setShowAddForm] = useState(false);
-  const [form, setForm] = useState({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "АВНГ", role: "cadet" as "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed", discord_id: "", avatar_url: "" });
+  const [form, setForm] = useState({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "АВНГ", role: "cadet" as "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed" | "senior_ufsvng", discord_id: "", avatar_url: "" });
   const [formError, setFormError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
   const [editUser, setEditUser] = useState<import("@/lib/api").AdminUser | null>(null);
@@ -642,7 +643,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
           { id: "rating", label: "Мой рейтинг" },
           { id: "testing", label: "Результаты тестов" },
         ] as const)
-          .filter((tab) => tab.id !== "whitelist" || authUser.role === "head_avng" || authUser.role === "deputy_head")
+          .filter((tab) => tab.id !== "whitelist" || authUser.role === "head_avng" || authUser.role === "deputy_head" || authUser.role === "senior_ufsvng")
           .map((tab) => {
           const expiredCount = wlUsers.filter((u) => {
             if (u.role !== "cadet" || !u.is_whitelisted || !u.created_at) return false;
@@ -1041,7 +1042,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       )}
 
       {/* ── WHITELIST TAB ── */}
-      {activeTab === "whitelist" && (authUser.role === "head_avng" || authUser.role === "deputy_head") && (
+      {activeTab === "whitelist" && (authUser.role === "head_avng" || authUser.role === "deputy_head" || authUser.role === "senior_ufsvng") && (
         <div className="space-y-4 animate-fade-in">
           <div className="flex justify-between items-center flex-wrap gap-3">
             <div className="flex items-center gap-4 flex-wrap">
@@ -1144,12 +1145,13 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                     className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary disabled:opacity-50" 
                     value={form.role} 
                     onChange={(e) => setForm({ ...form, role: e.target.value as any })}
-                    disabled={authUser.role !== "head_avng" && authUser.role !== "deputy_head"}
+                    disabled={authUser.role !== "head_avng" && authUser.role !== "deputy_head" && authUser.role !== "senior_ufsvng"}
                   >
-                    {(authUser.role === "head_avng" || authUser.role === "deputy_head") && (
+                    {(authUser.role === "head_avng" || authUser.role === "deputy_head" || authUser.role === "senior_ufsvng") && (
                       <>
                         <option value="head_avng">Нач.АВНГ</option>
                         <option value="deputy_head">Зам.Нач.АВНГ</option>
+                        <option value="senior_ufsvng">Ст.состав УФСВНГ</option>
                         <option value="chief_instructor">Гл.Инст.АВНГ</option>
                         <option value="senior_instructor">Ст.Инст.АВНГ</option>
                         <option value="instructor">Инст.АВНГ</option>
@@ -1243,10 +1245,11 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                     className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary disabled:opacity-50" 
                     value={editForm.role} 
                     onChange={(e) => setEditForm({ ...editForm, role: e.target.value as any })}
-                    disabled={authUser.role !== "head_avng" && authUser.role !== "deputy_head"}
+                    disabled={authUser.role !== "head_avng" && authUser.role !== "deputy_head" && authUser.role !== "senior_ufsvng"}
                   >
                     <option value="head_avng">Нач.АВНГ</option>
                     <option value="deputy_head">Зам.Нач.АВНГ</option>
+                    <option value="senior_ufsvng">Ст.состав УФСВНГ</option>
                     <option value="chief_instructor">Гл.Инст.АВНГ</option>
                     <option value="senior_instructor">Ст.Инст.АВНГ</option>
                     <option value="instructor">Инст.АВНГ</option>
@@ -1351,7 +1354,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                             <td className="px-4 py-3 text-xs text-muted-foreground">{u.rank}</td>
                             <td className="px-4 py-3 text-center">
                               <span className={`rank-badge px-2 py-0.5 border ${
-                                u.role === "head_avng" || u.role === "deputy_head"
+                                u.role === "head_avng" || u.role === "deputy_head" || u.role === "senior_ufsvng"
                                   ? "text-red-400 border-red-800 bg-red-900/20"
                                   : ["instructor", "chief_instructor", "senior_instructor", "junior_instructor"].includes(u.role)
                                   ? "text-yellow-400 border-yellow-800 bg-yellow-900/20"

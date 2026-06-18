@@ -18,7 +18,8 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
   const isQuestionAdmin = !!(authUser && [
     "head_avng",
     "deputy_head",
-    "chief_instructor"
+    "chief_instructor",
+    "senior_ufsvng"
   ].includes(authUser.role));
   
   // Results Tab State

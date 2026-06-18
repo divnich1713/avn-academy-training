@@ -292,7 +292,7 @@ Deno.serve(async (req) => {
         discord_id: string | null;
         avatar_url: string | null;
       }>(
-        `SELECT id, static_id, name, rank, unit, role, created_at, last_seen, discord_id, avatar_url FROM ${SCHEMA}.users WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head') AND is_whitelisted = true ORDER BY name ASC`
+        `SELECT id, static_id, name, rank, unit, role, created_at, last_seen, discord_id, avatar_url FROM ${SCHEMA}.users WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head', 'senior_ufsvng') AND is_whitelisted = true ORDER BY name ASC`
       );
 
       const instructors = instructorsRes.rows.map(r => ({

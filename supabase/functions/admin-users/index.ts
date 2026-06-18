@@ -28,7 +28,7 @@ async function getRequester(client: Client, token: string | null): Promise<{ id:
      WHERE s.token = $1 AND s.expires_at > NOW() AND u.is_whitelisted = true`,
     [token]
   );
-  if (res.rows.length > 0 && (res.rows[0].role === "instructor" || res.rows[0].role === "head_avng" || res.rows[0].role === "chief_instructor" || res.rows[0].role === "senior_instructor" || res.rows[0].role === "junior_instructor" || res.rows[0].role === "deputy_head")) {
+  if (res.rows.length > 0 && (res.rows[0].role === "instructor" || res.rows[0].role === "head_avng" || res.rows[0].role === "chief_instructor" || res.rows[0].role === "senior_instructor" || res.rows[0].role === "junior_instructor" || res.rows[0].role === "deputy_head" || res.rows[0].role === "senior_ufsvng")) {
     return res.rows[0];
   }
   return null;
@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
     }
 
     if (method === "POST") {
-      if (requester.role !== "head_avng" && requester.role !== "deputy_head") {
+      if (requester.role !== "head_avng" && requester.role !== "deputy_head" && requester.role !== "senior_ufsvng") {
         return new Response(JSON.stringify({ error: "Доступ запрещён" }), {
           status: 403,
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
@@ -116,15 +116,15 @@ Deno.serve(async (req) => {
         });
       }
 
-      if (role !== "cadet" && role !== "instructor" && role !== "head_avng" && role !== "chief_instructor" && role !== "senior_instructor" && role !== "junior_instructor" && role !== "deputy_head" && role !== "dismissed") {
+      if (role !== "cadet" && role !== "instructor" && role !== "head_avng" && role !== "chief_instructor" && role !== "senior_instructor" && role !== "junior_instructor" && role !== "deputy_head" && role !== "dismissed" && role !== "senior_ufsvng") {
         return new Response(JSON.stringify({ error: "Неверная роль" }), {
           status: 400,
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
         });
       }
 
-      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(r);
-      if (isInstructor(role) && requester.role !== "head_avng" && requester.role !== "deputy_head") {
+      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"].includes(r);
+      if (isInstructor(role) && requester.role !== "head_avng" && requester.role !== "deputy_head" && requester.role !== "senior_ufsvng") {
         return new Response(JSON.stringify({ error: "Только Начальник АВНГ или его Заместитель может назначать инструкторов" }), {
           status: 403,
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
@@ -163,7 +163,7 @@ Deno.serve(async (req) => {
       }
 
       const body = await req.json().catch(() => ({}));
-      if (requester.role !== "head_avng" && requester.role !== "deputy_head") {
+      if (requester.role !== "head_avng" && requester.role !== "deputy_head" && requester.role !== "senior_ufsvng") {
         const keys = Object.keys(body);
         const disallowed = keys.filter(k => k !== "is_whitelisted");
         if (disallowed.length > 0) {
@@ -181,15 +181,15 @@ Deno.serve(async (req) => {
         fields.push(`is_whitelisted = $${idx++}`);
         values.push(Boolean(body.is_whitelisted));
       }
-      if (body.role && (body.role === "cadet" || body.role === "instructor" || body.role === "head_avng" || body.role === "chief_instructor" || body.role === "senior_instructor" || body.role === "junior_instructor" || body.role === "deputy_head" || body.role === "dismissed")) {
-        if (requester.role !== "head_avng" && requester.role !== "deputy_head") {
+      if (body.role && (body.role === "cadet" || body.role === "instructor" || body.role === "head_avng" || body.role === "chief_instructor" || body.role === "senior_instructor" || body.role === "junior_instructor" || body.role === "deputy_head" || body.role === "dismissed" || body.role === "senior_ufsvng")) {
+        if (requester.role !== "head_avng" && requester.role !== "deputy_head" && requester.role !== "senior_ufsvng") {
           const curUserRes = await client.queryObject<{ role: string }>(
             `SELECT role FROM ${SCHEMA}.users WHERE id = $1`,
             [Number(userId)]
           );
           const currentRole = curUserRes.rows[0]?.role;
           if (currentRole !== body.role) {
-            const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(r);
+            const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"].includes(r);
             if (isInstructor(body.role) || isInstructor(currentRole)) {
               return new Response(JSON.stringify({ error: "Только Начальник АВНГ или его Заместитель может изменять роли инструкторов" }), {
                 status: 403,
@@ -253,7 +253,7 @@ Deno.serve(async (req) => {
     }
 
     if (method === "DELETE") {
-      if (requester.role !== "head_avng" && requester.role !== "deputy_head") {
+      if (requester.role !== "head_avng" && requester.role !== "deputy_head" && requester.role !== "senior_ufsvng") {
         return new Response(JSON.stringify({ error: "Доступ запрещён" }), {
           status: 403,
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" }

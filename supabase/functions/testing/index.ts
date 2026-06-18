@@ -928,7 +928,7 @@ Deno.serve(async (req) => {
       }
 
       const ownerId = attemptRes.rows[0][0] as number;
-      const isInstructor = ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(user.role);
+      const isInstructor = ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"].includes(user.role);
       if (user.id !== ownerId && !isInstructor) {
         return new Response(JSON.stringify({ error: "Доступ запрещен" }), {
           status: 403,
@@ -1111,8 +1111,8 @@ Deno.serve(async (req) => {
       const checkAdminAccess = (usr: any, method: string) => {
         const isMutation = ["POST", "PUT", "DELETE"].includes(method);
         const allowed = isMutation
-          ? ["head_avng", "chief_instructor", "deputy_head"]
-          : ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"];
+          ? ["head_avng", "chief_instructor", "deputy_head", "senior_ufsvng"]
+          : ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"];
         if (!allowed.includes(usr.role)) {
           throw new Error("Недостаточно прав для изменения вопросов тестов");
         }
@@ -1212,8 +1212,8 @@ Deno.serve(async (req) => {
       const checkAdminAccess = (usr: any, method: string) => {
         const isMutation = ["POST", "PUT", "DELETE"].includes(method);
         const allowed = isMutation
-          ? ["head_avng", "chief_instructor", "deputy_head"]
-          : ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"];
+          ? ["head_avng", "chief_instructor", "deputy_head", "senior_ufsvng"]
+          : ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"];
         if (!allowed.includes(usr.role)) {
           throw new Error("Недостаточно прав для изменения настроек тестов");
         }

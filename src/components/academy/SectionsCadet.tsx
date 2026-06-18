@@ -24,6 +24,7 @@ const OathMemo = lazy(() => import("./MaterialsMemos").then(m => ({ default: m.O
 const ROLE_LABELS: Record<string, string> = {
   head_avng: "Нач.АВНГ",
   deputy_head: "Зам.Нач.АВНГ",
+  senior_ufsvng: "Ст.состав УФСВНГ",
   chief_instructor: "Гл.Инст.АВНГ",
   senior_instructor: "Ст.Инст.АВНГ",
   instructor: "Инст.АВНГ",
@@ -107,7 +108,7 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
               АКАДЕМИЯ ВОЙСК НАЦИОНАЛЬНОЙ ГВАРДИИ
             </h2>
             <p className="text-xs md:text-sm font-mono text-muted-foreground tracking-wide mt-2">
-              {getGreeting()}, {authUser.rank ? `${authUser.rank} ` : ""}{authUser.name}{authUser.role === "head_avng" ? " [Нач.АВНГ]" : authUser.unit ? ` [${authUser.unit}]` : ""}
+              {getGreeting()}, {authUser.rank ? `${authUser.rank} ` : ""}{authUser.name}{authUser.role === "head_avng" ? " [Нач.АВНГ]" : authUser.role === "senior_ufsvng" ? " [Ст.состав УФСВНГ]" : authUser.unit ? ` [${authUser.unit}]` : ""}
             </p>
           </div>
         </div>
@@ -750,8 +751,8 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
         </button>
       )}
       <SectionHeader
-        title={displayUser.role === "head_avng" ? "Профиль Нач.АВНГ" : displayUser.role !== "cadet" ? "Профиль инструктора" : "Профиль курсанта"}
-        sub={displayUser.role === "head_avng" ? "Карточка начальника академии" : displayUser.role !== "cadet" ? "Личные и служебные данные инструктора" : "Личные данные и история обучения"}
+        title={displayUser.role === "head_avng" ? "Профиль Нач.АВНГ" : displayUser.role === "senior_ufsvng" ? "Профиль Ст.состава УФСВНГ" : displayUser.role !== "cadet" ? "Профиль инструктора" : "Профиль курсанта"}
+        sub={(displayUser.role === "head_avng" || displayUser.role === "senior_ufsvng") ? "Карточка руководящего состава" : displayUser.role !== "cadet" ? "Личные и служебные данные инструктора" : "Личные данные и история обучения"}
       />
       <div className="grid md:grid-cols-3 gap-4">
         <div className="corner-mark bg-tactical-card border border-tactical-border p-6 card-glow flex flex-col items-center text-center">
@@ -1061,7 +1062,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
         </>
       )}
 
-      {displayUser.id === authUser.id && authUser.role === "head_avng" && (
+      {displayUser.id === authUser.id && (authUser.role === "head_avng" || authUser.role === "senior_ufsvng") && (
         <div className="bg-tactical-card border border-tactical-border/60 p-5 mt-6 animate-fade-in">
           <h4 className="font-oswald text-xs tracking-widest uppercase text-muted-foreground mb-3 flex items-center gap-1.5 border-b border-tactical-border/40 pb-2">
             <Icon name="Settings" size={13} className="text-primary" />
@@ -1207,6 +1208,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
 // ═══════════════════════════════════════════════════════════════════════════════
 const ROLE_SENIORITY: Record<string, number> = {
   head_avng: 1,
+  senior_ufsvng: 1,
   deputy_head: 2,
   chief_instructor: 3,
   senior_instructor: 4,
@@ -1281,12 +1283,12 @@ export function Instructors({ onNavigate }: { onNavigate?: (s: import("./types")
     });
   }, [rawInstructors]);
 
-  const commandStaff = instructors.filter(i => i.role === "head_avng" || i.role === "deputy_head");
+  const commandStaff = instructors.filter(i => i.role === "head_avng" || i.role === "deputy_head" || i.role === "senior_ufsvng");
   const seniorStaff = instructors.filter(i => i.role === "chief_instructor" || i.role === "senior_instructor");
   const instructorStaff = instructors.filter(i => i.role === "instructor" || i.role === "junior_instructor");
 
   const getRoleStyle = (role: string) => {
-    if (role === "head_avng" || role === "deputy_head") {
+    if (role === "head_avng" || role === "deputy_head" || role === "senior_ufsvng") {
       return "text-red-400 border-red-800 bg-red-900/20";
     }
     if (["instructor", "chief_instructor", "senior_instructor", "junior_instructor"].includes(role)) {
@@ -1335,7 +1337,7 @@ export function Instructors({ onNavigate }: { onNavigate?: (s: import("./types")
 
   const renderCommandGroup = () => {
     if (commandStaff.length === 0) return null;
-    const heads = commandStaff.filter(i => i.role === "head_avng");
+    const heads = commandStaff.filter(i => i.role === "head_avng" || i.role === "senior_ufsvng");
     const deputies = commandStaff.filter(i => i.role === "deputy_head");
 
     return (

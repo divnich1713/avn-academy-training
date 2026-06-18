@@ -130,7 +130,7 @@ export function PromotionSection({ authUser }: { authUser: User }) {
   const [success, setSuccess] = useState("");
   const [submittedReportLink, setSubmittedReportLink] = useState("");
 
-  const isInstructor = authUser.role === "instructor" || authUser.role === "head_avng";
+  const isInstructor = authUser.role !== "cadet";
 
   const loadReports = useCallback(async () => {
     setReportsLoading(true);
