@@ -64,68 +64,45 @@ Deno.serve(async (req) => {
         intervalSql = "INTERVAL '365 days'";
       }
 
-      // Fetch all instructors
-      const instsRes = await client.queryObject<{
+      // Fetch ratings using a single combined query
+      const res = await client.queryObject<{
         id: number;
         name: string;
         rank: string;
         unit: string;
         discord_id: string | null;
         avatar_url: string | null;
+        lectures_count: number;
+        practices_count: number;
+        exams_count: number;
+        reviews_count: number;
       }>(
-        `SELECT id, name, rank, unit, discord_id, avatar_url FROM ${SCHEMA}.users WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head', 'senior_ufsvng')`
+        `SELECT 
+            u.id, 
+            u.name, 
+            u.rank, 
+            u.unit, 
+            u.discord_id, 
+            u.avatar_url,
+            COALESCE((SELECT COUNT(g.id)::int FROM ${SCHEMA}.grades g WHERE g.instructor_id = u.id AND g.type = 'lecture' AND g.graded_at > NOW() - ${intervalSql}), 0) as lectures_count,
+            COALESCE((SELECT COUNT(g.id)::int FROM ${SCHEMA}.grades g WHERE g.instructor_id = u.id AND g.type = 'practice' AND g.graded_at > NOW() - ${intervalSql}), 0) as practices_count,
+            COALESCE((SELECT COUNT(g.id)::int FROM ${SCHEMA}.grades g WHERE g.instructor_id = u.id AND g.type = 'exam' AND g.graded_at > NOW() - ${intervalSql}), 0) as exams_count,
+            COALESCE((SELECT COUNT(pr.id)::int FROM ${SCHEMA}.promotion_reports pr WHERE pr.reviewed_by = u.id AND pr.status != 'pending' AND pr.reviewed_at > NOW() - ${intervalSql}), 0) as reviews_count
+         FROM ${SCHEMA}.users u
+         WHERE u.role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head', 'senior_ufsvng')`
       );
 
-      // Fetch points statistics for the timeframe
-      // 1. Grades issued by instructors: lectures (type='lecture'), practices (type='practice'), exams (type='exam')
-      const gradesRes = await client.queryObject<{
-        instructor_id: number;
-        type: string;
-        cnt: number;
-      }>(
-        `SELECT instructor_id, type, COUNT(id)::int as cnt FROM ${SCHEMA}.grades
-         WHERE graded_at > NOW() - ${intervalSql}
-         GROUP BY instructor_id, type`
-      );
-
-      // 2. Promotion reports reviewed by instructors
-      const reviewsRes = await client.queryObject<{
-        reviewed_by: number;
-        cnt: number;
-      }>(
-        `SELECT reviewed_by, COUNT(id)::int as cnt FROM ${SCHEMA}.promotion_reports
-         WHERE reviewed_at > NOW() - ${intervalSql} AND status != 'pending' AND reviewed_by IS NOT NULL
-         GROUP BY reviewed_by`
-      );
-
-      // Map statistics
-      const lectureStats = new Map<number, number>();
-      const practiceStats = new Map<number, number>();
-      const examStats = new Map<number, number>();
-      const reviewStats = new Map<number, number>();
-
-      for (const row of gradesRes.rows) {
-        if (row.type === "lecture") lectureStats.set(row.instructor_id, row.cnt);
-        if (row.type === "practice") practiceStats.set(row.instructor_id, row.cnt);
-        if (row.type === "exam") examStats.set(row.instructor_id, row.cnt);
-      }
-
-      for (const row of reviewsRes.rows) {
-        reviewStats.set(row.reviewed_by, row.cnt);
-      }
-
-      const instructors = instsRes.rows.map(inst => {
-        const id = inst.id;
-        const lectures = lectureStats.get(id) || 0;
-        const practices = practiceStats.get(id) || 0;
-        const exams = examStats.get(id) || 0;
-        const reviews = reviewStats.get(id) || 0;
+      const instructors = res.rows.map(inst => {
+        const lectures = Number(inst.lectures_count);
+        const practices = Number(inst.practices_count);
+        const exams = Number(inst.exams_count);
+        const reviews = Number(inst.reviews_count);
 
         // Points weighting: lectures (5), practices (5), exams (10), reviews (2)
         const points = (lectures * 5) + (practices * 5) + (exams * 10) + (reviews * 2);
 
         return {
-          id,
+          id: inst.id,
           name: inst.name,
           rank: inst.rank,
           unit: inst.unit,
