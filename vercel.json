@@ -1,7 +1,0 @@
-{
-  "cleanUrls": true,
-  "rewrites": [
-    { "source": "/supabase-api/(.*)", "destination": "https://nsybygrjwrzhrpvlzpyv.supabase.co/functions/v1/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}
