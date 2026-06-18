@@ -356,7 +356,7 @@ export async function sendGeneralRequestDiscord({
   if (isExam) {
     title = "📋 Подан запрос на экзамен";
     color = 10181046; // Purple
-    targetType = "test";
+    targetType = subjectLower.includes("экзамен процедуры") ? "request" : "test";
   } else if (isPractice) {
     title = "🔧 Подан запрос на практику";
     color = 3447003; // Blue
@@ -407,7 +407,7 @@ export async function sendRequestReviewedDiscord({
   const typeLower = typeLabel.toLowerCase();
   const subjectLower = subject.toLowerCase();
   const isExam = typeLower.includes("экзамен") || subjectLower.includes("экзамен");
-  const targetType = isExam ? "test" : "request";
+  const targetType = (isExam && !subjectLower.includes("экзамен процедуры")) ? "test" : "request";
 
   const isApproved = status === "approved";
   const title = isApproved 
