@@ -117,7 +117,7 @@ export function InstructorAvatar({
     setDiscordAvatar(null);
     
     if (avatarUrl) return;
-    if (!discordId) return;
+    if (!discordId || !/^\d+$/.test(discordId)) return;
 
     setLoading(true);
     fetchDiscordProfile(discordId)

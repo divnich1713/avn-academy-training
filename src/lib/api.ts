@@ -7,11 +7,12 @@ if (USE_MOCK) {
   import("./mock-api").then(m => { mockApi = m; });
 }
 
-const AUTH_URL = "https://nsybygrjwrzhrpvlzpyv.supabase.co/functions/v1/auth";
-const ADMIN_URL = "https://nsybygrjwrzhrpvlzpyv.supabase.co/functions/v1/admin-users";
-const REQUESTS_URL = "https://nsybygrjwrzhrpvlzpyv.supabase.co/functions/v1/requests";
-const NOTIFICATIONS_URL = "https://nsybygrjwrzhrpvlzpyv.supabase.co/functions/v1/notifications";
-const PROMOTIONS_URL = "https://nsybygrjwrzhrpvlzpyv.supabase.co/functions/v1/promotions";
+const API_BASE = "/supabase-api";
+const AUTH_URL = `${API_BASE}/auth`;
+const ADMIN_URL = `${API_BASE}/admin-users`;
+const REQUESTS_URL = `${API_BASE}/requests`;
+const NOTIFICATIONS_URL = `${API_BASE}/notifications`;
+const PROMOTIONS_URL = `${API_BASE}/promotions`;
 
 export function getToken(): string | null {
   return localStorage.getItem("avng_token");
@@ -286,7 +287,7 @@ export async function markAllNotificationsRead() {
 }
 
 // ===== Ratings API =====
-const RATINGS_URL = "https://nsybygrjwrzhrpvlzpyv.supabase.co/functions/v1/ratings";
+const RATINGS_URL = `${API_BASE}/ratings`;
 
 export interface InstructorRating {
   id: number;

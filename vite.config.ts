@@ -42,6 +42,13 @@ export default defineConfig(({mode}) => ({
         hmr: {
             overlay: false, // Disables the error overlay if you only want console errors
             timeout: 7000, // pingInterval @vite/client — нужен <30s для DDoS Guard
+        },
+        proxy: {
+            '/supabase-api': {
+                target: 'https://nsybygrjwrzhrpvlzpyv.supabase.co/functions/v1',
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/supabase-api/, '')
+            }
         }
     },
 }));

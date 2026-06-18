@@ -1,6 +1,6 @@
 import { getToken } from "./api";
 
-const TESTING_API_URL = import.meta.env.VITE_TESTING_API_URL || "https://nsybygrjwrzhrpvlzpyv.supabase.co/functions/v1/testing";
+const TESTING_API_URL = import.meta.env.VITE_TESTING_API_URL || "/supabase-api/testing";
 
 async function request(path: string, options: RequestInit = {}) {
   const token = getToken();
