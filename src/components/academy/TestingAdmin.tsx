@@ -758,6 +758,7 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
                         <th className="p-3 text-muted-foreground uppercase font-semibold">Static ID</th>
                         <th className="p-3 text-muted-foreground uppercase font-semibold">ФИО</th>
                         <th className="p-3 text-muted-foreground uppercase font-semibold">Звание / Взвод</th>
+                        <th className="p-3 text-muted-foreground uppercase font-semibold">Тест</th>
                         <th className="p-3 text-muted-foreground uppercase font-semibold">Результат</th>
                         <th className="p-3 text-muted-foreground uppercase font-semibold">Дата</th>
                         <th className="p-3 text-muted-foreground uppercase font-semibold">Статус</th>
@@ -767,7 +768,7 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
                     <tbody>
                       {filteredAttempts.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                          <td colSpan={8} className="p-8 text-center text-muted-foreground">
                             Сессий тестирования не найдено по выбранным фильтрам.
                           </td>
                         </tr>
@@ -778,6 +779,9 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
                             <td className="p-3">{att.cadet_name}</td>
                             <td className="p-3 text-muted-foreground">
                               {att.rank} <span className="text-gold">/</span> {att.unit}
+                            </td>
+                            <td className="p-3 text-muted-foreground max-w-[200px] truncate" title={att.subject}>
+                              {att.subject}
                             </td>
                             <td className="p-3 font-bold text-primary">
                               {att.status === "completed" ? `${att.score_percent}%` : "—"}
