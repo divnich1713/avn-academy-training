@@ -566,10 +566,8 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Proximity selection
-      pool.sort((a: any, b: any) => Math.abs(a.elo_rating - currentElo) - Math.abs(b.elo_rating - currentElo));
-      const candidates = pool.slice(0, 5);
-      const selected = candidates[Math.floor(Math.random() * candidates.length)];
+      // Random selection
+      const selected = pool[Math.floor(Math.random() * pool.length)];
 
       let options = selected.options;
       if (selected.type === "matching" && options?.pairs) {

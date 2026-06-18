@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
-import { testingApi, CadetDashboard, TopicDifficulty, TimePerQuestion, ScoreDistribution } from "@/lib/testingApi";
+import { testingApi, CadetDashboard, TimePerQuestion, ScoreDistribution } from "@/lib/testingApi";
 import { TestingD3Stats } from "./TestingD3Stats";
 import { toast } from "sonner";
 
 export function TestingHistory() {
   const [dashboard, setDashboard] = useState<CadetDashboard | null>(null);
-  const [topicDifficulty, setTopicDifficulty] = useState<TopicDifficulty[]>([]);
   const [timePerQuestion, setTimePerQuestion] = useState<TimePerQuestion[]>([]);
   const [scoreDistribution, setScoreDistribution] = useState<ScoreDistribution[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,12 +21,10 @@ export function TestingHistory() {
       setDashboard(dash);
 
       // Load D3 stats
-      const [topics, times, scores] = await Promise.all([
-        testingApi.getD3TopicDifficulty(),
+      const [times, scores] = await Promise.all([
         testingApi.getD3TimePerQuestion(),
         testingApi.getD3ScoreDistribution(),
       ]);
-      setTopicDifficulty(topics);
       setTimePerQuestion(times);
       setScoreDistribution(scores);
     } catch (err: any) {
@@ -105,7 +102,6 @@ export function TestingHistory() {
           Общая визуальная статистика академии
         </h4>
         <TestingD3Stats
-          topicDifficulty={topicDifficulty}
           timePerQuestion={timePerQuestion}
           scoreDistribution={scoreDistribution}
         />
@@ -121,9 +117,6 @@ export function TestingHistory() {
             <thead>
               <tr className="border-b border-tactical-border bg-tactical-panel/40">
                 <th className="p-3 text-muted-foreground uppercase font-semibold">Дата</th>
-                <th className="p-3 text-muted-foreground uppercase font-semibold">Сложность</th>
-                <th className="p-3 text-muted-foreground uppercase font-semibold">Начальный ELO</th>
-                <th className="p-3 text-muted-foreground uppercase font-semibold">Конечный ELO</th>
                 <th className="p-3 text-muted-foreground uppercase font-semibold">Предупреждения</th>
                 <th className="p-3 text-muted-foreground uppercase font-semibold">Средний балл</th>
                 <th className="p-3 text-muted-foreground uppercase font-semibold">Статус</th>
@@ -132,7 +125,7 @@ export function TestingHistory() {
             <tbody>
               {dashboard.attempts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={4} className="p-8 text-center text-muted-foreground">
                     Вы ещё не проходили тестирование.
                   </td>
                 </tr>
@@ -140,9 +133,6 @@ export function TestingHistory() {
                 dashboard.attempts.map((att) => (
                   <tr key={att.id} className="border-b border-tactical-border/50 hover:bg-tactical-panel/20">
                     <td className="p-3">{new Date(att.started_at).toLocaleDateString("ru-RU")}</td>
-                    <td className="p-3">{att.difficulty}</td>
-                    <td className="p-3">{att.start_elo}</td>
-                    <td className="p-3 text-gold">{att.end_elo || "—"}</td>
                     <td className="p-3">{att.warnings_count} / 3</td>
                     <td className="p-3">{att.status === "completed" ? `${att.avg_score}%` : "—"}</td>
                     <td className="p-3">

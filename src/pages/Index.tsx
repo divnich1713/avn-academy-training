@@ -17,7 +17,6 @@ import {
   Instructors,
   TestingSystem,
   TestingHistory,
-  TestingAdmin,
 } from "@/components/academy/Sections";
 import { User } from "@/lib/api";
 
@@ -204,7 +203,6 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
       case "instructor": return <InstructorPanel authUser={authUser} highlightRequestId={highlightRequestId} highlightReportId={highlightReportId} onViewProfile={(cadet) => navigateTo("profile", undefined, cadet)} />;
       case "testing": return <TestingSystem />;
       case "testing-history": return <TestingHistory />;
-      case "testing-admin": return <TestingAdmin authUser={authUser} />;
     }
   };
 

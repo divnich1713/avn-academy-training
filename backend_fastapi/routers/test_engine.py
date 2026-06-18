@@ -368,10 +368,8 @@ async def get_next_question(
         if not pool:
             return {"completed": True}
 
-    # Sort by proximity to current ELO rating, pick randomly from top 5 closest
-    pool.sort(key=lambda q: abs(q.elo_rating - current_elo))
-    candidates = pool[:5]
-    selected_question = random.choice(candidates)
+    # Pick a random question from the pool
+    selected_question = random.choice(pool)
 
     # Return question details (without correct answers / explanation)
     options = selected_question.options

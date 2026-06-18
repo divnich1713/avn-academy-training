@@ -1,23 +1,15 @@
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
-import { TopicDifficulty, TimePerQuestion, ScoreDistribution } from "@/lib/testingApi";
+import { TimePerQuestion, ScoreDistribution } from "@/lib/testingApi";
 
 interface StatsProps {
-  topicDifficulty: TopicDifficulty[];
   timePerQuestion: TimePerQuestion[];
   scoreDistribution: ScoreDistribution[];
 }
 
-export function TestingD3Stats({ topicDifficulty, timePerQuestion, scoreDistribution }: StatsProps) {
+export function TestingD3Stats({ timePerQuestion, scoreDistribution }: StatsProps) {
   return (
-    <div className="grid md:grid-cols-3 gap-6">
-      <div className="corner-mark bg-tactical-card border border-tactical-border p-4 card-glow">
-        <h4 className="font-mono text-xs text-gold uppercase tracking-wider mb-4 border-b border-tactical-border pb-2">
-          Сложность тем (ELO)
-        </h4>
-        <TopicDifficultyChart data={topicDifficulty} />
-      </div>
-
+    <div className="grid md:grid-cols-2 gap-6">
       <div className="corner-mark bg-tactical-card border border-tactical-border p-4 card-glow">
         <h4 className="font-mono text-xs text-gold uppercase tracking-wider mb-4 border-b border-tactical-border pb-2">
           Время ответа (сек)
@@ -33,114 +25,6 @@ export function TestingD3Stats({ topicDifficulty, timePerQuestion, scoreDistribu
       </div>
     </div>
   );
-}
-
-function TopicDifficultyChart({ data }: { data: TopicDifficulty[] }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!containerRef.current || !data || data.length === 0) return;
-
-    // Clear previous chart
-    d3.select(containerRef.current).selectAll("*").remove();
-
-    const margin = { top: 20, right: 30, bottom: 40, left: 100 };
-    const width = containerRef.current.clientWidth - margin.left - margin.right;
-    const height = 240 - margin.top - margin.bottom;
-
-    const svg = d3
-      .select(containerRef.current)
-      .append("svg")
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.top + margin.bottom)
-      .append("g")
-      .attr("transform", `translate(${margin.left},${margin.top})`);
-
-    // X Scale (ELO rating)
-    const x = d3
-      .scaleLinear()
-      .domain([0, d3.max(data, (d) => d.difficulty_elo) || 2000])
-      .range([0, width]);
-
-    // Y Scale (Topic names)
-    const y = d3
-      .scaleBand()
-      .domain(data.map((d) => d.topic))
-      .range([0, height])
-      .padding(0.25);
-
-    // X Axis
-    svg
-      .append("g")
-      .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(x).ticks(5).tickSize(-height))
-      .call((g) => g.select(".domain").remove())
-      .call((g) =>
-        g.selectAll(".tick line").attr("stroke", "rgba(255, 255, 255, 0.05)")
-      )
-      .call((g) =>
-        g.selectAll(".tick text").attr("fill", "rgba(255, 255, 255, 0.5)").style("font-family", "monospace")
-      );
-
-    // Y Axis
-    svg
-      .append("g")
-      .call(d3.axisLeft(y))
-      .call((g) => g.select(".domain").remove())
-      .call((g) => g.selectAll(".tick line").remove())
-      .call((g) =>
-        g
-          .selectAll(".tick text")
-          .attr("fill", "rgba(255, 255, 255, 0.8)")
-          .style("font-size", "11px")
-          .style("font-family", "monospace")
-      );
-
-    // Draw bars
-    const gradient = svg
-      .append("defs")
-      .append("linearGradient")
-      .attr("id", "bar-gradient")
-      .attr("x1", "0%")
-      .attr("y1", "0%")
-      .attr("x2", "100%")
-      .attr("y2", "0%");
-
-    gradient.append("stop").attr("offset", "0%").attr("stop-color", "rgba(0, 240, 255, 0.3)");
-    gradient.append("stop").attr("offset", "100%").attr("stop-color", "rgba(0, 240, 255, 0.9)");
-
-    svg
-      .selectAll("rect")
-      .data(data)
-      .enter()
-      .append("rect")
-      .attr("x", 0)
-      .attr("y", (d) => y(d.topic) || 0)
-      .attr("height", y.bandwidth())
-      .attr("width", 0) // Start at 0 for animation
-      .attr("fill", "url(#bar-gradient)")
-      .attr("stroke", "rgba(0, 240, 255, 0.5)")
-      .attr("stroke-width", 1)
-      .transition()
-      .duration(800)
-      .attr("width", (d) => x(d.difficulty_elo));
-
-    // Draw labels on bars
-    svg
-      .selectAll(".bar-label")
-      .data(data)
-      .enter()
-      .append("text")
-      .attr("class", "bar-label")
-      .attr("x", (d) => x(d.difficulty_elo) + 8)
-      .attr("y", (d) => (y(d.topic) || 0) + y.bandwidth() / 2 + 4)
-      .attr("fill", "rgba(0, 240, 255, 1)")
-      .style("font-size", "10px")
-      .style("font-family", "monospace")
-      .text((d) => Math.round(d.difficulty_elo));
-  }, [data]);
-
-  return <div ref={containerRef} className="w-full h-[240px]" />;
 }
 
 function TimePerQuestionChart({ data }: { data: TimePerQuestion[] }) {

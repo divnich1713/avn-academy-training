@@ -3,7 +3,6 @@ import Icon from "@/components/ui/icon";
 import { 
   testingApi, 
   AdminAttempt, 
-  TopicDifficulty, 
   TimePerQuestion, 
   ScoreDistribution,
   QuestionAdmin,
@@ -24,7 +23,6 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
   
   // Results Tab State
   const [attempts, setAttempts] = useState<AdminAttempt[]>([]);
-  const [topicDifficulty, setTopicDifficulty] = useState<TopicDifficulty[]>([]);
   const [timePerQuestion, setTimePerQuestion] = useState<TimePerQuestion[]>([]);
   const [scoreDistribution, setScoreDistribution] = useState<ScoreDistribution[]>([]);
   const [loadingResults, setLoadingResults] = useState(true);
@@ -238,12 +236,10 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
       const res = await testingApi.getAdminDashboard();
       setAttempts(res.attempts);
 
-      const [topics, times, scores] = await Promise.all([
-        testingApi.getD3TopicDifficulty(),
+      const [times, scores] = await Promise.all([
         testingApi.getD3TimePerQuestion(),
         testingApi.getD3ScoreDistribution(),
       ]);
-      setTopicDifficulty(topics);
       setTimePerQuestion(times);
       setScoreDistribution(scores);
     } catch (err: any) {
@@ -305,18 +301,14 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
   // Export results to CSV
   const handleExportCSV = () => {
     try {
-      const headers = ["ID Курсанта", "ФИО", "Звание", "Взвод", "Начальный ELO", "Конечный ELO", "Сложность", "Средний балл %", "Предупреждения", "Статус", "Дата начала"];
+      const headers = ["ID Курсанта", "ФИО", "Звание", "Взвод", "Средний балл %", "Статус", "Дата начала"];
       const rows = filteredAttempts.map((att) => [
         att.static_id,
         att.cadet_name,
         att.rank || "",
         att.unit || "",
-        att.start_elo,
-        att.end_elo || "",
-        att.difficulty,
-        att.status === "completed" ? att.score_percent : "",
-        att.status === "completed" ? "—" : "В процессе",
-        att.status,
+        att.status === "completed" ? att.score_percent + "%" : "—",
+        att.status === "completed" ? "Завершен" : att.status === "aborted" ? "Аннулирован" : "В процессе",
         new Date(att.started_at).toLocaleDateString("ru-RU"),
       ]);
 
@@ -355,10 +347,8 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
           <td>${att.cadet_name}</td>
           <td>${att.rank || "—"}</td>
           <td>${att.unit || "—"}</td>
-          <td>${att.difficulty}</td>
-          <td>${att.start_elo} &rarr; ${att.end_elo || "—"}</td>
           <td>${att.status === "completed" ? att.score_percent + "%" : "—"}</td>
-          <td>${att.status}</td>
+          <td>${att.status === "completed" ? "Завершен" : att.status === "aborted" ? "Аннулирован" : "В процессе"}</td>
           <td>${new Date(att.started_at).toLocaleDateString("ru-RU")}</td>
         </tr>
       `
@@ -394,10 +384,6 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
                 <div class="summary-val">${filteredAttempts.filter((a) => a.status === "completed").length}</div>
                 <div>Сдано</div>
               </div>
-              <div class="summary-item">
-                <div class="summary-val">${Math.round(filteredAttempts.reduce((acc, a) => acc + (a.end_elo || 1000), 0) / (filteredAttempts.length || 1))} ELO</div>
-                <div>Средний ELO</div>
-              </div>
             </div>
             <table>
               <thead>
@@ -406,8 +392,6 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
                   <th>ФИО курсанта</th>
                   <th>Звание</th>
                   <th>Взвод</th>
-                  <th>Сложность</th>
-                  <th>ELO Прогресс</th>
                   <th>Средний балл</th>
                   <th>Статус</th>
                   <th>Дата</th>
@@ -602,10 +586,7 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
       toast.warning("Количество вопросов должно быть в диапазоне от 1 до 100!");
       return;
     }
-    if (editingSettings.base_elo < 100 || editingSettings.base_elo > 3000) {
-      toast.warning("Базовый ELO рейтинг должен быть в диапазоне от 100 до 3000!");
-      return;
-    }
+
 
     try {
       await testingApi.updateSettingsAdmin(editingSettings);
@@ -712,7 +693,6 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
                   Аналитический дашборд успеваемости
                 </h4>
                 <TestingD3Stats
-                  topicDifficulty={topicDifficulty}
                   timePerQuestion={timePerQuestion}
                   scoreDistribution={scoreDistribution}
                 />
@@ -778,8 +758,6 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
                         <th className="p-3 text-muted-foreground uppercase font-semibold">Static ID</th>
                         <th className="p-3 text-muted-foreground uppercase font-semibold">ФИО</th>
                         <th className="p-3 text-muted-foreground uppercase font-semibold">Звание / Взвод</th>
-                        <th className="p-3 text-muted-foreground uppercase font-semibold">Прогресс ELO</th>
-                        <th className="p-3 text-muted-foreground uppercase font-semibold">Сложность</th>
                         <th className="p-3 text-muted-foreground uppercase font-semibold">Результат</th>
                         <th className="p-3 text-muted-foreground uppercase font-semibold">Дата</th>
                         <th className="p-3 text-muted-foreground uppercase font-semibold">Статус</th>
@@ -789,7 +767,7 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
                     <tbody>
                       {filteredAttempts.length === 0 ? (
                         <tr>
-                          <td colSpan={9} className="p-8 text-center text-muted-foreground">
+                          <td colSpan={7} className="p-8 text-center text-muted-foreground">
                             Сессий тестирования не найдено по выбранным фильтрам.
                           </td>
                         </tr>
@@ -801,11 +779,6 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
                             <td className="p-3 text-muted-foreground">
                               {att.rank} <span className="text-gold">/</span> {att.unit}
                             </td>
-                            <td className="p-3">
-                              <span className="text-muted-foreground">{att.start_elo}</span> &rarr;{" "}
-                              <span className="text-gold font-bold">{att.end_elo || "—"}</span>
-                            </td>
-                            <td className="p-3">{att.difficulty}</td>
                             <td className="p-3 font-bold text-primary">
                               {att.status === "completed" ? `${att.score_percent}%` : "—"}
                             </td>
@@ -961,9 +934,7 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
                         <span className="px-2 py-0.5 bg-gold/10 border border-gold/20 text-[10px] text-gold font-mono uppercase">
                           {q.type === "choice" ? "Одиночный выбор" : q.type === "multichoice" ? "Множ. выбор" : q.type === "matching" ? "Сопоставление" : "Эссе"}
                         </span>
-                        <span className="text-[10px] text-muted-foreground font-mono">
-                          ELO: <span className="text-foreground font-bold">{q.elo_rating}</span>
-                        </span>
+                        
                       </div>
                       <div className="flex items-center gap-2">
                         <button
@@ -1122,7 +1093,7 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
                     </select>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                     <div>
                       <label className="text-muted-foreground uppercase block mb-1 text-[10px]">Таймер (мин)</label>
                       <input
@@ -1147,19 +1118,6 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
                         className="w-full bg-tactical-panel border border-tactical-border text-foreground p-2 focus:outline-none focus:border-primary font-bold text-center"
                       />
                       <span className="text-[10px] text-muted-foreground text-center block mt-1">1–100 вопр.</span>
-                    </div>
-
-                    <div>
-                      <label className="text-muted-foreground uppercase block mb-1 text-[10px]">Начальный ELO</label>
-                      <input
-                        type="number"
-                        min="100"
-                        max="3000"
-                        value={editingSettings.base_elo}
-                        onChange={(e) => setEditingSettings({ ...editingSettings, base_elo: parseInt(e.target.value) || 0 })}
-                        className="w-full bg-tactical-panel border border-tactical-border text-foreground p-2 focus:outline-none focus:border-primary font-bold text-center"
-                      />
-                      <span className="text-[10px] text-muted-foreground text-center block mt-1">Дефолт: 1000</span>
                     </div>
 
                     <div>
@@ -1192,9 +1150,8 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
                   <div className="bg-tactical-panel/20 border border-tactical-border/30 p-3 text-[10px] leading-relaxed text-muted-foreground space-y-1">
                     <span className="text-gold uppercase font-bold tracking-wider block mb-1">Информационная справка:</span>
                     <div>• <strong>Вопросов в тесте</strong> — сколько вопросов нужно ответить курсанту до завершения сессии.</div>
-                    <div>• <strong>Базовый ELO</strong> — отправная точка для расчета сложности (адаптивная сложность ELO).</div>
                     <div>• <strong>Таймер</strong> — общее время, по истечению которого сессия автоматически завершается.</div>
-                    <div>• <strong>Время на 1 вопрос</strong> — лимит времени (в секундах) на ответ на один конкретный вопрос.</div>
+                    <div>• <strong>Время на 1 вопрос</strong> — лимит времени (в секундах) на ответ на один конкретного вопрос.</div>
                     <div>• <strong>Проходной балл (%)</strong> — минимальный процент успеваемости для успешной сдачи.</div>
                   </div>
 
@@ -1264,20 +1221,6 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-muted-foreground uppercase block mb-1">Сложность вопроса (ELO)</label>
-                  <input
-                    type="number"
-                    min="100"
-                    max="3000"
-                    value={qElo}
-                    onChange={(e) => setQElo(parseInt(e.target.value) || 1000)}
-                    className="w-full bg-tactical-panel border border-tactical-border text-foreground p-2 focus:outline-none focus:border-primary"
-                    required
-                  />
-                </div>
-              </div>
 
               <div>
                 <label className="text-muted-foreground uppercase block mb-1">Текст вопроса</label>

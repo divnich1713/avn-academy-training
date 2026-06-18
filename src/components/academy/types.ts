@@ -12,8 +12,7 @@ export type Section =
   | "ratings"
   | "instructors"
   | "testing"
-  | "testing-history"
-  | "testing-admin";
+  | "testing-history";
 
 export type UserRole = "head_avng" | "deputy_head" | "chief_instructor" | "senior_instructor" | "instructor" | "junior_instructor" | "cadet" | "dismissed";
 
@@ -100,12 +99,6 @@ export const NAV_ITEMS: {
     id: "instructor",
     label: "Панель инструктора",
     icon: "Shield",
-    roles: ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"],
-  },
-  {
-    id: "testing-admin",
-    label: "Результаты тестов",
-    icon: "LineChart",
     roles: ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"],
   },
 ];
