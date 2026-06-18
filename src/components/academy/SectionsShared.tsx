@@ -237,7 +237,7 @@ export function RequestForm({
 
   // States for dismissal report
   const [dismissalName, setDismissalName] = useState(authUser?.name || "");
-  const [dismissalPassport, setDismissalPassport] = useState("");
+  const [dismissalPassport, setDismissalPassport] = useState(fmtStaticId(authUser?.static_id) || "");
   const [dismissalRank, setDismissalRank] = useState(authUser?.rank || "Рядовой");
   const [dismissalReason, setDismissalReason] = useState("ПСЖ");
   const [dismissalTag, setDismissalTag] = useState("Начальник АВНГ Заместитель начальника АВНГ");
