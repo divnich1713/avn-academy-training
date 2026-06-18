@@ -206,6 +206,16 @@ export function TestingAdmin() {
   const [showAddSubject, setShowAddSubject] = useState(false);
 
   useEffect(() => {
+    // Prefetch settings list on mount so it is available for results and questions tabs
+    testingApi.getSettingsAdmin().then(res => {
+      setSettingsList(res);
+      if (res.length > 0) {
+        setEditingSettings(res[0]);
+      }
+    }).catch(err => console.error("Failed to prefetch settings list on mount:", err));
+  }, []);
+
+  useEffect(() => {
     if (activeTab === "results") {
       loadResultsData();
     } else if (activeTab === "questions") {
