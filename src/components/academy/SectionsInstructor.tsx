@@ -25,7 +25,6 @@ const ROLE_LABELS: Record<string, string> = {
 
 const MILITARY_RANKS = [
   "Рядовой",
-  "Ефрейтор",
   "Младший сержант",
   "Сержант",
   "Старший сержант",

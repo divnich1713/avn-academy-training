@@ -1253,7 +1253,6 @@ const RANK_SENIORITY: { key: string; value: number }[] = [
   { key: "мл. сержант", value: 16 },
   { key: "мл.сержант", value: 16 },
   { key: "сержант", value: 15 },
-  { key: "ефрейтор", value: 17 },
   { key: "рядовой", value: 18 }
 ];
 
