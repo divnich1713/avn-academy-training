@@ -298,123 +298,7 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
     return matchesSearch && matchesType && matchesSubject;
   });
 
-  // Export results to CSV
-  const handleExportCSV = () => {
-    try {
-      const headers = ["ID Курсанта", "ФИО", "Звание", "Взвод", "Средний балл %", "Статус", "Дата начала"];
-      const rows = filteredAttempts.map((att) => [
-        att.static_id,
-        att.cadet_name,
-        att.rank || "",
-        att.unit || "",
-        att.status === "completed" ? att.score_percent + "%" : "—",
-        att.status === "completed" ? "Завершен" : att.status === "aborted" ? "Аннулирован" : "В процессе",
-        new Date(att.started_at).toLocaleDateString("ru-RU"),
-      ]);
 
-      const csvContent =
-        "\uFEFF" + // UTF-8 BOM
-        [headers.join(";"), ...rows.map((row) => row.map((val) => `"${val}"`).join(";"))].join("\n");
-
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `test_report_${new Date().toISOString().slice(0, 10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success("CSV успешно экспортирован!");
-    } catch (err: any) {
-      toast.error("Ошибка экспорта CSV: " + err.message);
-    }
-  };
-
-  // Print results PDF
-  const handleExportPDF = () => {
-    try {
-      const printWindow = window.open("", "_blank");
-      if (!printWindow) {
-        toast.error("Не удалось открыть окно печати. Разрешите всплывающие окна.");
-        return;
-      }
-
-      const rowsHTML = filteredAttempts
-        .map(
-          (att) => `
-        <tr>
-          <td>${att.static_id}</td>
-          <td>${att.cadet_name}</td>
-          <td>${att.rank || "—"}</td>
-          <td>${att.unit || "—"}</td>
-          <td>${att.status === "completed" ? att.score_percent + "%" : "—"}</td>
-          <td>${att.status === "completed" ? "Завершен" : att.status === "aborted" ? "Аннулирован" : "В процессе"}</td>
-          <td>${new Date(att.started_at).toLocaleDateString("ru-RU")}</td>
-        </tr>
-      `
-        )
-        .join("");
-
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Сводный отчет по тестированию</title>
-            <style>
-              body { font-family: Arial, sans-serif; color: #111; margin: 20px; }
-              h2 { text-align: center; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
-              .meta { text-align: center; font-size: 12px; color: #555; margin-bottom: 30px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 11px; }
-              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-              th { background-color: #f5f5f5; font-weight: bold; }
-              tr:nth-child(even) { background-color: #fafafa; }
-              .summary { display: flex; justify-content: space-around; margin-bottom: 20px; background: #f9f9f9; padding: 15px; border: 1px solid #eaeaea; }
-              .summary-item { text-align: center; }
-              .summary-val { font-size: 18px; font-weight: bold; color: #0088cc; }
-            </style>
-          </head>
-          <body>
-            <h2>Сводный отчет по успеваемости</h2>
-            <div class="meta">Академия АВНГ &bull; Сформирован: ${new Date().toLocaleDateString("ru-RU")}</div>
-            <div class="summary">
-              <div class="summary-item">
-                <div class="summary-val">${filteredAttempts.length}</div>
-                <div>Всего сессий</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-val">${filteredAttempts.filter((a) => a.status === "completed").length}</div>
-                <div>Сдано</div>
-              </div>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Static ID</th>
-                  <th>ФИО курсанта</th>
-                  <th>Звание</th>
-                  <th>Взвод</th>
-                  <th>Средний балл</th>
-                  <th>Статус</th>
-                  <th>Дата</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rowsHTML}
-              </tbody>
-            </table>
-            <script>
-              window.onload = function() {
-                window.print();
-                window.onafterprint = function() { window.close(); };
-              }
-            </script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-    } catch (err: any) {
-      toast.error("Ошибка генерации PDF: " + err.message);
-    }
-  };
 
   // Open Question Edit / Create Modal
   const handleOpenQuestionModal = (q: QuestionAdmin | null = null) => {
@@ -733,21 +617,7 @@ export function TestingAdmin({ authUser }: { authUser?: User }) {
                     </select>
                   </div>
 
-                  {/* Action Export Buttons */}
-                  <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-                    <button
-                      onClick={handleExportCSV}
-                      className="bg-tactical-panel hover:bg-tactical-border text-gold border border-gold/30 font-mono text-xs uppercase px-4 py-2 transition-all flex items-center gap-1.5"
-                    >
-                      <Icon name="Download" size={12} /> Экспорт CSV
-                    </button>
-                    <button
-                      onClick={handleExportPDF}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground font-mono text-xs uppercase px-4 py-2 transition-all flex items-center gap-1.5 border border-primary/20"
-                    >
-                      <Icon name="FileText" size={12} /> Отчет PDF
-                    </button>
-                  </div>
+
                 </div>
 
                 {/* Results table */}
