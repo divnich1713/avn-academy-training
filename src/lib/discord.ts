@@ -42,28 +42,60 @@ export async function sendDiscordEmbed(payload: {
   try {
     const pingRoleId = localStorage.getItem("avng_discord_ping_role_id") || import.meta.env.VITE_DISCORD_PING_ROLE_ID || "";
     const content = pingRoleId ? `<@&${pingRoleId.replace(/\D/g, "")}>` : undefined;
+    const token = localStorage.getItem("avng_token") || "";
+    const isMock = import.meta.env.VITE_USE_MOCK === "true";
 
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        content,
-        embeds: [
-          {
-            title: payload.title,
-            description: payload.description || "",
-            color: payload.color,
-            fields: payload.fields || [],
-            timestamp: new Date().toISOString(),
-            footer: {
-              text: "Академия Росгвардии AVNG",
+    let response;
+    if (isMock) {
+      response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          content,
+          embeds: [
+            {
+              title: payload.title,
+              description: payload.description || "",
+              color: payload.color,
+              fields: payload.fields || [],
+              timestamp: new Date().toISOString(),
+              footer: {
+                text: "Академия Росгвардии AVNG",
+              },
             },
-          },
-        ],
-      }),
-    });
+          ],
+        }),
+      });
+    } else {
+      // Proxy through Supabase Edge Function to bypass regional blocks in Russia
+      response = await fetch(`/supabase-api/notifications?action=discord`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Session-Token": token,
+        },
+        body: JSON.stringify({
+          webhookUrl,
+          payload: {
+            content,
+            embeds: [
+              {
+                title: payload.title,
+                description: payload.description || "",
+                color: payload.color,
+                fields: payload.fields || [],
+                timestamp: new Date().toISOString(),
+                footer: {
+                  text: "Академия Росгвардии AVNG",
+                },
+              },
+            ],
+          }
+        }),
+      });
+    }
 
     if (!response.ok) {
       console.error(`Ошибка при отправке в Discord Webhook: ${response.status} ${response.statusText}`);

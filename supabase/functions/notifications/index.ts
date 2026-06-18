@@ -52,6 +52,37 @@ Deno.serve(async (req) => {
     const method = req.method;
     const action = url.searchParams.get("action") || "";
 
+    if (method === "POST" && action === "discord") {
+      const body = await req.json().catch(() => ({}));
+      const { webhookUrl, payload } = body;
+
+      if (!webhookUrl || !webhookUrl.startsWith("https://discord.com/api/webhooks/")) {
+        return new Response(JSON.stringify({ error: "Неверный URL вебхука" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      const discordRes = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!discordRes.ok) {
+        const errText = await discordRes.text();
+        return new Response(JSON.stringify({ error: `Discord API error: ${discordRes.status} ${errText}` }), {
+          status: 502,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    }
+
     if (method === "GET") {
       const res = await client.queryObject<{
         id: number;
