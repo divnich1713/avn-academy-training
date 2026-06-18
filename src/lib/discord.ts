@@ -12,7 +12,7 @@ export async function sendDiscordEmbed(payload: {
   description?: string;
   color: number; // Decimal color code
   fields?: DiscordEmbedField[];
-}, targetType?: "dismissal" | "promotion" | "test" | "request") {
+}, targetType?: "dismissal" | "promotion" | "test" | "request"): Promise<{ messageId?: string; channelId?: string } | undefined> {
   let webhookUrl = "";
 
   // Try to find target-specific webhook URL
@@ -47,7 +47,8 @@ export async function sendDiscordEmbed(payload: {
 
     let response;
     if (isMock) {
-      response = await fetch(webhookUrl, {
+      const urlWithWait = webhookUrl.includes("?") ? `${webhookUrl}&wait=true` : `${webhookUrl}?wait=true`;
+      response = await fetch(urlWithWait, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -68,6 +69,10 @@ export async function sendDiscordEmbed(payload: {
           ],
         }),
       });
+      if (response.ok) {
+        const data = await response.json();
+        return { messageId: data.id, channelId: data.channel_id };
+      }
     } else {
       // Proxy through Supabase Edge Function to bypass regional blocks in Russia
       response = await fetch(`/supabase-api/notifications?action=discord`, {
@@ -95,6 +100,10 @@ export async function sendDiscordEmbed(payload: {
           }
         }),
       });
+      if (response.ok) {
+        const data = await response.json();
+        return { messageId: data.messageId, channelId: data.channelId };
+      }
     }
 
     if (!response.ok) {
@@ -122,7 +131,7 @@ export async function sendDismissalReportDiscord({
   photoUrl: string;
   staticId: string;
   unit?: string;
-}) {
+}): Promise<{ messageId?: string; channelId?: string } | undefined> {
   const formattedStaticId = fmtStaticId(staticId);
   const description = `**Курсант:** ${name} | ${formattedStaticId}
 **Звание:** ${rank || "—"}
@@ -132,7 +141,7 @@ export async function sendDismissalReportDiscord({
 Ссылка на фотокарточку (удостоверение)
 ${photoUrl}`;
 
-  await sendDiscordEmbed({
+  return await sendDiscordEmbed({
     title: "🚨 Подан рапорт на увольнение из академии",
     description,
     color: 15548997, // Red

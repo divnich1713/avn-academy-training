@@ -224,10 +224,17 @@ export function RequestForm({
 }) {
   const isOptionDisabled = (opt: string) => {
     if (opt.startsWith("──")) return true;
+    if (opt === "Рапорт на увольнение из академии") return false;
     return completedSubjects.includes(opt);
   };
 
   const firstValidOption = subjectOptions.find((opt) => !isOptionDisabled(opt)) || "";
+  console.log("[AVNG DEBUG] RequestForm render:", { 
+    subjectOptions, 
+    completedSubjects, 
+    firstValidOption, 
+    isOptionDisabledDismissal: isOptionDisabled("Рапорт на увольнение из академии") 
+  });
   const [subject, setSubject] = useState(firstValidOption);
   const [description, setDescription] = useState("");
   // Get current local date in YYYY-MM-DD format
@@ -323,18 +330,27 @@ export function RequestForm({
         finalDescription = `[Доказательства]\n${formattedUrls}${description ? `\n\n[Комментарий]\n${description}` : ""}`;
       }
 
-      await createRequest({ type, subject, description: finalDescription, preferred_date: date || undefined });
-      
+      let discord_message_id: string | undefined = undefined;
+      let discord_channel_id: string | undefined = undefined;
+
       // Trigger Discord notifications
       if (subject === "Рапорт на увольнение из академии") {
-        sendDismissalReportDiscord({
-          name: dismissalName,
-          rank: dismissalRank,
-          reason: dismissalReason,
-          photoUrl: dismissalPhotoUrl,
-          staticId: authUser.static_id,
-          unit: authUser.unit || "АВНГ"
-        }).catch(err => console.error("Discord error:", err));
+        try {
+          const discordRes = await sendDismissalReportDiscord({
+            name: dismissalName,
+            rank: dismissalRank,
+            reason: dismissalReason,
+            photoUrl: dismissalPhotoUrl,
+            staticId: authUser.static_id,
+            unit: authUser.unit || "АВНГ"
+          });
+          if (discordRes) {
+            discord_message_id = discordRes.messageId;
+            discord_channel_id = discordRes.channelId;
+          }
+        } catch (err) {
+          console.error("Discord error:", err);
+        }
       } else {
         sendGeneralRequestDiscord({
           name: authUser.name,
@@ -347,6 +363,15 @@ export function RequestForm({
           details: finalDescription
         }).catch(err => console.error("Discord error:", err));
       }
+
+      await createRequest({ 
+        type, 
+        subject, 
+        description: finalDescription, 
+        preferred_date: date || undefined,
+        discord_message_id,
+        discord_channel_id
+      });
 
       onSubmit();
     } catch (err: unknown) {
@@ -369,7 +394,7 @@ export function RequestForm({
             onChange={(e) => setSubject(e.target.value)}
           >
             {subjectOptions.map((s) => {
-              const isCompleted = completedSubjects.includes(s);
+              const isCompleted = completedSubjects.includes(s) && s !== "Рапорт на увольнение из академии";
               return (
                 <option key={s} value={s} disabled={isOptionDisabled(s)}>
                   {s} {isCompleted ? " (Выполнено)" : ""}
@@ -642,6 +667,16 @@ export function RequestSection({
       .filter((r) => r.status === "approved")
       .map((r) => r.subject);
   }, [requests]);
+
+  console.log("[AVNG DEBUG] RequestSection render:", { 
+    type, 
+    title, 
+    isInstructor, 
+    showForm, 
+    allRequestsCount: allRequests.length,
+    requestsCount: requests.length,
+    completedSubjects 
+  });
 
   return (
     <div className="animate-fade-in space-y-6">

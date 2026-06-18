@@ -336,6 +336,8 @@ export async function createRequest(payload: {
   subject: string;
   description?: string;
   preferred_date?: string;
+  discord_message_id?: string;
+  discord_channel_id?: string;
 }) {
   await delay();
   const user = getUser();
@@ -355,7 +357,9 @@ export async function createRequest(payload: {
     cadet_static_id: user.static_id,
     cadet_id: user.id,
     reviewer_name: null,
-  };
+    discord_message_id: payload.discord_message_id,
+    discord_channel_id: payload.discord_channel_id,
+  } as any;
   REQUESTS.push(req);
   return { ok: true, request_id: req.id };
 }

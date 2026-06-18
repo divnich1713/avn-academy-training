@@ -204,6 +204,8 @@ export async function createRequest(payload: {
   subject: string;
   description?: string;
   preferred_date?: string;
+  discord_message_id?: string;
+  discord_channel_id?: string;
 }) {
   if (USE_MOCK && mockApi) return mockApi.createRequest(payload);
   const res = await fetch(REQUESTS_URL, {

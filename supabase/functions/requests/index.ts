@@ -124,10 +124,13 @@ Deno.serve(async (req) => {
         });
       }
 
+      const discord_message_id = body.discord_message_id || null;
+      const discord_channel_id = body.discord_channel_id || null;
+
       const insertRes = await client.queryObject<{ id: number }>(
-        `INSERT INTO ${SCHEMA}.requests (user_id, type, subject, description, preferred_date)
-         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        [user.id, req_type, subject, description || null, preferred_date]
+        `INSERT INTO ${SCHEMA}.requests (user_id, type, subject, description, preferred_date, discord_message_id, discord_channel_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+        [user.id, req_type, subject, description || null, preferred_date, discord_message_id, discord_channel_id]
       );
       const newId = insertRes.rows[0].id;
 
@@ -189,8 +192,14 @@ Deno.serve(async (req) => {
         [status, comment || null, user.id, Number(requestId)]
       );
 
-      const reqRes = await client.queryObject<{ user_id: number; subject: string; type: string }>(
-        `SELECT user_id, subject, type FROM ${SCHEMA}.requests WHERE id = $1`,
+      const reqRes = await client.queryObject<{ 
+        user_id: number; 
+        subject: string; 
+        type: string;
+        discord_message_id: string | null;
+        discord_channel_id: string | null;
+      }>(
+        `SELECT user_id, subject, type, discord_message_id, discord_channel_id FROM ${SCHEMA}.requests WHERE id = $1`,
         [Number(requestId)]
       );
 
@@ -198,6 +207,8 @@ Deno.serve(async (req) => {
         const cadetId = reqRes.rows[0].user_id;
         const subject = reqRes.rows[0].subject;
         const reqType = reqRes.rows[0].type;
+        const msgId = reqRes.rows[0].discord_message_id;
+        const chanId = reqRes.rows[0].discord_channel_id;
         const statusText = status === "approved" ? "одобрен" : "отклонён";
         let notifMessage = `Инструктор ${user.name} ${statusText} ваш запрос на тему "${subject}".`;
         if (comment) {
@@ -209,6 +220,33 @@ Deno.serve(async (req) => {
            VALUES ($1, $2, $3, $4)`,
           [cadetId, "request_reviewed", `Запрос ${statusText}`, notifMessage]
         );
+
+        // Add ❌ reaction to original Discord message if the request is a rejected dismissal report
+        if (status === "rejected" && subject === "Рапорт на увольнение из академии" && msgId && chanId) {
+          const botToken = Deno.env.get("DISCORD_BOT_TOKEN");
+          if (botToken) {
+            try {
+              const url = `https://discord.com/api/v10/channels/${chanId}/messages/${msgId}/reactions/%E2%9D%8C/@me`;
+              const dRes = await fetch(url, {
+                method: "PUT",
+                headers: {
+                  "Authorization": `Bot ${botToken}`,
+                  "Content-Type": "application/json"
+                }
+              });
+              if (!dRes.ok) {
+                const errText = await dRes.text();
+                console.error(`Discord reaction error: ${dRes.status} ${errText}`);
+              } else {
+                console.log(`Successfully reacted ❌ to message ${msgId} in channel ${chanId}`);
+              }
+            } catch (err) {
+              console.error(`Failed to add Discord reaction: ${err.message}`);
+            }
+          } else {
+            console.warn("DISCORD_BOT_TOKEN not found in environment, skipped Discord reaction");
+          }
+        }
 
         // Auto-grade if type is lecture, practice, or exam
         if (reqType === "lecture" || reqType === "practice" || reqType === "exam") {

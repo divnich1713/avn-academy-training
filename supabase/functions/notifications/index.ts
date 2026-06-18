@@ -63,7 +63,9 @@ Deno.serve(async (req) => {
         });
       }
 
-      const discordRes = await fetch(webhookUrl, {
+      const urlWithWait = webhookUrl.includes("?") ? `${webhookUrl}&wait=true` : `${webhookUrl}?wait=true`;
+
+      const discordRes = await fetch(urlWithWait, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -77,7 +79,9 @@ Deno.serve(async (req) => {
         });
       }
 
-      return new Response(JSON.stringify({ success: true }), {
+      const data = await discordRes.json();
+
+      return new Response(JSON.stringify({ success: true, messageId: data.id, channelId: data.channel_id }), {
         status: 200,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
       });
