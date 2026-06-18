@@ -653,9 +653,14 @@ class TestSettingsUpdate(BaseModel):
     time_limit_per_question: Optional[int] = 0
     passing_score_percent: Optional[int] = 80
 
-def check_admin_access(user: User):
-    if user.role not in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "cadet"):
-        raise HTTPException(status_code=403, detail="Доступ разрешен только администраторам и инструкторам")
+def check_admin_access(user: User, is_mutation: bool = False):
+    allowed = (
+        ("head_avng", "chief_instructor", "deputy_head")
+        if is_mutation
+        else ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head")
+    )
+    if user.role not in allowed:
+        raise HTTPException(status_code=403, detail="Недостаточно прав для выполнения операции")
 
 # Admin CRUD endpoints
 @router.get("/questions-admin")
@@ -675,7 +680,7 @@ async def create_question_admin(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    check_admin_access(user)
+    check_admin_access(user, is_mutation=True)
     question = TestQuestion(
         subject=payload.subject,
         type=payload.type,
@@ -698,7 +703,7 @@ async def update_question_admin(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    check_admin_access(user)
+    check_admin_access(user, is_mutation=True)
     stmt = select(TestQuestion).where(TestQuestion.id == question_id)
     res = await db.execute(stmt)
     question = res.scalar_one_or_none()
@@ -718,7 +723,7 @@ async def delete_question_admin(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    check_admin_access(user)
+    check_admin_access(user, is_mutation=True)
     stmt = select(TestQuestion).where(TestQuestion.id == question_id)
     res = await db.execute(stmt)
     question = res.scalar_one_or_none()
@@ -817,7 +822,7 @@ async def update_settings_admin(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    check_admin_access(user)
+    check_admin_access(user, is_mutation=True)
     stmt = select(TestSettings).where(TestSettings.subject == payload.subject)
     res = await db.execute(stmt)
     settings_row = res.scalar_one_or_none()

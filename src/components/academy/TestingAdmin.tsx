@@ -12,9 +12,15 @@ import {
 import { TestingD3Stats } from "./TestingD3Stats";
 import { toast } from "sonner";
 import { fmtStaticId } from "./SectionsShared";
+import { User } from "@/lib/api";
 
-export function TestingAdmin() {
+export function TestingAdmin({ authUser }: { authUser?: User }) {
   const [activeTab, setActiveTab] = useState<"results" | "questions" | "settings">("results");
+  const isQuestionAdmin = !!(authUser && [
+    "head_avng",
+    "deputy_head",
+    "chief_instructor"
+  ].includes(authUser.role));
   
   // Results Tab State
   const [attempts, setAttempts] = useState<AdminAttempt[]>([]);
@@ -665,26 +671,30 @@ export function TestingAdmin() {
         >
           <Icon name="LineChart" size={13} /> Результаты
         </button>
-        <button
-          onClick={() => setActiveTab("questions")}
-          className={`flex items-center gap-2 font-mono text-xs uppercase px-4 py-2 border-t border-x transition-all ${
-            activeTab === "questions"
-              ? "bg-tactical-card border-tactical-border text-gold border-b-tactical-card -mb-px font-bold"
-              : "bg-transparent border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Icon name="ClipboardList" size={13} /> Банк вопросов
-        </button>
-        <button
-          onClick={() => setActiveTab("settings")}
-          className={`flex items-center gap-2 font-mono text-xs uppercase px-4 py-2 border-t border-x transition-all ${
-            activeTab === "settings"
-              ? "bg-tactical-card border-tactical-border text-gold border-b-tactical-card -mb-px font-bold"
-              : "bg-transparent border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Icon name="Settings" size={13} /> Параметры теста
-        </button>
+        {isQuestionAdmin && (
+          <button
+            onClick={() => setActiveTab("questions")}
+            className={`flex items-center gap-2 font-mono text-xs uppercase px-4 py-2 border-t border-x transition-all ${
+              activeTab === "questions"
+                ? "bg-tactical-card border-tactical-border text-gold border-b-tactical-card -mb-px font-bold"
+                : "bg-transparent border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Icon name="ClipboardList" size={13} /> Банк вопросов
+          </button>
+        )}
+        {isQuestionAdmin && (
+          <button
+            onClick={() => setActiveTab("settings")}
+            className={`flex items-center gap-2 font-mono text-xs uppercase px-4 py-2 border-t border-x transition-all ${
+              activeTab === "settings"
+                ? "bg-tactical-card border-tactical-border text-gold border-b-tactical-card -mb-px font-bold"
+                : "bg-transparent border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Icon name="Settings" size={13} /> Параметры теста
+          </button>
+        )}
       </div>
 
       {/* TAB 1: RESULTS */}
@@ -887,7 +897,7 @@ export function TestingAdmin() {
       )}
 
       {/* TAB 2: QUESTIONS */}
-      {activeTab === "questions" && (
+      {activeTab === "questions" && isQuestionAdmin && (
         <div className="space-y-6 animate-fade-in">
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-tactical-card border border-tactical-border p-4 card-glow">
             {/* Filters */}
@@ -1043,7 +1053,7 @@ export function TestingAdmin() {
       )}
 
       {/* TAB 3: SETTINGS */}
-      {activeTab === "settings" && (
+      {activeTab === "settings" && isQuestionAdmin && (
         <div className="space-y-6 max-w-xl mx-auto animate-fade-in">
           {loadingSettings ? (
             <div className="flex items-center justify-center h-[200px]">

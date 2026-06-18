@@ -1116,14 +1116,17 @@ Deno.serve(async (req) => {
     // 13. Admin CRUD: /api/tests/questions-admin
     // ==========================================
     if (path.startsWith("/api/tests/questions-admin")) {
-      const checkAdminAccess = (usr: any) => {
-        const allowed = ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "cadet"];
+      const checkAdminAccess = (usr: any, method: string) => {
+        const isMutation = ["POST", "PUT", "DELETE"].includes(method);
+        const allowed = isMutation
+          ? ["head_avng", "chief_instructor", "deputy_head"]
+          : ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"];
         if (!allowed.includes(usr.role)) {
-          throw new Error("Доступ разрешен только администраторам и инструкторам");
+          throw new Error("Недостаточно прав для изменения вопросов тестов");
         }
       };
       
-      checkAdminAccess(user);
+      checkAdminAccess(user, req.method);
 
       // GET /api/tests/questions-admin — list all
       if (req.method === "GET" && path === "/api/tests/questions-admin") {
@@ -1214,14 +1217,17 @@ Deno.serve(async (req) => {
     // 14. Admin Settings: /api/tests/settings-admin
     // ==========================================
     if (path === "/api/tests/settings-admin") {
-      const checkAdminAccess = (usr: any) => {
-        const allowed = ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "cadet"];
+      const checkAdminAccess = (usr: any, method: string) => {
+        const isMutation = ["POST", "PUT", "DELETE"].includes(method);
+        const allowed = isMutation
+          ? ["head_avng", "chief_instructor", "deputy_head"]
+          : ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"];
         if (!allowed.includes(usr.role)) {
-          throw new Error("Доступ разрешен только администраторам и инструкторам");
+          throw new Error("Недостаточно прав для изменения настроек тестов");
         }
       };
       
-      checkAdminAccess(user);
+      checkAdminAccess(user, req.method);
 
       // GET /api/tests/settings-admin
       if (req.method === "GET") {
