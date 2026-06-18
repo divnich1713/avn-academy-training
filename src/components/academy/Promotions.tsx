@@ -12,7 +12,7 @@ import {
   reviewPromotionReport,
 } from "@/lib/api";
 import { fmt, Spinner, Empty, fmtStaticId } from "./SectionsShared";
-import { sendPromotionReportDiscord } from "@/lib/discord";
+import { sendPromotionReportDiscord, sendPromotionApprovedDiscord } from "@/lib/discord";
 
 const PROMOTION_LABELS: Record<PromotionType, string> = {
   junior_sergeant: "Мл. Сержант",
@@ -609,10 +609,20 @@ export function PromotionInstructorTab({
     }
   };
 
-  const handleReview = async (id: number, status: "approved" | "rejected") => {
-    setReviewLoading((prev) => ({ ...prev, [id]: true }));
+  const handleReview = async (report: PromotionReport, status: "approved" | "rejected") => {
+    setReviewLoading((prev) => ({ ...prev, [report.id]: true }));
     try {
-      await reviewPromotionReport(id, status, reviewComment[id] || "");
+      await reviewPromotionReport(report.id, status, reviewComment[report.id] || "");
+      
+      if (status === "approved") {
+        sendPromotionApprovedDiscord({
+          name: report.cadet_name,
+          staticId: report.cadet_static_id,
+          promotionType: report.promotion_type,
+          reportId: report.id,
+        }).catch((err) => console.error("Discord error:", err));
+      }
+
       await loadReports();
       setExpandedId(null);
       if (onReviewSuccess) {
@@ -621,7 +631,7 @@ export function PromotionInstructorTab({
     } catch {
       // silent fail
     }
-    setReviewLoading((prev) => ({ ...prev, [id]: false }));
+    setReviewLoading((prev) => ({ ...prev, [report.id]: false }));
   };
 
   const promoDates = useMemo(() => {
@@ -844,14 +854,14 @@ export function PromotionInstructorTab({
                         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                           <button
                             disabled={reviewLoading[r.id]}
-                            onClick={() => handleReview(r.id, "approved")}
+                            onClick={() => handleReview(r, "approved")}
                             className="rank-badge text-green-400 border border-green-800 px-3 py-1 hover:bg-green-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
                           >
                             <Icon name="Check" size={12} />Одобрить и повысить
                           </button>
                           <button
                             disabled={reviewLoading[r.id]}
-                            onClick={() => handleReview(r.id, "rejected")}
+                            onClick={() => handleReview(r, "rejected")}
                             className="rank-badge text-red-400 border border-red-800 px-3 py-1 hover:bg-red-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
                           >
                             <Icon name="X" size={12} />Отклонить

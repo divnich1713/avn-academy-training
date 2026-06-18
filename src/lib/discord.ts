@@ -366,3 +366,41 @@ export async function sendRequestReviewedDiscord({
     ],
   }, targetType);
 }
+
+// 6. Promotion approved notification (Plain text matching user template)
+export async function sendPromotionApprovedDiscord({
+  name,
+  staticId,
+  promotionType,
+  reportId,
+}: {
+  name: string;
+  staticId: string;
+  promotionType: "junior_sergeant" | "sergeant";
+  reportId: number;
+}) {
+  const webhookUrl = 
+    import.meta.env.VITE_DISCORD_PROMOTION_APPROVED_WEBHOOK_URL || 
+    "https://discord.com/api/webhooks/1517165782377697330/dmXqCUJzD_2xp8HE-bwFsLtuOUTAtgjR6vxGeuyG5GT-NJ0ddHAWhAO5i9PDxLjzB9WH";
+
+  const formattedStaticId = fmtStaticId(staticId);
+  const targetRankLabel = promotionType === "junior_sergeant" ? "Мл. Сержанта" : "Сержанта";
+  const systemUrl = typeof window !== "undefined" ? window.location.origin : "https://avn-academy-training-netlify-app.ru";
+  const reportLink = `${systemUrl}/?tab=promotions&reportId=${reportId}`;
+
+  const content = `${name} | ${formattedStaticId} повышен до ${targetRankLabel} согласно [рапорту](${reportLink}) АВНГ`;
+
+  try {
+    await fetch(webhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        content,
+      }),
+    });
+  } catch (error) {
+    console.error("Ошибка при отправке в Discord Webhook о повышении:", error);
+  }
+}
