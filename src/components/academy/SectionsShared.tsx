@@ -185,7 +185,7 @@ export function RequestCard({
           {r.instructor_comment && (
             <p className="text-xs text-muted-foreground mt-1 italic">
               <span className="text-foreground font-semibold not-italic">Комментарий инструктора: </span>
-              "{r.instructor_comment}"
+              "{renderTextWithLinks(r.instructor_comment)}"
             </p>
           )}
           {r.reviewer_name && (
@@ -679,5 +679,33 @@ export function RequestSection({
         </div>
       )}
     </div>
+  );
+}
+
+export function renderTextWithLinks(text: string | null | undefined) {
+  if (!text) return null;
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  return (
+    <>
+      {parts.map((part, idx) => {
+        if (part.match(/^https?:\/\//)) {
+          return (
+            <a
+              key={idx}
+              href={part}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline inline-flex items-center gap-0.5 break-all"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {part}
+              <Icon name="ExternalLink" size={10} className="inline flex-shrink-0" />
+            </a>
+          );
+        }
+        return <span key={idx}>{part}</span>;
+      })}
+    </>
   );
 }

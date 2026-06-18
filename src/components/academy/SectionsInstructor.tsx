@@ -4,7 +4,7 @@ import Icon from "@/components/ui/icon";
 import { SectionHeader, StatCard, StatusBadge, GradeCircle, OnlineStatus, InstructorAvatar } from "./UIComponents";
 import { User, reviewRequest, TrainingRequest } from "@/lib/api";
 import { useRequests, useGrades, useAdminUsers, usePromotionReports, queryKeys } from "@/lib/useQueries";
-import { TYPE_LABEL, fmt, Spinner, Empty, fmtStaticId } from "./SectionsShared";
+import { TYPE_LABEL, fmt, Spinner, Empty, fmtStaticId, renderTextWithLinks } from "./SectionsShared";
 import { InstructorRatingView } from "./SectionsRatings";
 import { PromotionInstructorTab } from "./Promotions";
 import { TestingAdmin } from "./TestingAdmin";
@@ -70,6 +70,8 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   const { data: reports = [] } = usePromotionReports();
   const [reviewComment, setReviewComment] = useState<Record<number, string>>({});
   const [reviewLoading, setReviewLoading] = useState<Record<number, boolean>>({});
+  const [reviewStartScreenshot, setReviewStartScreenshot] = useState<Record<number, string>>({});
+  const [reviewEndScreenshot, setReviewEndScreenshot] = useState<Record<number, string>>({});
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("pending");
 
@@ -116,7 +118,21 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       }
     } else {
       const req = requests.find((r) => r.id === id);
-      await reviewRequest(id, status, reviewComment[id] || "").catch(() => {});
+      const isPracticeExam = req && (req.subject.includes("Штраф — Задержание — Арест") || req.subject.includes("Штраф, Задержание, Арест"));
+      
+      let finalComment = reviewComment[id] || "";
+      if (status === "approved" && isPracticeExam) {
+        const start = (reviewStartScreenshot[id] || "").trim();
+        const end = (reviewEndScreenshot[id] || "").trim();
+        if (!start.startsWith("http") || !end.startsWith("http")) {
+          alert("Для одобрения этого экзамена необходимо приложить корректные ссылки на скриншоты начала и конца практики!");
+          setReviewLoading((prev) => ({ ...prev, [id]: false }));
+          return;
+        }
+        finalComment = `[Начало практики: ${start}] [Конец практики: ${end}] ${finalComment}`.trim();
+      }
+
+      await reviewRequest(id, status, finalComment).catch(() => {});
       
       if (req) {
         // Run Discord notification in the background so it doesn't block the UI update
@@ -131,7 +147,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
               subject: req.subject,
               status: status,
               reviewerName: `${authUser.rank} ${authUser.name}`,
-              comment: reviewComment[id]
+              comment: finalComment
             });
           } catch (err) {
             console.error("Failed to send review to Discord:", err);
@@ -581,39 +597,71 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
           </div>
           <StatusBadge status={r.status} />
         </div>
-        {r.status === "pending" && (
-          <div className="border-t border-tactical-border pt-3 space-y-2">
-            <input
-              className="w-full bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary transition-colors"
-              placeholder="Комментарий инструктора (необязательно)..."
-              value={reviewComment[r.id] || ""}
-              onChange={(e) => setReviewComment((prev) => ({ ...prev, [r.id]: e.target.value }))}
-            />
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                type="button"
-                disabled={reviewLoading[r.id]}
-                onClick={() => handleReview(r.id, "approved")}
-                className="rank-badge text-green-400 border border-green-800 px-3 py-1 hover:bg-green-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
-              >
-                <Icon name="Check" size={12} />Одобрить
-              </button>
-              <button
-                type="button"
-                disabled={reviewLoading[r.id]}
-                onClick={() => handleReview(r.id, "rejected")}
-                className="rank-badge text-red-400 border border-red-800 px-3 py-1 hover:bg-red-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
-              >
-                <Icon name="X" size={12} />Отклонить
-              </button>
-               {reviewLoading[r.id] && <Icon name="Loader2" size={14} className="text-primary animate-spin" />}
+        {r.status === "pending" && (() => {
+          const isPracticeExam = r.subject.includes("Штраф — Задержание — Арест") || r.subject.includes("Штраф, Задержание, Арест");
+          return (
+            <div className="border-t border-tactical-border pt-3 space-y-2">
+              {isPracticeExam && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 my-2 p-2 bg-tactical-card/50 border border-tactical-border/60">
+                  <div>
+                    <label className="text-[10px] font-mono text-primary uppercase tracking-wider block mb-1">Скриншот начала практики (Обязательно)*</label>
+                    <input
+                      type="url"
+                      className="w-full bg-tactical-panel border border-tactical-border px-3 py-1 text-xs text-foreground font-mono focus:outline-none focus:border-primary transition-colors"
+                      placeholder="https://i.imgur.com/... (начало)"
+                      value={reviewStartScreenshot[r.id] || ""}
+                      onChange={(e) => setReviewStartScreenshot(prev => ({ ...prev, [r.id]: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-mono text-primary uppercase tracking-wider block mb-1">Скриншот конца практики (Обязательно)*</label>
+                    <input
+                      type="url"
+                      className="w-full bg-tactical-panel border border-tactical-border px-3 py-1 text-xs text-foreground font-mono focus:outline-none focus:border-primary transition-colors"
+                      placeholder="https://i.imgur.com/... (конец)"
+                      value={reviewEndScreenshot[r.id] || ""}
+                      onChange={(e) => setReviewEndScreenshot(prev => ({ ...prev, [r.id]: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              )}
+              <input
+                className="w-full bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary transition-colors"
+                placeholder="Комментарий инструктора (необязательно)..."
+                value={reviewComment[r.id] || ""}
+                onChange={(e) => setReviewComment((prev) => ({ ...prev, [r.id]: e.target.value }))}
+              />
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  disabled={reviewLoading[r.id]}
+                  onClick={() => handleReview(r.id, "approved")}
+                  className="rank-badge text-green-400 border border-green-800 px-3 py-1 hover:bg-green-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
+                >
+                  <Icon name="Check" size={12} />Одобрить
+                </button>
+                <button
+                  type="button"
+                  disabled={reviewLoading[r.id]}
+                  onClick={() => handleReview(r.id, "rejected")}
+                  className="rank-badge text-red-400 border border-red-800 px-3 py-1 hover:bg-red-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
+                >
+                  <Icon name="X" size={12} />Отклонить
+                </button>
+                 {reviewLoading[r.id] && <Icon name="Loader2" size={14} className="text-primary animate-spin" />}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
         {r.status !== "pending" && r.reviewer_name && (
-          <p className="text-xs text-muted-foreground font-mono border-t border-tactical-border pt-2">
-            Рассмотрел: {r.reviewer_name}
-            {r.instructor_comment && ` · "${r.instructor_comment}"`}
+          <p className="text-xs text-muted-foreground font-mono border-t border-tactical-border pt-2 flex flex-wrap items-center gap-1">
+            <span>Рассмотрел: {r.reviewer_name}</span>
+            {r.instructor_comment && (
+              <>
+                <span>·</span>
+                <span className="italic">"{renderTextWithLinks(r.instructor_comment)}"</span>
+              </>
+            )}
           </p>
         )}
       </div>

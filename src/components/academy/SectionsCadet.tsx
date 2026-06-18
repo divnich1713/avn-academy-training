@@ -5,7 +5,7 @@ import { SectionHeader, StatCard, StatusBadge, GradeCircle, OnlineStatus, Instru
 import { User, fetchDiscordProfile, TrainingRequest } from "@/lib/api";
 import { useRequests, useGrades, useInstructors, useRatings, usePromotionReports } from "@/lib/useQueries";
 import { MOCK_MATERIALS } from "./types";
-import { TYPE_LABEL, fmt, Spinner, Empty, RequestSection, fmtStaticId } from "./SectionsShared";
+import { TYPE_LABEL, fmt, Spinner, Empty, RequestSection, fmtStaticId, renderTextWithLinks } from "./SectionsShared";
 
 // P2-10: Lazy-load individual memos — each ~10-20KB, only loaded when opened
 const PatrolMemo = lazy(() => import("./MaterialsMemos").then(m => ({ default: m.PatrolMemo })));
@@ -1032,7 +1032,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
                         <div>
                           <p className={`text-sm font-ibm ${style.titleColor}`}>{r.subject}</p>
                           <p className="text-xs text-muted-foreground font-mono">{TYPE_LABEL[r.type]} · {fmt(r.created_at)}</p>
-                          {r.instructor_comment && <p className="text-xs text-muted-foreground italic mt-0.5">"{r.instructor_comment}"</p>}
+                          {r.instructor_comment && <p className="text-xs text-muted-foreground italic mt-0.5">"{renderTextWithLinks(r.instructor_comment)}"</p>}
                         </div>
                       </div>
                       <StatusBadge status={r.status} />
