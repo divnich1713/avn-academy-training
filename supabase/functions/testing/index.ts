@@ -1,4 +1,4 @@
-import { Client } from "postgres";
+import { Pool, Client } from "postgres";
 
 const SCHEMA = "t_p29017774_avn_academy_training";
 const CORS_HEADERS = {
@@ -7,16 +7,11 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type, X-Session-Token",
 };
 
-// Database helper
-async function getDbClient() {
-  const databaseUrl = Deno.env.get("DATABASE_URL");
-  if (!databaseUrl) {
-    throw new Error("DATABASE_URL is not set");
-  }
-  const client = new Client(databaseUrl);
-  await client.connect();
-  return client;
+const databaseUrl = Deno.env.get("DATABASE_URL");
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is not set");
 }
+const pool = new Pool(databaseUrl, 5, true);
 
 // SSO authorization helper
 async function getCurrentUser(req: Request, client: Client) {
@@ -164,8 +159,7 @@ async function gradeEssayInBackground(
     }
 
     // Write to DB
-    client = new Client(databaseUrl);
-    await client.connect();
+    client = await pool.connect();
 
     const isCorrect = grade >= 60;
     await client.queryArray(
@@ -225,7 +219,7 @@ async function gradeEssayInBackground(
     console.error("Async grading process error: ", err);
   } finally {
     if (client) {
-      await client.end().catch(console.error);
+      client.release();
     }
   }
 }
@@ -281,9 +275,9 @@ Deno.serve(async (req) => {
   // Router path cleaning
   const path = url.pathname.replace(/\/functions\/v1\/testing/, "").replace(/^\/testing/, "").replace(/\/+$/, "");
 
-  let client: Client | null = null;
+  let client: any = null;
   try {
-    client = await getDbClient();
+    client = await pool.connect();
     
     // Inline database migration to ensure columns exist
     try {
@@ -1294,7 +1288,7 @@ Deno.serve(async (req) => {
     });
   } finally {
     if (client) {
-      await client.end().catch(console.error);
+      client.release();
     }
   }
 });

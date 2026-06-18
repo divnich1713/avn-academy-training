@@ -1,4 +1,4 @@
-import { Client } from "postgres";
+import { Pool, Client } from "postgres";
 
 const SCHEMA = "t_p29017774_avn_academy_training";
 const CORS_HEADERS = {
@@ -43,15 +43,11 @@ const PROMOTION_REQUIREMENTS: Record<string, {
   },
 };
 
-async function getDbClient() {
-  const databaseUrl = Deno.env.get("DATABASE_URL");
-  if (!databaseUrl) {
-    throw new Error("DATABASE_URL is not set");
-  }
-  const client = new Client(databaseUrl);
-  await client.connect();
-  return client;
+const databaseUrl = Deno.env.get("DATABASE_URL");
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is not set");
 }
+const pool = new Pool(databaseUrl, 5, true);
 
 async function getUserByToken(client: Client, token: string | null) {
   if (!token) return null;
@@ -169,9 +165,8 @@ Deno.serve(async (req) => {
 
   const token = req.headers.get("X-Session-Token") || req.headers.get("x-session-token");
   let client;
-
   try {
-    client = await getDbClient();
+    client = await pool.connect();
     const user = await getUserByToken(client, token);
     if (!user) {
       return new Response(JSON.stringify({ error: "Сессия истекла или не авторизован" }), {
@@ -462,7 +457,7 @@ Deno.serve(async (req) => {
     });
   } finally {
     if (client) {
-      await client.end().catch(console.error);
+      client.release();
     }
   }
 });

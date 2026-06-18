@@ -97,18 +97,8 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
 
   const handleTabClick = (tab: typeof activeTab) => {
     setActiveTab(tab);
-    // P1-6: React Query auto-caches — we just invalidate stale data on tab switch
-    if (tab === "whitelist" || tab === "cadets" || tab === "expired") {
-      queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers });
-    }
-    if (tab === "grades") {
-      queryClient.invalidateQueries({ queryKey: queryKeys.grades });
-      queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers });
-    }
-    if (tab === "requests" || tab === "promotions") {
-      queryClient.invalidateQueries({ queryKey: queryKeys.requests });
-      queryClient.invalidateQueries({ queryKey: queryKeys.promotionReports });
-    }
+    // Caching optimization: do NOT invalidate queries on tab click.
+    // React Query will serve cached data instantly and fetch updates in the background.
   };
 
   const handleReview = async (id: number, status: "approved" | "rejected") => {
@@ -129,21 +119,24 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       await reviewRequest(id, status, reviewComment[id] || "").catch(() => {});
       
       if (req) {
-        try {
-          const { sendRequestReviewedDiscord } = await import("@/lib/discord");
-          await sendRequestReviewedDiscord({
-            name: req.cadet_name || "Курсант",
-            rank: req.cadet_rank || "",
-            staticId: req.cadet_static_id || "",
-            typeLabel: TYPE_LABEL[req.type] || req.type,
-            subject: req.subject,
-            status: status,
-            reviewerName: `${authUser.rank} ${authUser.name}`,
-            comment: reviewComment[id]
-          });
-        } catch (err) {
-          console.error("Failed to send review to Discord:", err);
-        }
+        // Run Discord notification in the background so it doesn't block the UI update
+        (async () => {
+          try {
+            const { sendRequestReviewedDiscord } = await import("@/lib/discord");
+            await sendRequestReviewedDiscord({
+              name: req.cadet_name || "Курсант",
+              rank: req.cadet_rank || "",
+              staticId: req.cadet_static_id || "",
+              typeLabel: TYPE_LABEL[req.type] || req.type,
+              subject: req.subject,
+              status: status,
+              reviewerName: `${authUser.rank} ${authUser.name}`,
+              comment: reviewComment[id]
+            });
+          } catch (err) {
+            console.error("Failed to send review to Discord:", err);
+          }
+        })();
       }
 
       if (status === "approved" && req && req.subject === "Рапорт на увольнение из академии") {

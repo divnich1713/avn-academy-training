@@ -41,8 +41,8 @@ export function useRequests() {
   return useQuery({
     queryKey: queryKeys.requests,
     queryFn: fetchRequests,
-    staleTime: 30_000,        // Fresh for 30 seconds
-    refetchInterval: 60_000,  // Background refetch every 60s
+    staleTime: 60_000,        // Fresh for 60 seconds
+    refetchInterval: 120_000, // Background refetch every 120s
     placeholderData: [] as TrainingRequest[],
   });
 }
@@ -51,8 +51,8 @@ export function useGrades() {
   return useQuery({
     queryKey: queryKeys.grades,
     queryFn: fetchGrades,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    staleTime: 60_000,        // Fresh for 60 seconds
+    refetchInterval: 120_000, // Background refetch every 120s
     placeholderData: [] as Grade[],
   });
 }
@@ -89,7 +89,7 @@ export function usePromotionReports() {
   return useQuery({
     queryKey: queryKeys.promotionReports,
     queryFn: fetchPromotionReports,
-    staleTime: 30_000,
+    staleTime: 60_000,        // Fresh for 60 seconds
     placeholderData: [],
   });
 }
@@ -98,7 +98,7 @@ export function useAdminUsers() {
   return useQuery({
     queryKey: queryKeys.adminUsers,
     queryFn: adminListUsers,
-    staleTime: 30_000,
+    staleTime: 120_000,       // Whitelist users fresh for 2 minutes
     placeholderData: [],
   });
 }

@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Icon from "@/components/ui/icon";
 import { StatusBadge, SectionHeader } from "./UIComponents";
 import { User } from "@/lib/api";
-import { fetchRequests, createRequest, TrainingRequest } from "@/lib/api";
+import { createRequest, TrainingRequest } from "@/lib/api";
 import { sendDismissalReportDiscord, sendGeneralRequestDiscord } from "@/lib/discord";
+import { useRequests } from "@/lib/useQueries";
 
 export const TYPE_LABEL: Record<string, string> = {
   lecture: "Лекция",
@@ -627,24 +628,20 @@ export function RequestSection({
   emptyText: string;
   highlightRequestId?: number;
 }) {
-  const [requests, setRequests] = useState<TrainingRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: allRequests = [], isLoading: loading, refetch } = useRequests();
   const [showForm, setShowForm] = useState(false);
   const isInstructor = authUser.role !== "cadet";
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const all = await fetchRequests().catch(() => []);
-    setRequests(all.filter((r) => r.type === type));
-    setLoading(false);
-  }, [type]);
-
-  useEffect(() => { load(); }, [load]);
+  const requests = useMemo(() => {
+    return allRequests.filter((r) => r.type === type);
+  }, [allRequests, type]);
 
   // Find all subjects that have already been approved
-  const completedSubjects = requests
-    .filter((r) => r.status === "approved")
-    .map((r) => r.subject);
+  const completedSubjects = useMemo(() => {
+    return requests
+      .filter((r) => r.status === "approved")
+      .map((r) => r.subject);
+  }, [requests]);
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -665,7 +662,7 @@ export function RequestSection({
           type={type}
           subjectOptions={subjectOptions}
           completedSubjects={completedSubjects}
-          onSubmit={() => { setShowForm(false); load(); }}
+          onSubmit={() => { setShowForm(false); refetch(); }}
           onClose={() => setShowForm(false)}
         />
       )}

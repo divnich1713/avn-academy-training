@@ -1,4 +1,4 @@
-import { Client } from "postgres";
+import { Pool, Client } from "postgres";
 
 const SCHEMA = "t_p29017774_avn_academy_training";
 const CORS_HEADERS = {
@@ -7,36 +7,11 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type, X-Session-Token",
 };
 
-async function getDbClient() {
-  const databaseUrl = Deno.env.get("DATABASE_URL");
-  if (!databaseUrl) {
-    throw new Error("DATABASE_URL is not set");
-  }
-  const client = new Client(databaseUrl);
-  await client.connect();
-
-  // Dynamic DDL update to support 'dismissed' (уволен) role in remote DB constraint
-  try {
-    const checkRes = await client.queryObject<{ def: string }>(
-      `SELECT pg_get_constraintdef(c.oid) as def 
-       FROM pg_constraint c 
-       JOIN pg_class t ON t.oid = c.conrelid
-       JOIN pg_namespace n ON n.oid = t.relnamespace
-       WHERE c.conname = 'users_role_check' AND n.nspname = '${SCHEMA}'`
-    );
-    if (checkRes.rows.length > 0 && !checkRes.rows[0].def.includes("dismissed")) {
-      await client.queryObject(`
-        ALTER TABLE ${SCHEMA}.users DROP CONSTRAINT IF EXISTS users_role_check;
-        ALTER TABLE ${SCHEMA}.users ADD CONSTRAINT users_role_check CHECK (role IN ('cadet', 'instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head', 'dismissed'));
-      `);
-      console.log("Database constraint updated to include 'dismissed' role.");
-    }
-  } catch (e) {
-    console.error("Failed to check/update database constraint:", e);
-  }
-
-  return client;
+const databaseUrl = Deno.env.get("DATABASE_URL");
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is not set");
 }
+const pool = new Pool(databaseUrl, 5, true);
 
 async function hashPassword(password: string): Promise<string> {
   const msgUint8 = new TextEncoder().encode(password);
@@ -68,7 +43,7 @@ Deno.serve(async (req) => {
   let client;
 
   try {
-    client = await getDbClient();
+    client = await pool.connect();
     const requester = await getRequester(client, token);
     if (!requester) {
       return new Response(JSON.stringify({ error: "Доступ запрещён" }), {
@@ -314,7 +289,7 @@ Deno.serve(async (req) => {
     });
   } finally {
     if (client) {
-      await client.end().catch(console.error);
+      client.release();
     }
   }
 });

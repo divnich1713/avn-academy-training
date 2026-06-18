@@ -1,4 +1,4 @@
-import { Client } from "postgres";
+import { Pool, Client } from "postgres";
 
 const SCHEMA = "t_p29017774_avn_academy_training";
 const CORS_HEADERS = {
@@ -7,15 +7,11 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type, X-Session-Token",
 };
 
-async function getDbClient() {
-  const databaseUrl = Deno.env.get("DATABASE_URL");
-  if (!databaseUrl) {
-    throw new Error("DATABASE_URL is not set");
-  }
-  const client = new Client(databaseUrl);
-  await client.connect();
-  return client;
+const databaseUrl = Deno.env.get("DATABASE_URL");
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is not set");
 }
+const pool = new Pool(databaseUrl, 5, true);
 
 async function hashPassword(password: string): Promise<string> {
   const msgUint8 = new TextEncoder().encode(password);
@@ -104,7 +100,7 @@ Deno.serve(async (req) => {
 
   let client;
   try {
-    client = await getDbClient();
+    client = await pool.connect();
 
     if (action === "login" && req.method === "POST") {
       const body = await req.json().catch(() => ({}));
@@ -324,7 +320,7 @@ Deno.serve(async (req) => {
     });
   } finally {
     if (client) {
-      await client.end().catch(console.error);
+      client.release();
     }
   }
 });
