@@ -93,7 +93,7 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
       <div className="relative overflow-hidden border border-tactical-border/60 bg-tactical-panel h-52 flex flex-col justify-end p-6 md:p-8 corner-mark">
         <div 
           className="absolute inset-0 bg-cover bg-center opacity-85"
-          style={{ backgroundImage: 'url("/classroom_banner.png")' }}
+          style={{ backgroundImage: 'url("/classroom_banner.png?v=2")' }}
         />
         <div 
           className="absolute right-0 top-0 bottom-0 w-80 bg-contain bg-right bg-no-repeat opacity-30 pointer-events-none z-0"
@@ -210,7 +210,7 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
             <div className="relative border border-tactical-border/60 bg-tactical-card/30 p-4 h-28 overflow-hidden flex flex-col justify-between">
               <div 
                 className="absolute inset-0 bg-cover bg-center opacity-10 pointer-events-none"
-                style={{ backgroundImage: 'url("/patrol_tower.png")' }}
+                style={{ backgroundImage: 'url("/patrol_tower.png?v=2")' }}
               />
               <div className="flex justify-between items-start">
                 <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">АКТИВНЫХ ЗАПРОСОВ</span>

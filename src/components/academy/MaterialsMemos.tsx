@@ -117,7 +117,7 @@ export function PatrolMemo({ isOpen, onClose }: MemoProps) {
             <div className="border border-tactical-border p-2 bg-tactical-card/30 rounded">
               <p className="text-xs text-muted-foreground mb-1.5 text-center font-mono uppercase tracking-wider">Визуализация несения службы на посту Вышка</p>
               <img 
-                src="/patrol_tower.webp" 
+                src="/patrol_tower.webp?v=2" 
                 alt="Несение службы на посту Вышка" 
                 className="w-full max-h-[350px] object-contain rounded border border-tactical-border bg-black/40"
                 loading="lazy"
@@ -169,7 +169,7 @@ export function PatrolMemo({ isOpen, onClose }: MemoProps) {
             <div className="border border-tactical-border p-2 bg-tactical-card/30 rounded">
               <p className="text-xs text-muted-foreground mb-1.5 text-center font-mono uppercase tracking-wider">Визуализация несения службы на посту КПП №1</p>
               <img 
-                src="/patrol_kpp1.webp" 
+                src="/patrol_kpp1.webp?v=2" 
                 alt="Несение службы на посту КПП №1" 
                 className="w-full max-h-[350px] object-contain rounded border border-tactical-border bg-black/40"
                 loading="lazy"
@@ -209,7 +209,7 @@ export function PatrolMemo({ isOpen, onClose }: MemoProps) {
             <div className="border border-tactical-border p-2 bg-tactical-card/30 rounded">
               <p className="text-xs text-muted-foreground mb-1.5 text-center font-mono uppercase tracking-wider">Визуализация несения службы на посту КПП №2</p>
               <img 
-                src="/patrol_kpp2.webp" 
+                src="/patrol_kpp2.webp?v=2" 
                 alt="Несение службы на посту КПП №2" 
                 className="w-full max-h-[350px] object-contain rounded border border-tactical-border bg-black/40"
                 loading="lazy"
