@@ -1283,7 +1283,8 @@ export function Instructors({ onNavigate }: { onNavigate?: (s: import("./types")
     });
   }, [rawInstructors]);
 
-  const commandStaff = instructors.filter(i => i.role === "head_avng" || i.role === "deputy_head" || i.role === "senior_ufsvng");
+  const ufsvngStaff = instructors.filter(i => i.role === "senior_ufsvng");
+  const commandStaff = instructors.filter(i => i.role === "head_avng" || i.role === "deputy_head");
   const seniorStaff = instructors.filter(i => i.role === "chief_instructor" || i.role === "senior_instructor");
   const instructorStaff = instructors.filter(i => i.role === "instructor" || i.role === "junior_instructor");
 
@@ -1335,9 +1336,28 @@ export function Instructors({ onNavigate }: { onNavigate?: (s: import("./types")
     </div>
   );
 
+  const renderUfsvngGroup = () => {
+    if (ufsvngStaff.length === 0) return null;
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 border-b border-tactical-border/40 pb-1.5">
+          <div className="w-5 h-5 flex items-center justify-center text-primary">
+            <Icon name="Shield" size={15} className="text-red-500" />
+          </div>
+          <h4 className="font-oswald text-xs font-bold tracking-widest uppercase text-muted-foreground">
+            Руководство УФСВНГ ({ufsvngStaff.length})
+          </h4>
+        </div>
+        <div className="flex flex-wrap justify-center gap-4 w-full">
+          {ufsvngStaff.map(h => renderCard(h))}
+        </div>
+      </div>
+    );
+  };
+
   const renderCommandGroup = () => {
     if (commandStaff.length === 0) return null;
-    const heads = commandStaff.filter(i => i.role === "head_avng" || i.role === "senior_ufsvng");
+    const heads = commandStaff.filter(i => i.role === "head_avng");
     const deputies = commandStaff.filter(i => i.role === "deputy_head");
 
     return (
@@ -1398,6 +1418,7 @@ export function Instructors({ onNavigate }: { onNavigate?: (s: import("./types")
         <Empty text="Инструкторы не найдены" />
       ) : (
         <div className="space-y-8">
+          {renderUfsvngGroup()}
           {renderCommandGroup()}
           {renderGroup("Старший преподавательский состав", seniorStaff, "Award")}
           {renderGroup("Преподавательский состав", instructorStaff, "Users")}
