@@ -4,7 +4,7 @@ services:
   db:
     image: mirror.gcr.io/library/postgres:17-alpine
     ports:
-      - "54322:5432"
+      - "127.0.0.1:54322:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -14,25 +14,29 @@ services:
     restart: always
 
   db_migration:
-    build: ./backend_fastapi
+    build:
+      context: ./backend_fastapi
+      dockerfile: Dockerfile
     volumes:
       - .:/app
     working_dir: /app
     environment:
       - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/postgres}
-      - SCHEMA=t_p29017774_avn_academy_training
+      - SCHEMA=${SCHEMA:-t_p29017774_avn_academy_training}
     command: python db_migrations/migrate.py
     depends_on:
       - db
 
   api:
-    build: ./backend_fastapi
+    build:
+      context: ./backend_fastapi
+      dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/postgres}
       - REDIS_URL=redis://redis:6379/0
-      - SCHEMA=t_p29017774_avn_academy_training
+      - SCHEMA=${SCHEMA:-t_p29017774_avn_academy_training}
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL}
@@ -44,11 +48,13 @@ services:
     restart: always
 
   worker:
-    build: ./worker
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
     environment:
       - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/postgres}
       - REDIS_URL=redis://redis:6379/0
-      - SCHEMA=t_p29017774_avn_academy_training
+      - SCHEMA=${SCHEMA:-t_p29017774_avn_academy_training}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL}
       - HTTP_PROXY=${HTTP_PROXY}
@@ -61,13 +67,13 @@ services:
   supabase_functions:
     image: mirror.gcr.io/denoland/deno:alpine
     ports:
-      - "54321:54321"
+      - "127.0.0.1:54321:54321"
     volumes:
       - .:/app
     working_dir: /app/supabase/functions
     environment:
       - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/postgres}
-      - SCHEMA=t_p29017774_avn_academy_training
+      - SCHEMA=${SCHEMA:-t_p29017774_avn_academy_training}
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL}
@@ -80,23 +86,8 @@ services:
 
   redis:
     image: mirror.gcr.io/library/redis:7-alpine
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
-    restart: always
-
-  web:
-    image: node:20-alpine
-    working_dir: /app
-    ports:
-      - "3000:3000"
-    volumes:
-      - .:/app
-    environment:
-      - VITE_USE_MOCK=false
-      - VITE_TESTING_API_URL=http://localhost:8000
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 3000"
     restart: always
 
 volumes:

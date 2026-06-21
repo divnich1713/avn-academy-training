@@ -12,7 +12,9 @@ export type Section =
   | "ratings"
   | "instructors"
   | "testing"
-  | "testing-history";
+  | "testing-history"
+  | "simulator"
+  | "flashcards";
 
 export type UserRole = "head_avng" | "deputy_head" | "chief_instructor" | "senior_instructor" | "instructor" | "junior_instructor" | "cadet" | "dismissed" | "senior_ufsvng";
 
@@ -65,10 +67,22 @@ export const NAV_ITEMS: {
     roles: [],
   },
   {
+    id: "simulator",
+    label: "Тренажер ситуаций",
+    icon: "Target",
+    roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"],
+  },
+  {
+    id: "flashcards",
+    label: "Карточки законов",
+    icon: "Brain",
+    roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"],
+  },
+  {
     id: "promotions",
     label: "Повышение",
     icon: "Medal",
-    roles: ["cadet"],
+    roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"],
   },
   {
     id: "reports",

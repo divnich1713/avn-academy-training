@@ -5,7 +5,7 @@ from typing import List, Dict, Any
 from datetime import datetime
 
 from database import get_db
-from models import User, TestAttempt, TestAnswer, TestQuestion, StudentElo
+from models import User, TestAttempt, TestAnswer, TestQuestion, StudentElo, TestSettings
 from routers.test_engine import get_current_user
 
 router = APIRouter(prefix="/api/stats", tags=["Statistics"])
@@ -24,6 +24,18 @@ async def get_cadet_dashboard(
     res = await db.execute(stmt)
     attempts = res.scalars().all()
 
+    # Fetch all settings to have a lookup dictionary
+    settings_stmt = select(TestSettings)
+    settings_res = await db.execute(settings_stmt)
+    settings_list = settings_res.scalars().all()
+    settings_map = {
+        s.subject: {
+            "question_count": s.question_count,
+            "passing_score_percent": s.passing_score_percent
+        }
+        for s in settings_list
+    }
+
     attempts_history = []
     for att in attempts:
         # Calculate grade percentage
@@ -40,6 +52,8 @@ async def get_cadet_dashboard(
         
         avg_score = score / graded_count if graded_count > 0 else 0.0
 
+        subj_settings = settings_map.get(att.subject, {"question_count": 30, "passing_score_percent": 80})
+
         attempts_history.append({
             "id": att.id,
             "subject": att.subject,
@@ -50,7 +64,9 @@ async def get_cadet_dashboard(
             "warnings_count": att.warnings_count,
             "started_at": att.started_at.isoformat(),
             "completed_at": att.completed_at.isoformat() if att.completed_at else None,
-            "avg_score": round(avg_score, 1)
+            "avg_score": round(avg_score, 1),
+            "question_count": subj_settings["question_count"],
+            "passing_score_percent": subj_settings["passing_score_percent"]
         })
 
     # 2. Fetch user's ELO ratings per subject and calculate average mastery
@@ -117,6 +133,18 @@ async def get_admin_dashboard(
     res = await db.execute(stmt)
     rows = res.all()
 
+    # Fetch all settings to have a lookup dictionary
+    settings_stmt = select(TestSettings)
+    settings_res = await db.execute(settings_stmt)
+    settings_list = settings_res.scalars().all()
+    settings_map = {
+        s.subject: {
+            "question_count": s.question_count,
+            "passing_score_percent": s.passing_score_percent
+        }
+        for s in settings_list
+    }
+
     admin_attempts = []
     for att, name, static_id, rank, unit in rows:
         ans_stmt = select(TestAnswer).where(TestAnswer.attempt_id == att.id)
@@ -132,6 +160,8 @@ async def get_admin_dashboard(
         
         avg_score = score / graded_count if graded_count > 0 else 0.0
 
+        subj_settings = settings_map.get(att.subject, {"question_count": 30, "passing_score_percent": 80})
+
         admin_attempts.append({
             "attempt_id": att.id,
             "subject": att.subject,
@@ -145,7 +175,9 @@ async def get_admin_dashboard(
             "end_elo": att.end_elo,
             "score_percent": round(avg_score, 1),
             "started_at": att.started_at.isoformat(),
-            "completed_at": att.completed_at.isoformat() if att.completed_at else None
+            "completed_at": att.completed_at.isoformat() if att.completed_at else None,
+            "question_count": subj_settings["question_count"],
+            "passing_score_percent": subj_settings["passing_score_percent"]
         })
 
     return {"attempts": admin_attempts}

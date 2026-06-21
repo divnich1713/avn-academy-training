@@ -1,10 +1,17 @@
 // ─── Mock mode: если VITE_USE_MOCK=true — все вызовы идут в локальные заглушки ──
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
-let mockApi: typeof import("./mock-api") | null = null;
+let mockApiPromise: Promise<typeof import("./mock-api")> | null = null;
+
 if (USE_MOCK) {
   console.log("%c⚡ MOCK MODE — бэкенд не используется", "color: #f59e0b; font-weight: bold; font-size: 14px");
-  // Dynamic import only in mock mode — keeps mock-api out of production bundle
-  import("./mock-api").then(m => { mockApi = m; });
+  mockApiPromise = import("./mock-api");
+}
+
+function getMockApi() {
+  if (!mockApiPromise) {
+    mockApiPromise = import("./mock-api");
+  }
+  return mockApiPromise;
 }
 
 const API_BASE = "/supabase-api";
@@ -13,6 +20,7 @@ const ADMIN_URL = `${API_BASE}/admin-users`;
 const REQUESTS_URL = `${API_BASE}/requests`;
 const NOTIFICATIONS_URL = `${API_BASE}/notifications`;
 const PROMOTIONS_URL = `${API_BASE}/promotions`;
+const RATINGS_URL = `${API_BASE}/ratings`;
 
 export function getToken(): string | null {
   return localStorage.getItem("avng_token");
@@ -31,54 +39,87 @@ function authHeaders(): Record<string, string> {
   return token ? { "X-Session-Token": token } : {};
 }
 
+// Robust JSON fetch wrapper
+async function safeFetch(url: string, options: RequestInit = {}): Promise<any> {
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    let errMsg = `HTTP error ${res.status}`;
+    try {
+      const data = JSON.parse(text);
+      errMsg = data.error || data.detail || errMsg;
+    } catch {
+      if (text) {
+        errMsg = text.replace(/<[^>]*>/g, '').trim().substring(0, 150) || text.substring(0, 150);
+      }
+    }
+    throw new Error(errMsg);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : {};
+}
+
 export async function apiLogin(static_id: string, password: string) {
-  if (USE_MOCK && mockApi) return mockApi.apiLogin(static_id, password);
-  const res = await fetch(`${AUTH_URL}/?action=login`, {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.apiLogin(static_id, password);
+  }
+  return safeFetch(`${AUTH_URL}/?action=login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ static_id, password }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Ошибка входа");
-  return data as { token: string; user: User };
 }
 
 export async function apiMe(): Promise<User | null> {
-  if (USE_MOCK && mockApi) return mockApi.apiMe();
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.apiMe();
+  }
   const token = getToken();
   if (!token) return null;
-  const res = await fetch(`${AUTH_URL}/?action=me`, {
-    headers: { "X-Session-Token": token },
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.user as User;
+  try {
+    const data = await safeFetch(`${AUTH_URL}/?action=me`, {
+      headers: { "X-Session-Token": token },
+    });
+    return data.user as User;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchInstructors(): Promise<User[]> {
-  if (USE_MOCK && mockApi) return mockApi.fetchInstructors();
-  const res = await fetch(`${AUTH_URL}/?action=instructors`, { headers: authHeaders() });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.fetchInstructors();
+  }
+  const data = await safeFetch(`${AUTH_URL}/?action=instructors`, { headers: authHeaders() });
   return data.instructors;
 }
 
 export async function apiLogout() {
-  if (USE_MOCK && mockApi) return mockApi.apiLogout();
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.apiLogout();
+  }
   const token = getToken();
   if (!token) return;
-  await fetch(`${AUTH_URL}/?action=logout`, {
-    method: "POST",
-    headers: { "X-Session-Token": token },
-  });
-  removeToken();
+  try {
+    await safeFetch(`${AUTH_URL}/?action=logout`, {
+      method: "POST",
+      headers: { "X-Session-Token": token },
+    });
+  } finally {
+    removeToken();
+  }
 }
 
 export async function adminListUsers(): Promise<AdminUser[]> {
-  if (USE_MOCK && mockApi) return mockApi.adminListUsers();
-  const res = await fetch(ADMIN_URL, { headers: authHeaders() });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.adminListUsers();
+  }
+  const data = await safeFetch(ADMIN_URL, { headers: authHeaders() });
   return data.users;
 }
 
@@ -93,15 +134,15 @@ export async function adminCreateUser(payload: {
   discord_id?: string | null;
   avatar_url?: string | null;
 }) {
-  if (USE_MOCK && mockApi) return mockApi.adminCreateUser(payload);
-  const res = await fetch(ADMIN_URL, {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.adminCreateUser(payload);
+  }
+  return safeFetch(ADMIN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
-  return data;
 }
 
 export async function adminUpdateUser(id: number, payload: {
@@ -116,26 +157,26 @@ export async function adminUpdateUser(id: number, payload: {
   discord_id?: string | null;
   avatar_url?: string | null;
 }) {
-  if (USE_MOCK && mockApi) return mockApi.adminUpdateUser(id, payload);
-  const res = await fetch(`${ADMIN_URL}?id=${id}`, {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.adminUpdateUser(id, payload);
+  }
+  return safeFetch(`${ADMIN_URL}?id=${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
-  return data;
 }
 
 export async function adminRemoveUser(id: number) {
-  if (USE_MOCK && mockApi) return mockApi.adminRemoveUser(id);
-  const res = await fetch(`${ADMIN_URL}?id=${id}`, {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.adminRemoveUser(id);
+  }
+  return safeFetch(`${ADMIN_URL}?id=${id}`, {
     method: "DELETE",
-    headers: { ...authHeaders() },
+    headers: authHeaders(),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
-  return data;
 }
 
 export interface User {
@@ -174,6 +215,9 @@ export interface TrainingRequest {
   cadet_static_id: string;
   cadet_id: number;
   reviewer_name: string | null;
+  cadet_discord_id?: string | null;
+  instructor_id?: number | null;
+  target_instructor_name?: string | null;
 }
 
 export interface Grade {
@@ -192,10 +236,11 @@ export interface Grade {
 // ===== Requests API =====
 
 export async function fetchRequests(): Promise<TrainingRequest[]> {
-  if (USE_MOCK && mockApi) return mockApi.fetchRequests();
-  const res = await fetch(REQUESTS_URL, { headers: authHeaders() });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.fetchRequests();
+  }
+  const data = await safeFetch(REQUESTS_URL, { headers: authHeaders() });
   return data.requests;
 }
 
@@ -206,35 +251,37 @@ export async function createRequest(payload: {
   preferred_date?: string;
   discord_message_id?: string;
   discord_channel_id?: string;
+  instructor_id?: number;
 }) {
-  if (USE_MOCK && mockApi) return mockApi.createRequest(payload);
-  const res = await fetch(REQUESTS_URL, {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.createRequest(payload);
+  }
+  return safeFetch(REQUESTS_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
-  return data;
 }
 
 export async function reviewRequest(id: number, status: "approved" | "rejected", comment?: string) {
-  if (USE_MOCK && mockApi) return mockApi.reviewRequest(id, status, comment);
-  const res = await fetch(`${REQUESTS_URL}?action=review&id=${id}`, {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.reviewRequest(id, status, comment);
+  }
+  return safeFetch(`${REQUESTS_URL}?action=review&id=${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ status, comment }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
-  return data;
 }
 
 export async function fetchGrades(): Promise<Grade[]> {
-  if (USE_MOCK && mockApi) return mockApi.fetchGrades();
-  const res = await fetch(`${REQUESTS_URL}?action=grades`, { headers: authHeaders() });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.fetchGrades();
+  }
+  const data = await safeFetch(`${REQUESTS_URL}?action=grades`, { headers: authHeaders() });
   return data.grades;
 }
 
@@ -246,15 +293,15 @@ export async function createGrade(payload: {
   comment?: string;
   request_id?: number;
 }) {
-  if (USE_MOCK && mockApi) return mockApi.createGrade(payload);
-  const res = await fetch(`${REQUESTS_URL}?action=grade`, {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.createGrade(payload);
+  }
+  return safeFetch(`${REQUESTS_URL}?action=grade`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
-  return data;
 }
 
 // ===== Notifications API =====
@@ -270,26 +317,25 @@ export interface Notification {
 }
 
 export async function fetchNotifications(): Promise<{ notifications: Notification[]; unread_count: number }> {
-  if (USE_MOCK && mockApi) return mockApi.fetchNotifications();
-  const res = await fetch(NOTIFICATIONS_URL, { headers: authHeaders() });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
-  return data;
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.fetchNotifications();
+  }
+  return safeFetch(NOTIFICATIONS_URL, { headers: authHeaders() });
 }
 
 export async function markAllNotificationsRead() {
-  if (USE_MOCK && mockApi) return mockApi.markAllNotificationsRead();
-  const res = await fetch(`${NOTIFICATIONS_URL}?action=read`, {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.markAllNotificationsRead();
+  }
+  return safeFetch(`${NOTIFICATIONS_URL}?action=read`, {
     method: "PUT",
     headers: authHeaders(),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
-  return data;
 }
 
 // ===== Ratings API =====
-const RATINGS_URL = `${API_BASE}/ratings`;
 
 export interface InstructorRating {
   id: number;
@@ -306,22 +352,22 @@ export interface InstructorRating {
 }
 
 export async function fetchRatings(timeframe: "daily" | "weekly" | "monthly" | "yearly" = "weekly"): Promise<{ instructors: InstructorRating[] }> {
-  if (USE_MOCK && mockApi) return mockApi.fetchRatings(timeframe);
-  const res = await fetch(`${RATINGS_URL}?timeframe=${timeframe}`, { headers: authHeaders() });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
-  return data;
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.fetchRatings(timeframe);
+  }
+  return safeFetch(`${RATINGS_URL}?timeframe=${timeframe}`, { headers: authHeaders() });
 }
 
 export async function markNotificationRead(id: number) {
-  if (USE_MOCK && mockApi) return mockApi.markNotificationRead(id);
-  const res = await fetch(`${NOTIFICATIONS_URL}?action=read_one&id=${id}`, {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.markNotificationRead(id);
+  }
+  return safeFetch(`${NOTIFICATIONS_URL}?action=read_one&id=${id}`, {
     method: "PUT",
     headers: authHeaders(),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
-  return data;
 }
 
 // ===== Promotions API =====
@@ -358,55 +404,119 @@ export interface PromotionReport {
   cadet_rank: string;
   cadet_static_id: string;
   cadet_id: number;
+  cadet_discord_id?: string | null;
   reviewer_name: string | null;
 }
 
 export async function checkPromotionRequirements(type: PromotionType, cadetId?: number): Promise<PromotionCheckResult> {
-  if (USE_MOCK && mockApi) return mockApi.checkPromotionRequirements(type, cadetId);
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.checkPromotionRequirements(type, cadetId);
+  }
   let url = `${PROMOTIONS_URL}?action=check&type=${type}`;
   if (cadetId) url += `&cadet_id=${cadetId}`;
-  const res = await fetch(url, { headers: authHeaders() });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
-  return data;
+  return safeFetch(url, { headers: authHeaders() });
 }
 
 export async function fetchPromotionReports(): Promise<PromotionReport[]> {
-  if (USE_MOCK && mockApi) return mockApi.fetchPromotionReports();
-  const res = await fetch(PROMOTIONS_URL, { headers: authHeaders() });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.fetchPromotionReports();
+  }
+  const data = await safeFetch(PROMOTIONS_URL, { headers: authHeaders() });
   return data.reports;
 }
 
 export async function createPromotionReport(promotion_type: PromotionType) {
-  if (USE_MOCK && mockApi) return mockApi.createPromotionReport(promotion_type);
-  const res = await fetch(PROMOTIONS_URL, {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.createPromotionReport(promotion_type);
+  }
+  return safeFetch(PROMOTIONS_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ promotion_type }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
-  return data;
 }
 
 export async function reviewPromotionReport(id: number, status: "approved" | "rejected", comment?: string) {
-  if (USE_MOCK && mockApi) return mockApi.reviewPromotionReport(id, status, comment);
-  const res = await fetch(`${PROMOTIONS_URL}?action=review&id=${id}`, {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.reviewPromotionReport(id, status, comment);
+  }
+  return safeFetch(`${PROMOTIONS_URL}?action=review&id=${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ status, comment }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
-  return data;
+}
+
+export interface InstructorPromotionReport {
+  id: number;
+  user_id: number;
+  current_rank: string;
+  target_rank: string;
+  total_points: number;
+  items_completed: Array<{
+    num: number;
+    name: string;
+    points: number;
+    count: number;
+    links: string[];
+  }>;
+  status: "pending" | "approved" | "rejected";
+  instructor_comment: string | null;
+  reviewed_by: number | null;
+  reviewed_at: string | null;
+  created_at: string;
+  instructor_name?: string;
+  instructor_static_id?: string;
+  instructor_id?: number;
+  instructor_discord_id?: string | null;
+  reviewer_name?: string | null;
+}
+
+export async function fetchInstructorPromotionReports(): Promise<InstructorPromotionReport[]> {
+  if (USE_MOCK) {
+    return [];
+  }
+  const data = await safeFetch(`${PROMOTIONS_URL}?action=instructor_reports`, {
+    headers: authHeaders(),
+  });
+  return data.reports || [];
+}
+
+export async function submitInstructorPromotionReport(payload: {
+  current_rank: string;
+  target_rank: string;
+  total_points: number;
+  items_completed: any[];
+}) {
+  if (USE_MOCK) {
+    return { ok: true, id: Date.now() };
+  }
+  return safeFetch(`${PROMOTIONS_URL}?action=submit_instructor_report`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function reviewInstructorPromotionReport(id: number, status: "approved" | "rejected", comment: string) {
+  if (USE_MOCK) {
+    return { ok: true };
+  }
+  return safeFetch(`${PROMOTIONS_URL}?action=review_instructor_report&id=${id}`, {
+    method: "PUT",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ status, comment }),
+  });
 }
 
 export async function fetchDiscordProfile(discordId: string) {
-  if (USE_MOCK && mockApi) return mockApi.fetchDiscordProfile(discordId);
-  const res = await fetch(`${AUTH_URL}/?action=discord&id=${discordId}`);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Failed to load Discord profile");
-  return data;
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.fetchDiscordProfile(discordId);
+  }
+  return safeFetch(`${AUTH_URL}/?action=discord&id=${discordId}`);
 }

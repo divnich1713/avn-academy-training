@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
-import { apiLogout, apiMe, fetchRequests, createRequest, TrainingRequest, User } from "@/lib/api";
+import { apiLogout, apiMe, fetchRequests, createRequest, TrainingRequest, User, fetchInstructors } from "@/lib/api";
 import { testingApi, Question, ActiveSession } from "@/lib/testingApi";
 import { toast } from "sonner";
 import { fmtStaticId } from "./SectionsShared";
-import { sendTestCompletedDiscord } from "@/lib/discord";
+import { sendTestCompletedDiscord, sendGeneralRequestDiscord } from "@/lib/discord";
 
 export function TestingSystem() {
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [loading, setLoading] = useState(true);
+  const [instructors, setInstructors] = useState<User[]>([]);
+  const [selectedInstructorId, setSelectedInstructorId] = useState<string>("");
   
   // Starting config state
   const [subject, setSubject] = useState("Тест по ФЗ ФСВНГ и уставу ФСВНГ");
@@ -73,6 +75,10 @@ export function TestingSystem() {
     try {
       const me = await apiMe();
       setAuthUser(me);
+
+      fetchInstructors().then((data) => {
+        setInstructors(data || []);
+      }).catch(err => console.error("Error fetching instructors for testing system:", err));
 
       const session = await testingApi.getActiveSession();
       setActiveSession(session);
@@ -259,10 +265,27 @@ export function TestingSystem() {
   async function handleRequestAccess() {
     if (!authUser) return;
     try {
+      const selectedInst = instructors.find(i => i.id === Number(selectedInstructorId));
+      const instructorName = selectedInst ? `${selectedInst.rank} ${selectedInst.name}` : undefined;
+
+      sendGeneralRequestDiscord({
+        name: authUser.name,
+        rank: authUser.rank,
+        staticId: authUser.static_id,
+        unit: authUser.unit || "АВНГ",
+        typeLabel: "Экзамен",
+        subject: `Допуск к тесту: ${subject}`,
+        preferredDate: new Date().toLocaleDateString("sv-SE"),
+        details: `Прошу выдать допуск к прохождению тестирования по теме: ${subject}`,
+        cadetDiscordId: authUser.discord_id || undefined,
+        instructorName
+      }).catch(err => console.error("Discord error:", err));
+
       await createRequest({
         type: "exam",
         subject: `Допуск к тесту: ${subject}`,
-        description: `Прошу выдать допуск к прохождению тестирования по теме: ${subject}`
+        description: `Прошу выдать допуск к прохождению тестирования по теме: ${subject}`,
+        instructor_id: selectedInstructorId ? Number(selectedInstructorId) : undefined
       });
       toast.success("Запрос на допуск успешно отправлен инструктору!");
       checkAccess(subject);
@@ -391,7 +414,8 @@ export function TestingSystem() {
             totalQuestions: res.certificate.total_questions,
             percent: res.certificate.percentage,
             grade: res.certificate.grade,
-            passed: res.certificate.passed
+            passed: res.certificate.passed,
+            cadetDiscordId: authUser?.discord_id || undefined
           }).catch(err => console.error("Discord error:", err));
         } else {
           loadSession();
@@ -451,7 +475,8 @@ export function TestingSystem() {
             totalQuestions: res.certificate.total_questions,
             percent: res.certificate.percentage,
             grade: res.certificate.grade,
-            passed: res.certificate.passed
+            passed: res.certificate.passed,
+            cadetDiscordId: authUser?.discord_id || undefined
           }).catch(err => console.error("Discord error:", err));
         } else {
           loadSession();
@@ -876,6 +901,24 @@ export function TestingSystem() {
               ))}
             </select>
           </div>
+
+          {!checkingAccess && !rankLockMessage && !isAttemptsExceeded && !hasApproval && !pendingRequest && (
+            <div>
+              <label className="text-[10px] font-mono text-muted-foreground uppercase block mb-1">Выберите инструктора (необязательно)</label>
+              <select
+                value={selectedInstructorId}
+                onChange={(e) => setSelectedInstructorId(e.target.value)}
+                className="w-full bg-tactical-panel border border-tactical-border text-foreground font-mono text-xs p-2.5 focus:outline-none focus:border-primary"
+              >
+                <option value="">Любой инструктор</option>
+                {instructors.map((inst) => (
+                  <option key={inst.id} value={String(inst.id)}>
+                    {inst.rank ? `${inst.rank} ` : ""}{inst.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {checkingAccess ? (
             <div className="flex items-center justify-center py-4 gap-2 text-xs font-mono text-muted-foreground">

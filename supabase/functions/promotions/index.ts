@@ -13,8 +13,8 @@ const PROMOTION_REQUIREMENTS: Record<string, {
   items: { category: string; label: string; type: string; subject: string }[];
 }> = {
   junior_sergeant: {
-    label: "Мл. Сержант",
-    rank: "Мл. Сержант",
+    label: "Младший Сержант",
+    rank: "Младший Сержант",
     items: [
       { category: "Подготовка", label: "Строевая, физическая и огневая подготовка", type: "practice", subject: "Строевая, физическая и огневая подготовка" },
       { category: "Подготовка", label: "Присяга", type: "practice", subject: "Присяга" },
@@ -158,7 +158,7 @@ async function checkRequirements(
   };
 }
 
-Deno.serve(async (req) => {
+export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response("", { headers: CORS_HEADERS, status: 200 });
   }
@@ -223,6 +223,58 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ===== GET /promotions?action=instructor_reports =====
+    if (method === "GET" && action === "instructor_reports") {
+      let query = "";
+      const params: any[] = [];
+      const isLeadership = (r: string) => ["head_avng", "chief_instructor", "deputy_head"].includes(r);
+      if (isLeadership(user.role)) {
+        query = `
+          SELECT ipr.id, ipr.current_rank, ipr.target_rank, ipr.total_points, ipr.items_completed,
+                 ipr.status, ipr.instructor_comment, ipr.reviewed_at, ipr.created_at,
+                 u.name as instructor_name, u.static_id as instructor_static_id,
+                 u.id as instructor_id, u.discord_id as instructor_discord_id,
+                 rv.name as reviewer_name
+          FROM ${SCHEMA}.instructor_promotion_reports ipr
+          JOIN ${SCHEMA}.users u ON ipr.user_id = u.id
+          LEFT JOIN ${SCHEMA}.users rv ON ipr.reviewed_by = rv.id
+          ORDER BY ipr.created_at DESC
+        `;
+      } else {
+        query = `
+          SELECT ipr.id, ipr.current_rank, ipr.target_rank, ipr.total_points, ipr.items_completed,
+                 ipr.status, ipr.instructor_comment, ipr.reviewed_at, ipr.created_at,
+                 u.name as instructor_name, u.static_id as instructor_static_id,
+                 u.id as instructor_id, u.discord_id as instructor_discord_id,
+                 rv.name as reviewer_name
+          FROM ${SCHEMA}.instructor_promotion_reports ipr
+          JOIN ${SCHEMA}.users u ON ipr.user_id = u.id
+          LEFT JOIN ${SCHEMA}.users rv ON ipr.reviewed_by = rv.id
+          WHERE ipr.user_id = $1
+          ORDER BY ipr.created_at DESC
+        `;
+        params.push(user.id);
+      }
+
+      const res = await client.queryObject<any>(query, params);
+      const reports = res.rows.map(row => {
+        const item = { ...row };
+        if (item.created_at) item.created_at = new Date(item.created_at).toISOString();
+        if (item.reviewed_at) item.reviewed_at = new Date(item.reviewed_at).toISOString();
+        if (typeof item.items_completed === "string") {
+          try {
+            item.items_completed = JSON.parse(item.items_completed);
+          } catch (_) {}
+        }
+        return item;
+      });
+
+      return new Response(JSON.stringify({ reports }), {
+        status: 200,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    }
+
     // ===== GET /promotions — список рапортов на повышение =====
     if (method === "GET" && !action) {
       let query = "";
@@ -234,6 +286,7 @@ Deno.serve(async (req) => {
                  pr.reviewed_at, pr.created_at,
                  u.name as cadet_name, u.rank as cadet_rank, u.static_id as cadet_static_id,
                  u.id as cadet_id,
+                 u.discord_id as cadet_discord_id,
                  rv.name as reviewer_name
           FROM ${SCHEMA}.promotion_reports pr
           JOIN ${SCHEMA}.users u ON pr.user_id = u.id
@@ -246,6 +299,7 @@ Deno.serve(async (req) => {
                  pr.reviewed_at, pr.created_at,
                  u.name as cadet_name, u.rank as cadet_rank, u.static_id as cadet_static_id,
                  u.id as cadet_id,
+                 u.discord_id as cadet_discord_id,
                  rv.name as reviewer_name
           FROM ${SCHEMA}.promotion_reports pr
           JOIN ${SCHEMA}.users u ON pr.user_id = u.id
@@ -350,6 +404,59 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ===== POST /promotions?action=submit_instructor_report =====
+    if (method === "POST" && action === "submit_instructor_report") {
+      const body = await req.json().catch(() => ({}));
+      const currentRank = String(body.current_rank || "").trim();
+      const targetRank = String(body.target_rank || "").trim();
+      const totalPoints = Number(body.total_points || 0);
+      const itemsCompleted = body.items_completed || [];
+
+      if (!currentRank || !targetRank || totalPoints <= 0) {
+        return new Response(JSON.stringify({ error: "Неверные параметры рапорта" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      // Проверка: нет pending рапорта
+      const pendingRes = await client.queryObject<{ id: number }>(
+        `SELECT id FROM ${SCHEMA}.instructor_promotion_reports
+         WHERE user_id = $1 AND status = 'pending'`,
+        [user.id]
+      );
+      if (pendingRes.rows.length > 0) {
+        return new Response(JSON.stringify({ error: "У вас уже есть ожидающий рапорт на рассмотрении" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      const insertRes = await client.queryObject<{ id: number }>(
+        `INSERT INTO ${SCHEMA}.instructor_promotion_reports (user_id, current_rank, target_rank, total_points, items_completed)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [user.id, currentRank, targetRank, totalPoints, JSON.stringify(itemsCompleted)]
+      );
+      const newId = insertRes.rows[0].id;
+
+      // Уведомление руководству
+      await client.queryArray(
+        `INSERT INTO ${SCHEMA}.notifications (user_id, type, title, message)
+         SELECT id, 'instructor_promotion_request', $1, $2
+         FROM ${SCHEMA}.users
+         WHERE role IN ('head_avng', 'chief_instructor', 'deputy_head')`,
+        [
+          `Рапорт инструктора: ${targetRank}`,
+          `${user.rank} ${user.name} подал рапорт на повышение до ${targetRank} (${totalPoints} баллов).`
+        ]
+      );
+
+      return new Response(JSON.stringify({ success: true, id: newId }), {
+        status: 200,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    }
+
     // ===== PUT /promotions?action=review&id=N — инструктор рассматривает рапорт =====
     if (method === "PUT" && action === "review") {
         const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"].includes(r);
@@ -444,6 +551,96 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ===== PUT /promotions?action=review_instructor_report =====
+    if (method === "PUT" && action === "review_instructor_report") {
+      const isLeadership = (r: string) => ["head_avng", "chief_instructor", "deputy_head"].includes(r);
+      if (!isLeadership(user.role)) {
+        return new Response(JSON.stringify({ error: "Только для руководства АВНГ" }), {
+          status: 403,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      const reportId = url.searchParams.get("id");
+      if (!reportId || !/^\d+$/.test(reportId)) {
+        return new Response(JSON.stringify({ error: "Неверный ID рапорта" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      const body = await req.json().catch(() => ({}));
+      const status = body.status;
+      const comment = String(body.comment || "").trim();
+
+      if (status !== "approved" && status !== "rejected") {
+        return new Response(JSON.stringify({ error: "Статус: approved или rejected" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      // Получить рапорт
+      const reportRes = await client.queryObject<{
+        id: number;
+        user_id: number;
+        target_rank: string;
+        status: string;
+      }>(
+        `SELECT id, user_id, target_rank, status FROM ${SCHEMA}.instructor_promotion_reports WHERE id = $1`,
+        [Number(reportId)]
+      );
+
+      if (reportRes.rows.length === 0) {
+        return new Response(JSON.stringify({ error: "Рапорт не найден" }), {
+          status: 404,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      const report = reportRes.rows[0];
+      if (report.status !== "pending") {
+        return new Response(JSON.stringify({ error: "Рапорт уже рассмотрен" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      // Обновить рапорт
+      await client.queryArray(
+        `UPDATE ${SCHEMA}.instructor_promotion_reports
+         SET status = $1, instructor_comment = $2, reviewed_by = $3, reviewed_at = NOW()
+         WHERE id = $4`,
+        [status, comment || null, user.id, Number(reportId)]
+      );
+
+      // Если одобрено — обновить звание инструктора
+      if (status === "approved") {
+        await client.queryArray(
+          `UPDATE ${SCHEMA}.users SET rank = $1 WHERE id = $2`,
+          [report.target_rank, report.user_id]
+        );
+      }
+
+      // Уведомление инструктору
+      const statusText = status === "approved" ? "одобрен" : "отклонён";
+      let notifMessage = `Руководство АВНГ ${statusText} ваш рапорт на повышение до ${report.target_rank}.`;
+      if (comment) {
+        notifMessage += ` Комментарий: ${comment}`;
+      }
+
+      await client.queryArray(
+        `INSERT INTO ${SCHEMA}.notifications (user_id, type, title, message)
+         VALUES ($1, $2, $3, $4)`,
+        [report.user_id, "promotion_reviewed", `Рапорт ${statusText}`, notifMessage]
+      );
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    }
+
     return new Response(JSON.stringify({ error: "Не найдено" }), {
       status: 404,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
@@ -460,4 +657,8 @@ Deno.serve(async (req) => {
       client.release();
     }
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handler);
+}

@@ -1,15 +1,27 @@
+import React, { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import LoginPage from "./components/academy/LoginPage";
 import { useAuth } from "./lib/useAuth";
 import Icon from "@/components/ui/icon";
 
-const queryClient = new QueryClient();
+// Lazy-load pages
+const Index = lazy(() => import("./pages/Index"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const LoginPage = lazy(() => import("./components/academy/LoginPage"));
+
+// Configure default cache options for optimization
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30 * 1000, // Consider data fresh for 30 seconds
+      gcTime: 5 * 60 * 1000, // Keep unused cache for 5 minutes (gcTime replaces cacheTime in react-query v5)
+      refetchOnWindowFocus: false, // Prevent redundant background refetches
+    },
+  },
+});
 
 function AppContent() {
   const { user, loading, login, reloadUser, logout } = useAuth();
@@ -26,15 +38,29 @@ function AppContent() {
   }
 
   if (!user) {
-    return <LoginPage onLogin={(u, _token) => login(u)} />;
+    return (
+      <Suspense fallback={
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <Icon name="Loader2" size={32} className="text-primary animate-spin" />
+        </div>
+      }>
+        <LoginPage onLogin={(u, _token) => login(u)} />
+      </Suspense>
+    );
   }
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Index authUser={user} onLogout={logout} onReloadUser={reloadUser} />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <Suspense fallback={
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <Icon name="Loader2" size={32} className="text-primary animate-spin" />
+        </div>
+      }>
+        <Routes>
+          <Route path="/" element={<Index authUser={user} onLogout={logout} onReloadUser={reloadUser} />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

@@ -6,6 +6,153 @@ import { User, fetchDiscordProfile, TrainingRequest } from "@/lib/api";
 import { useRequests, useGrades, useInstructors, useRatings, usePromotionReports } from "@/lib/useQueries";
 import { MOCK_MATERIALS } from "./types";
 import { TYPE_LABEL, fmt, Spinner, Empty, RequestSection, fmtStaticId, renderTextWithLinks } from "./SectionsShared";
+import { testingApi } from "@/lib/testingApi";
+
+export interface UserGamificationStats {
+  kppHours: number;
+  krazAttacks: number;
+  lecturesConducted: number;
+}
+
+export function getUserBadgeStats(userId: number | string): UserGamificationStats {
+  try {
+    const saved = localStorage.getItem(`avng_gamification_stats_${userId}`);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return {
+        kppHours: Number(parsed.kppHours || 0),
+        krazAttacks: Number(parsed.krazAttacks || 0),
+        lecturesConducted: Number(parsed.lecturesConducted || 0),
+      };
+    }
+  } catch (e) {
+    console.error("Error reading gamification stats", e);
+  }
+  return { kppHours: 0, krazAttacks: 0, lecturesConducted: 0 };
+}
+
+export function saveUserBadgeStats(userId: number | string, stats: UserGamificationStats) {
+  try {
+    localStorage.setItem(`avng_gamification_stats_${userId}`, JSON.stringify(stats));
+  } catch (e) {
+    console.error("Error saving gamification stats", e);
+  }
+}
+
+export function calculateUserXP({
+  userId,
+  grades,
+  attempts,
+  stats,
+}: {
+  userId: number | string;
+  grades: any[];
+  attempts: any[];
+  stats: UserGamificationStats;
+}) {
+  let gradesXp = 0;
+  const cadetGrades = grades.filter((g) => g.cadet_id === userId && g.grade >= 3);
+  cadetGrades.forEach((g) => {
+    if (g.type === "lecture" || g.type === "practice") {
+      gradesXp += 50;
+    } else if (g.type === "exam") {
+      gradesXp += 100;
+    }
+  });
+
+  const passedSubjects = new Set<string>();
+  attempts.forEach((att) => {
+    const score = att.avg_score !== undefined ? att.avg_score : (att.score_percent !== undefined ? att.score_percent : 0);
+    if (score >= 80 && att.status === "completed") {
+      passedSubjects.add(att.subject);
+    }
+  });
+  const testsXp = passedSubjects.size * 40;
+
+  let simulatorXp = 0;
+  try {
+    const savedSim = localStorage.getItem("avng_completed_scenarios");
+    if (savedSim) {
+      const parsedSim = JSON.parse(savedSim);
+      const passedCount = Object.values(parsedSim).filter((s: any) => s.passed).length;
+      simulatorXp = passedCount * 30;
+    }
+  } catch (e) {
+    console.error("Error reading simulator progress for XP:", e);
+  }
+
+  let flashcardsXp = 0;
+  try {
+    const savedLearned = localStorage.getItem("avn_flashcards_learned");
+    const learnedStats = savedLearned ? JSON.parse(savedLearned) : {};
+    const savedDecks = localStorage.getItem("avng_custom_flashcards_decks");
+    const deckSizes: Record<string, number> = {
+      "uk-rf": 5,
+      "koap-rf": 4,
+      "pk-rf": 5,
+      "ustav-avng": 5,
+    };
+    if (savedDecks) {
+      try {
+        const parsedDecks = JSON.parse(savedDecks);
+        parsedDecks.forEach((d: any) => {
+          deckSizes[d.id] = (d.cards || []).length;
+        });
+      } catch {}
+    }
+    Object.keys(deckSizes).forEach((deckId) => {
+      const totalCards = deckSizes[deckId];
+      const learnedCards = learnedStats[deckId] || [];
+      if (totalCards > 0 && learnedCards.length === totalCards) {
+        flashcardsXp += 30;
+      }
+    });
+  } catch (e) {
+    console.error("Error reading flashcards progress for XP:", e);
+  }
+
+  const has100PercentTest = attempts.some((att) => {
+    const score = att.avg_score !== undefined ? att.avg_score : (att.score_percent !== undefined ? att.score_percent : 0);
+    return score === 100 && att.status === "completed";
+  });
+
+  const isKppUnlocked = stats.kppHours >= 10;
+  const isExcellentUnlocked = has100PercentTest;
+  const isKrazUnlocked = stats.krazAttacks >= 5;
+  const isMentorUnlocked = stats.lecturesConducted >= 20;
+
+  let achievementXp = 0;
+  if (isKppUnlocked) achievementXp += 100;
+  if (isExcellentUnlocked) achievementXp += 100;
+  if (isKrazUnlocked) achievementXp += 100;
+  if (isMentorUnlocked) achievementXp += 100;
+
+  const totalXp = gradesXp + testsXp + simulatorXp + flashcardsXp + achievementXp;
+
+  return {
+    totalXp,
+    unlockedBadges: {
+      kpp: isKppUnlocked,
+      excellent: isExcellentUnlocked,
+      kraz: isKrazUnlocked,
+      mentor: isMentorUnlocked,
+    }
+  };
+}
+
+export function calculateLevel(xp: number) {
+  if (xp < 150) {
+    return { level: 1, title: "Рядовой Академии", minXp: 0, maxXp: 150 };
+  } else if (xp < 400) {
+    return { level: 2, title: "Младший Курсант", minXp: 150, maxXp: 400 };
+  } else if (xp < 800) {
+    return { level: 3, title: "Курсант АВНГ", minXp: 400, maxXp: 800 };
+  } else if (xp < 1300) {
+    return { level: 4, title: "Старший Курсант", minXp: 800, maxXp: 1300 };
+  } else {
+    return { level: 5, title: "Элита АВНГ", minXp: 1300, maxXp: 1300 };
+  }
+}
 
 // P2-10: Lazy-load individual memos — each ~10-20KB, only loaded when opened
 const PatrolMemo = lazy(() => import("./MaterialsMemos").then(m => ({ default: m.PatrolMemo })));
@@ -40,6 +187,19 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
   // P1-6: React Query — cached, deduplicated, auto-refetch
   const { data: requests = [] } = useRequests();
   const { data: grades = [] } = useGrades();
+  const [attempts, setAttempts] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (authUser.role === "cadet") {
+      testingApi.getCadetDashboard()
+        .then((data) => {
+          setAttempts(data.attempts || []);
+        })
+        .catch((err) => {
+          console.error("Error fetching cadet testing attempts on dashboard:", err);
+        });
+    }
+  }, [authUser]);
 
 
   const myGrades = grades.filter((g) => g.cadet_id === authUser.id);
@@ -113,6 +273,74 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
           </div>
         </div>
       </div>
+
+      {/* Level & XP Progress Section */}
+      {authUser.role !== "cadet" && (() => {
+        const stats = getUserBadgeStats(authUser.id);
+        const { totalXp, unlockedBadges } = calculateUserXP({
+          userId: authUser.id,
+          grades,
+          attempts,
+          stats,
+        });
+        const { level, title, minXp, maxXp } = calculateLevel(totalXp);
+        const unlockedCount = Object.values(unlockedBadges).filter(Boolean).length;
+        
+        const isMaxLevel = level === 5;
+        const levelRange = maxXp - minXp;
+        const progressXp = totalXp - minXp;
+        const percent = isMaxLevel ? 100 : Math.min(100, Math.max(0, (progressXp / levelRange) * 100));
+
+        return (
+          <div className="border border-tactical-border/60 bg-tactical-panel/40 p-4 md:p-5 corner-mark relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-in">
+            <div 
+              className="absolute right-0 top-0 bottom-0 w-64 bg-gradient-to-l from-amber-500/5 to-transparent pointer-events-none" 
+            />
+            
+            <div className="flex items-center gap-4 relative z-10">
+              <div className="w-14 h-14 border border-amber-500/40 bg-gradient-to-b from-amber-950/40 to-yellow-950/20 flex flex-col items-center justify-center rounded-lg shadow-[0_0_15px_rgba(245,158,11,0.15)] select-none">
+                <span className="text-[10px] font-mono text-amber-500 uppercase tracking-widest leading-none font-bold">УРОВЕНЬ</span>
+                <span className="font-oswald text-2xl font-bold text-yellow-400 mt-1 leading-none">{level}</span>
+              </div>
+              <div>
+                <h4 className="font-oswald text-base font-bold text-foreground tracking-wider uppercase flex items-center gap-2">
+                  {title}
+                  <span className="text-xs font-mono text-amber-500 font-semibold lowercase">
+                    ({totalXp} XP)
+                  </span>
+                </h4>
+                <p className="text-xs text-muted-foreground font-ibm mt-0.5">
+                  {isMaxLevel ? "Достигнут максимальный уровень академии" : `До следующего уровня: ${maxXp - totalXp} XP`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex-1 max-w-xl relative z-10 w-full">
+              <div className="flex justify-between text-[10px] font-mono text-muted-foreground uppercase mb-1">
+                <span>Lvl {level}</span>
+                <span>{isMaxLevel ? `${totalXp} XP` : `${totalXp} / ${maxXp} XP`}</span>
+                {!isMaxLevel && <span>Lvl {level + 1}</span>}
+              </div>
+              <div className="w-full h-3 border border-tactical-border bg-black/40 overflow-hidden p-[2px]">
+                <div 
+                  className="h-full bg-gradient-to-r from-amber-600 to-yellow-400 shadow-[0_0_10px_rgba(251,191,36,0.3)] transition-all duration-500 ease-out"
+                  style={{ width: `${percent}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 md:pl-4 shrink-0 relative z-10">
+              <div className="w-8 h-8 border border-tactical-border/60 bg-tactical-card flex items-center justify-center text-yellow-500">
+                <Icon name="Award" size={16} />
+              </div>
+              <div>
+                <div className="text-[10px] font-mono text-muted-foreground uppercase leading-none">НАГРАДЫ</div>
+                <div className="font-oswald text-base font-bold text-foreground mt-1 leading-none">{unlockedCount} / 4</div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Call to Action Banner - Memos reading guidance */}
       <div className="relative overflow-hidden border border-yellow-600/40 bg-yellow-950/10 p-4 corner-mark flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in">
@@ -603,9 +831,13 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
   const [webhookInput, setWebhookInput] = useState(() => localStorage.getItem("avng_discord_webhook_url") || "");
   const [dismissalWebhook, setDismissalWebhook] = useState(() => localStorage.getItem("avng_discord_dismissal_webhook_url") || "");
   const [promotionWebhook, setPromotionWebhook] = useState(() => localStorage.getItem("avng_discord_promotion_webhook_url") || "");
+  const [instructorPromotionWebhook, setInstructorPromotionWebhook] = useState(() => localStorage.getItem("avng_discord_instructor_promotion_webhook_url") || "");
   const [testWebhook, setTestWebhook] = useState(() => localStorage.getItem("avng_discord_test_webhook_url") || "");
   const [requestWebhook, setRequestWebhook] = useState(() => localStorage.getItem("avng_discord_request_webhook_url") || "");
   const [pingRoleId, setPingRoleId] = useState(() => localStorage.getItem("avng_discord_ping_role_id") || "");
+  const [chiefInstructorRoleId, setChiefInstructorRoleId] = useState(() => localStorage.getItem("avng_discord_chief_instructor_role_id") || "");
+  const [headAvngRoleId, setHeadAvngRoleId] = useState(() => localStorage.getItem("avng_discord_head_avng_role_id") || "");
+  const [deputyHeadRoleId, setDeputyHeadRoleId] = useState(() => localStorage.getItem("avng_discord_deputy_head_role_id") || "");
 
   const [discordProfile, setDiscordProfile] = useState<{
     username: string;
@@ -616,6 +848,147 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
 
 
   const displayUser = targetUser || authUser;
+
+  const [attempts, setAttempts] = useState<any[]>([]);
+  const [stats, setStats] = useState<UserGamificationStats>(() => getUserBadgeStats(displayUser.id));
+
+  // Sync stats when displayUser.id changes
+  useEffect(() => {
+    setStats(getUserBadgeStats(displayUser.id));
+  }, [displayUser.id]);
+
+  useEffect(() => {
+    if (displayUser.role === "cadet") {
+      if (authUser.id === displayUser.id) {
+        testingApi.getCadetDashboard()
+          .then((data) => {
+            setAttempts(data.attempts || []);
+          })
+          .catch((err) => {
+            console.error("Error fetching cadet testing attempts:", err);
+          });
+      } else {
+        testingApi.getAdminDashboard()
+          .then((data) => {
+            const cadetAttempts = (data.attempts || []).filter((att: any) => 
+              att.static_id === displayUser.static_id || 
+              (att.cadet_name && att.cadet_name.toLowerCase().includes(displayUser.name.toLowerCase()))
+            );
+            const mapped = cadetAttempts.map((att: any) => ({
+              ...att,
+              avg_score: att.score_percent,
+            }));
+            setAttempts(mapped);
+          })
+          .catch((err) => {
+            console.error("Error fetching admin testing attempts:", err);
+          });
+      }
+    }
+  }, [authUser, displayUser]);
+
+  const adjustStat = (field: keyof UserGamificationStats, amount: number) => {
+    const displayUserId = displayUser.id;
+    const currentStats = getUserBadgeStats(displayUserId);
+    const newValue = Math.max(0, currentStats[field] + amount);
+    const updatedStats = {
+      ...currentStats,
+      [field]: newValue,
+    };
+    
+    const oldUnlocked = {
+      kpp: currentStats.kppHours >= 10,
+      kraz: currentStats.krazAttacks >= 5,
+      mentor: currentStats.lecturesConducted >= 20,
+    };
+    
+    const newUnlocked = {
+      kpp: updatedStats.kppHours >= 10,
+      kraz: updatedStats.krazAttacks >= 5,
+      mentor: updatedStats.lecturesConducted >= 20,
+    };
+
+    saveUserBadgeStats(displayUserId, updatedStats);
+    setStats(updatedStats);
+
+    if (!oldUnlocked.kpp && newUnlocked.kpp) {
+      toast.success(`Достижение «Кремень» разблокировано для ${displayUser.name}! (+100 XP)`);
+    }
+    if (!oldUnlocked.kraz && newUnlocked.kraz) {
+      toast.success(`Достижение «Железный кулак» разблокировано для ${displayUser.name}! (+100 XP)`);
+    }
+    if (!oldUnlocked.mentor && newUnlocked.mentor) {
+      toast.success(`Достижение «Наставник» разблокировано для ${displayUser.name}! (+100 XP)`);
+    }
+  };
+
+  const badgesList = useMemo(() => {
+    const kppVal = stats.kppHours;
+    const isKppUnlocked = kppVal >= 10;
+    
+    const has100PercentTest = attempts.some((att) => {
+      const score = att.avg_score !== undefined ? att.avg_score : (att.score_percent !== undefined ? att.score_percent : 0);
+      return score === 100 && att.status === "completed";
+    });
+    const isExcellentUnlocked = has100PercentTest;
+
+    const krazVal = stats.krazAttacks;
+    const isKrazUnlocked = krazVal >= 5;
+
+    const mentorVal = stats.lecturesConducted;
+    const isMentorUnlocked = mentorVal >= 20;
+
+    return [
+      {
+        id: "kpp" as const,
+        field: "kppHours" as const,
+        title: "🎖️ «Кремень»",
+        desc: "Отстоять на КПП в сумме 10 часов.",
+        current: kppVal,
+        target: 10,
+        unlocked: isKppUnlocked,
+        icon: "Clock",
+        colorClass: "border-amber-500/50 bg-amber-950/20 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.15)]",
+        label: "КПП: "
+      },
+      {
+        id: "excellent" as const,
+        field: null,
+        title: "🎖️ «Отличник»",
+        desc: "Сдать теоретический тест на 100% с первого раза.",
+        current: isExcellentUnlocked ? 1 : 0,
+        target: 1,
+        unlocked: isExcellentUnlocked,
+        icon: "Award",
+        colorClass: "border-yellow-500/50 bg-yellow-950/20 text-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.15)]",
+        label: "Тесты: "
+      },
+      {
+        id: "kraz" as const,
+        field: "krazAttacks" as const,
+        title: "🎖️ «Железный кулак»",
+        desc: "Успешно отбить 5 нападений на КРАЗ/поставки.",
+        current: krazVal,
+        target: 5,
+        unlocked: isKrazUnlocked,
+        icon: "Shield",
+        colorClass: "border-red-500/50 bg-red-950/20 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.15)]",
+        label: "Поставки: "
+      },
+      {
+        id: "mentor" as const,
+        field: "lecturesConducted" as const,
+        title: "🎖️ «Наставник»",
+        desc: "Провести 20 лекций/практик для новобранцев (для инструкторов).",
+        current: mentorVal,
+        target: 20,
+        unlocked: isMentorUnlocked,
+        icon: "GraduationCap",
+        colorClass: "border-emerald-500/50 bg-emerald-950/20 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)]",
+        label: "Занятия: "
+      }
+    ];
+  }, [stats, attempts, displayUser.name]);
 
   // P1-6: React Query — cached, deduplicated, shared with other sections
   const { data: allRequests = [], isLoading: loadingR } = useRequests();
@@ -692,7 +1065,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
           id: `promotion-${rep.id}`,
           type: "promotion",
           title: rep.status === "approved" ? "Одобрил рапорт на повышение" : "Отклонил рапорт на повышение",
-          subtitle: `${rep.cadet_rank} ${rep.cadet_name} до звания ${rep.promotion_type === "junior_sergeant" ? "Мл. Сержант" : "Сержант"}`,
+          subtitle: `${rep.cadet_rank} ${rep.cadet_name} до звания ${rep.promotion_type === "junior_sergeant" ? "Младший Сержант" : "Сержант"}`,
           date: rep.reviewed_at || rep.created_at,
           meta: rep.instructor_comment,
         });
@@ -867,6 +1240,134 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
           </div>
         </div>
       </div>
+
+      {/* Боевые награды и достижения */}
+      {displayUser.role !== "cadet" && (
+        <div className="bg-tactical-card border border-tactical-border p-4 mt-6 animate-fade-in">
+          <h3 className="font-oswald text-sm tracking-widest uppercase text-muted-foreground mb-4 flex items-center gap-2">
+            <Icon name="Award" size={16} className="text-yellow-500" />
+            Боевые награды и достижения
+          </h3>
+          
+          {(() => {
+            const { totalXp } = calculateUserXP({
+              userId: displayUser.id,
+              grades,
+              attempts,
+              stats,
+            });
+            const { level, title, minXp, maxXp } = calculateLevel(totalXp);
+            const isMaxLevel = level === 5;
+            const levelRange = maxXp - minXp;
+            const progressXp = totalXp - minXp;
+            const percent = isMaxLevel ? 100 : Math.min(100, Math.max(0, (progressXp / levelRange) * 100));
+
+            return (
+              <div className="border border-tactical-border/40 bg-tactical-panel/30 p-4 mb-5 corner-mark flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="w-10 h-10 border border-amber-500/30 bg-amber-950/20 flex flex-col items-center justify-center rounded">
+                    <span className="text-[8px] font-mono text-amber-500 leading-none">LVL</span>
+                    <span className="font-oswald text-lg font-bold text-yellow-400 leading-none mt-0.5">{level}</span>
+                  </div>
+                  <div>
+                    <h4 className="font-oswald text-sm font-bold text-foreground uppercase leading-none">
+                      {title} <span className="text-xs font-mono text-amber-500 font-normal">({totalXp} XP)</span>
+                    </h4>
+                    <p className="text-[10px] text-muted-foreground font-mono mt-1 uppercase">Личный ранг опыта в системе АВНГ</p>
+                  </div>
+                </div>
+                
+                <div className="flex-1 max-w-md w-full">
+                  <div className="flex justify-between text-[9px] font-mono text-muted-foreground uppercase mb-1">
+                    <span>Lvl {level}</span>
+                    <span>{isMaxLevel ? `${totalXp} XP` : `${totalXp} / ${maxXp} XP`}</span>
+                  </div>
+                  <div className="w-full h-2 border border-tactical-border bg-black/40 p-[1px]">
+                    <div 
+                      className="h-full bg-gradient-to-r from-amber-600 to-yellow-400"
+                      style={{ width: `${percent}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {badgesList.map((badge) => {
+              const pct = Math.min(100, Math.max(0, (badge.current / badge.target) * 100));
+              const isInstructorOrAdmin = authUser.role !== "cadet";
+              return (
+                <div 
+                  key={badge.id}
+                  className={`corner-mark border p-4 flex flex-col justify-between min-h-[170px] relative transition-all duration-300 ${
+                    badge.unlocked 
+                      ? badge.colorClass 
+                      : "border-tactical-border/60 bg-tactical-panel/10 text-muted-foreground"
+                  }`}
+                >
+                  <div>
+                    {!badge.unlocked && (
+                      <div className="absolute right-3 top-3 w-5 h-5 bg-tactical-panel border border-tactical-border flex items-center justify-center text-muted-foreground/60 rounded-full">
+                        <Icon name="Lock" size={10} />
+                      </div>
+                    )}
+                    {badge.unlocked && (
+                      <div className="absolute right-3 top-3 w-5 h-5 bg-green-950 border border-green-500/30 flex items-center justify-center text-green-400 rounded-full">
+                        <Icon name="Check" size={10} />
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={`w-8 h-8 border flex items-center justify-center rounded-lg ${badge.unlocked ? "border-current bg-current/5" : "border-tactical-border/60 bg-tactical-card"}`}>
+                        <Icon name={badge.icon} size={16} className={badge.unlocked ? "" : "text-muted-foreground/30"} />
+                      </div>
+                      <h4 className="font-oswald text-sm font-bold tracking-wide uppercase leading-tight">{badge.title}</h4>
+                    </div>
+                    
+                    <p className="text-[11px] font-ibm text-muted-foreground leading-relaxed mt-1">{badge.desc}</p>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-tactical-border/30">
+                    <div className="flex justify-between items-center text-[10px] font-mono mb-1">
+                      <span>{badge.label} <strong className="text-foreground font-ibm">{badge.current}</strong> / {badge.target}</span>
+                      <span className="font-bold">{Math.round(pct)}%</span>
+                    </div>
+                    
+                    <div className="w-full h-1.5 bg-black/40 p-[1px] mb-2">
+                      <div 
+                        className={`h-full transition-all duration-500 ${badge.unlocked ? "bg-primary" : "bg-muted-foreground/30"}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+
+                    {isInstructorOrAdmin && badge.field && (
+                      <div className="flex items-center gap-1.5 mt-2 justify-end">
+                        <button
+                          type="button"
+                          onClick={() => adjustStat(badge.field!, -1)}
+                          className="w-6 h-6 border border-red-900/60 bg-red-950/20 hover:bg-red-900/30 text-red-500 flex items-center justify-center text-xs font-bold transition-all cursor-pointer corner-mark"
+                          title="Уменьшить на 1"
+                        >
+                          -
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => adjustStat(badge.field!, 1)}
+                          className="w-6 h-6 border border-green-900/60 bg-green-950/20 hover:bg-green-900/30 text-green-500 flex items-center justify-center text-xs font-bold transition-all cursor-pointer corner-mark"
+                          title="Увеличить на 1"
+                        >
+                          +
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {displayUser.role !== "cadet" && (
         <div className="space-y-6">
@@ -1062,7 +1563,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
         </>
       )}
 
-      {displayUser.id === authUser.id && (authUser.role === "head_avng" || authUser.role === "senior_ufsvng") && (
+      {displayUser.id === authUser.id && (authUser.role === "head_avng" || authUser.role === "deputy_head" || authUser.role === "senior_ufsvng") && (
         <div className="bg-tactical-card border border-tactical-border/60 p-5 mt-6 animate-fade-in">
           <h4 className="font-oswald text-xs tracking-widest uppercase text-muted-foreground mb-3 flex items-center gap-1.5 border-b border-tactical-border/40 pb-2">
             <Icon name="Settings" size={13} className="text-primary" />
@@ -1086,7 +1587,7 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-[10px] font-ibm uppercase tracking-wider text-muted-foreground mb-1">
                   Рапорты на увольнение
@@ -1102,13 +1603,26 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
 
               <div>
                 <label className="block text-[10px] font-ibm uppercase tracking-wider text-muted-foreground mb-1">
-                  Рапорты на повышение
+                  Рапорты на повышение (Курсанты)
                 </label>
                 <input
                   type="text"
                   placeholder="https://discord.com/api/webhooks/... (или пусто для общего)"
                   value={promotionWebhook}
                   onChange={(e) => setPromotionWebhook(e.target.value.trim())}
+                  className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-mono focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-ibm uppercase tracking-wider text-muted-foreground mb-1">
+                  Повышение инструкторов
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://discord.com/api/webhooks/... (или пусто для общего)"
+                  value={instructorPromotionWebhook}
+                  onChange={(e) => setInstructorPromotionWebhook(e.target.value.trim())}
                   className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-mono focus:outline-none focus:border-primary transition-colors"
                 />
               </div>
@@ -1140,17 +1654,58 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
               </div>
             </div>
 
-            <div>
-              <label className="block text-[10px] font-ibm uppercase tracking-wider text-muted-foreground mb-1">
-                ID роли Discord для упоминания/пинга (например, роли Инструкторов)
-              </label>
-              <input
-                type="text"
-                placeholder="ID роли Discord (например, 1150493827103984640) или оставьте пустым"
-                value={pingRoleId}
-                onChange={(e) => setPingRoleId(e.target.value.trim())}
-                className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-mono focus:outline-none focus:border-primary transition-colors"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-[10px] font-ibm uppercase tracking-wider text-muted-foreground mb-1">
+                  ID роли Discord для пинга (Инструкторы)
+                </label>
+                <input
+                  type="text"
+                  placeholder="ID роли Discord или пусто"
+                  value={pingRoleId}
+                  onChange={(e) => setPingRoleId(e.target.value.trim())}
+                  className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-mono focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-ibm uppercase tracking-wider text-muted-foreground mb-1">
+                  ID роли Гл.Инструктора АВНГ в Discord
+                </label>
+                <input
+                  type="text"
+                  placeholder="ID роли Discord или пусто"
+                  value={chiefInstructorRoleId}
+                  onChange={(e) => setChiefInstructorRoleId(e.target.value.trim())}
+                  className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-mono focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-ibm uppercase tracking-wider text-muted-foreground mb-1">
+                  ID роли Нач.АВНГ в Discord
+                </label>
+                <input
+                  type="text"
+                  placeholder="ID роли Discord или пусто"
+                  value={headAvngRoleId}
+                  onChange={(e) => setHeadAvngRoleId(e.target.value.trim())}
+                  className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-mono focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-ibm uppercase tracking-wider text-muted-foreground mb-1">
+                  ID роли Зам.Нач.АВНГ в Discord
+                </label>
+                <input
+                  type="text"
+                  placeholder="ID роли Discord или пусто"
+                  value={deputyHeadRoleId}
+                  onChange={(e) => setDeputyHeadRoleId(e.target.value.trim())}
+                  className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-mono focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
             </div>
 
             <div className="flex justify-end pt-2">
@@ -1161,15 +1716,19 @@ export function Profile({ authUser, targetUser, onNavigate }: { authUser: User; 
                     { key: "avng_discord_webhook_url", value: webhookInput, label: "Общий канал" },
                     { key: "avng_discord_dismissal_webhook_url", value: dismissalWebhook, label: "Рапорты на увольнение" },
                     { key: "avng_discord_promotion_webhook_url", value: promotionWebhook, label: "Рапорты на повышение" },
+                    { key: "avng_discord_instructor_promotion_webhook_url", value: instructorPromotionWebhook, label: "Повышение инструкторов" },
                     { key: "avng_discord_test_webhook_url", value: testWebhook, label: "Результаты тестов" },
                     { key: "avng_discord_request_webhook_url", value: requestWebhook, label: "Запросы на лекции/практики" },
-                    { key: "avng_discord_ping_role_id", value: pingRoleId, label: "ID роли для пинга" }
+                    { key: "avng_discord_ping_role_id", value: pingRoleId, label: "ID роли для пинга" },
+                    { key: "avng_discord_chief_instructor_role_id", value: chiefInstructorRoleId, label: "ID роли Гл.Инструктора" },
+                    { key: "avng_discord_head_avng_role_id", value: headAvngRoleId, label: "ID роли Нач.АВНГ" },
+                    { key: "avng_discord_deputy_head_role_id", value: deputyHeadRoleId, label: "ID роли Зам.Нач.АВНГ" }
                   ];
 
                   let hasError = false;
                   
                   for (const item of items) {
-                    if (item.key === "avng_discord_ping_role_id") {
+                    if (item.key === "avng_discord_ping_role_id" || item.key === "avng_discord_head_avng_role_id" || item.key === "avng_discord_deputy_head_role_id" || item.key === "avng_discord_chief_instructor_role_id") {
                       if (item.value && !/^\d+$/.test(item.value)) {
                         toast.error(`Некорректный ID роли Discord в поле "${item.label}"! Он должен состоять только из цифр.`);
                         hasError = true;

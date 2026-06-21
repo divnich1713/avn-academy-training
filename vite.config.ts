@@ -1,4 +1,4 @@
-import {defineConfig} from "vite";
+import {defineConfig, loadEnv} from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import {componentTagger} from "pp-tagger";
@@ -23,32 +23,55 @@ const hmrKeepalive = {
 };
 
 // https://vitejs.dev/config/
-export default defineConfig(({mode}) => ({
-    plugins: [
-        react(),
-        hmrKeepalive,
-        mode === 'development' &&
-        componentTagger(),
-    ].filter(Boolean),
-    resolve: {
-        alias: {
-            "@": path.resolve(__dirname, "./src"),
+export default defineConfig(({mode}) => {
+    // Load env variables based on `mode` in the current working directory.
+    const env = loadEnv(mode, process.cwd(), '');
+    const supabaseApiUrl = env.VITE_SUPABASE_API_URL || 'http://localhost:54321';
+
+    return {
+        plugins: [
+            react(),
+            hmrKeepalive,
+            mode === 'development' &&
+            componentTagger(),
+        ].filter(Boolean),
+        resolve: {
+            alias: {
+                "@": path.resolve(__dirname, "./src"),
+            },
         },
-    },
-    server: {
-        host: '0.0.0.0',
-        port: 5173,
-        allowedHosts: true,
-        hmr: {
-            overlay: false, // Disables the error overlay if you only want console errors
-            timeout: 7000, // pingInterval @vite/client — нужен <30s для DDoS Guard
-        },
-        proxy: {
-            '/supabase-api': {
-                target: 'https://nsybygrjwrzhrpvlzpyv.supabase.co/functions/v1',
-                changeOrigin: true,
-                rewrite: (path) => path.replace(/^\/supabase-api/, '')
+        build: {
+            rollupOptions: {
+                output: {
+                    manualChunks(id) {
+                        if (id.includes('node_modules')) {
+                            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+                                return 'vendor-react';
+                            }
+                            if (id.includes('@tanstack') || id.includes('query-core')) {
+                                return 'vendor-query';
+                            }
+                        }
+                    }
+                }
             }
-        }
-    },
-}));
+        },
+        server: {
+            host: '0.0.0.0',
+            port: 5173,
+            allowedHosts: true,
+            hmr: {
+                overlay: false, // Disables the error overlay if you only want console errors
+                timeout: 7000, // pingInterval @vite/client — нужен <30s для DDoS Guard
+            },
+            proxy: {
+                '/supabase-api': {
+                    target: supabaseApiUrl,
+                    changeOrigin: true,
+                    rewrite: (path) => path.replace(/^\/supabase-api/, '')
+                }
+            }
+        },
+    };
+});
+

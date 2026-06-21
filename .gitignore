@@ -28,3 +28,6 @@ builds
 
 # Local Netlify folder
 .netlify
+
+# Local scratch files
+scratch/

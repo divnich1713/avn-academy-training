@@ -34,7 +34,7 @@ async function getRequester(client: Client, token: string | null): Promise<{ id:
   return null;
 }
 
-Deno.serve(async (req) => {
+export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response("", { headers: CORS_HEADERS, status: 200 });
   }
@@ -292,4 +292,8 @@ Deno.serve(async (req) => {
       client.release();
     }
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handler);
+}

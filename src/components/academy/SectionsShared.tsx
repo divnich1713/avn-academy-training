@@ -4,7 +4,7 @@ import { StatusBadge, SectionHeader } from "./UIComponents";
 import { User } from "@/lib/api";
 import { createRequest, TrainingRequest } from "@/lib/api";
 import { sendDismissalReportDiscord, sendGeneralRequestDiscord } from "@/lib/discord";
-import { useRequests } from "@/lib/useQueries";
+import { useRequests, useInstructors } from "@/lib/useQueries";
 
 export const TYPE_LABEL: Record<string, string> = {
   lecture: "Лекция",
@@ -142,6 +142,9 @@ export function RequestCard({
             {r.cadet_name && (
               <p className={`text-xs font-mono mt-1 ${style.nameColor}`}>{r.cadet_rank} {r.cadet_name}</p>
             )}
+            {r.target_instructor_name && (
+              <p className="text-xs font-mono mt-1 text-yellow-500">Желаемый инструктор: {r.target_instructor_name}</p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -222,6 +225,8 @@ export function RequestForm({
   onClose: () => void;
   completedSubjects?: string[];
 }) {
+  const { data: instructors = [] } = useInstructors();
+  const [selectedInstructorId, setSelectedInstructorId] = useState("");
   const isOptionDisabled = (opt: string) => {
     if (opt.startsWith("──")) return true;
     if (opt === "Рапорт на увольнение из академии") return false;
@@ -352,6 +357,9 @@ export function RequestForm({
           console.error("Discord error:", err);
         }
       } else {
+        const selectedInst = instructors.find(i => i.id === Number(selectedInstructorId));
+        const instructorName = selectedInst ? `${selectedInst.rank} ${selectedInst.name}` : undefined;
+
         sendGeneralRequestDiscord({
           name: authUser.name,
           rank: authUser.rank,
@@ -360,7 +368,9 @@ export function RequestForm({
           typeLabel: TYPE_LABEL[type],
           subject,
           preferredDate: date || "Не указана",
-          details: finalDescription
+          details: finalDescription,
+          cadetDiscordId: authUser.discord_id || undefined,
+          instructorName
         }).catch(err => console.error("Discord error:", err));
       }
 
@@ -370,7 +380,8 @@ export function RequestForm({
         description: finalDescription, 
         preferred_date: date || undefined,
         discord_message_id,
-        discord_channel_id
+        discord_channel_id,
+        instructor_id: selectedInstructorId ? Number(selectedInstructorId) : undefined
       });
 
       onSubmit();
@@ -385,7 +396,7 @@ export function RequestForm({
       <h3 className="font-oswald text-sm tracking-widest uppercase text-primary">
         Новый запрос — {TYPE_LABEL[type]}
       </h3>
-      <div className="grid md:grid-cols-2 gap-3">
+      <div className={`grid grid-cols-1 ${type === "report" ? "md:grid-cols-2" : "md:grid-cols-3"} gap-3`}>
         <div>
           <label className="rank-badge text-muted-foreground block mb-1">Тема</label>
           <select
@@ -403,6 +414,23 @@ export function RequestForm({
             })}
           </select>
         </div>
+        {type !== "report" && (
+          <div>
+            <label className="rank-badge text-muted-foreground block mb-1">Инструктор (необязательно)</label>
+            <select
+              className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary transition-colors"
+              value={selectedInstructorId}
+              onChange={(e) => setSelectedInstructorId(e.target.value)}
+            >
+              <option value="">Любой инструктор</option>
+              {instructors.map((inst) => (
+                <option key={inst.id} value={String(inst.id)}>
+                  {inst.rank ? `${inst.rank} ` : ""}{inst.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className="rank-badge text-muted-foreground block mb-1">Предпочтительная дата</label>
           <input

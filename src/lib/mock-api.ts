@@ -138,7 +138,7 @@ const REQUESTS: TrainingRequest[] = [
     id: 4,
     type: "report",
     subject: "Рапорт на повышение в звании",
-    description: "Прошу рассмотреть рапорт на присвоение звания Мл. Сержант",
+    description: "Прошу рассмотреть рапорт на присвоение звания Младший Сержант",
     preferred_date: null,
     status: "rejected",
     instructor_comment: "Недостаточный срок службы",
@@ -327,8 +327,19 @@ export async function fetchRequests(): Promise<TrainingRequest[]> {
   const user = getUser();
   if (!user) return [];
   const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"].includes(r);
-  if (isInstructor(user.role)) return [...REQUESTS].reverse();
-  return REQUESTS.filter((r) => r.cadet_id === user.id).reverse();
+  
+  const mapRequest = (r: TrainingRequest): TrainingRequest => {
+    const cadet = USERS.find((u) => u.id === r.cadet_id);
+    const inst = r.instructor_id ? USERS.find((u) => u.id === r.instructor_id) : null;
+    return {
+      ...r,
+      cadet_discord_id: cadet?.discord_id || null,
+      target_instructor_name: inst ? `${inst.rank} ${inst.name}` : null,
+    };
+  };
+
+  if (isInstructor(user.role)) return [...REQUESTS].map(mapRequest).reverse();
+  return REQUESTS.filter((r) => r.cadet_id === user.id).map(mapRequest).reverse();
 }
 
 export async function createRequest(payload: {
@@ -338,6 +349,7 @@ export async function createRequest(payload: {
   preferred_date?: string;
   discord_message_id?: string;
   discord_channel_id?: string;
+  instructor_id?: number;
 }) {
   await delay();
   const user = getUser();
@@ -359,6 +371,7 @@ export async function createRequest(payload: {
     reviewer_name: null,
     discord_message_id: payload.discord_message_id,
     discord_channel_id: payload.discord_channel_id,
+    instructor_id: payload.instructor_id || null,
   } as any;
   REQUESTS.push(req);
   return { ok: true, request_id: req.id };
@@ -369,6 +382,9 @@ export async function reviewRequest(id: number, status: "approved" | "rejected",
   const req = REQUESTS.find((r) => r.id === id);
   if (!req) throw new Error("Запрос не найден");
   const user = getUser();
+  if (req.instructor_id && req.instructor_id !== user?.id) {
+    throw new Error("Этот запрос адресован конкретному инструктору");
+  }
   req.status = status;
   req.instructor_comment = comment || null;
   req.reviewer_name = user ? `${user.rank} ${user.name}` : null;
@@ -478,8 +494,8 @@ export async function fetchRatings(timeframe: "daily" | "weekly" | "monthly" | "
 
 const MOCK_PROMOTION_REQUIREMENTS = {
   junior_sergeant: {
-    label: "Мл. Сержант",
-    rank: "Мл. Сержант",
+    label: "Младший Сержант",
+    rank: "Младший Сержант",
     items: [
       { category: "Подготовка", label: "Строевая, физическая и огневая подготовка", type: "practice" as const, subject: "Строевая, физическая и огневая подготовка" },
       { category: "Подготовка", label: "Присяга", type: "practice" as const, subject: "Присяга" },
@@ -578,7 +594,7 @@ export async function createPromotionReport(promotion_type: import("./api").Prom
   if (promotion_type === "sergeant") {
     const isMlSergeant = user.rank && (user.rank.toLowerCase().includes("мл.") || user.rank.toLowerCase().includes("младший"));
     if (!isMlSergeant) {
-      throw new Error("Подача рапорта на звание Сержант доступна только в звании Мл. Сержант");
+      throw new Error("Подача рапорта на звание Сержант доступна только в звании Младший Сержант");
     }
   }
 
@@ -683,3 +699,4 @@ export async function fetchDiscordProfile(discordId: string) {
     return { username: "discord_user", global_name: "Пользователь Discord" };
   }
 }
+

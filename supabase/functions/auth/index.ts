@@ -26,7 +26,37 @@ function generateToken(): string {
   return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-Deno.serve(async (req) => {
+async function downloadAvatar(discordId: string, avatarUrl: string): Promise<string | null> {
+  try {
+    const res = await fetch(avatarUrl);
+    if (!res.ok) {
+      console.error(`[Avatar Downloader] Failed to fetch avatar from Discord: HTTP ${res.status}`);
+      return null;
+    }
+    const arrayBuffer = await res.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    
+    const dirs = ["../../dist/avatars", "../../public/avatars"];
+    let saved = false;
+    for (const dir of dirs) {
+      try {
+        await Deno.mkdir(dir, { recursive: true });
+        const filePath = `${dir}/${discordId}.png`;
+        await Deno.writeFile(filePath, uint8Array);
+        console.log(`[Avatar Downloader] Saved avatar to ${filePath}`);
+        saved = true;
+      } catch (writeErr) {
+        console.warn(`[Avatar Downloader] Failed to write to ${dir}:`, writeErr.message);
+      }
+    }
+    return saved ? `/avatars/${discordId}.png` : null;
+  } catch (err) {
+    console.error("[Avatar Downloader] Error in downloadAvatar:", err);
+    return null;
+  }
+}
+
+export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response("", { headers: CORS_HEADERS, status: 200 });
   }
@@ -59,7 +89,8 @@ Deno.serve(async (req) => {
 
       const discordRes = await fetch(`https://discord.com/api/v10/users/${discordId}`, {
         headers: {
-          "Authorization": `Bot ${botToken.trim()}`
+          "Authorization": `Bot ${botToken.trim()}`,
+          "User-Agent": "DiscordBot (https://avn-academy.ru, v1.0)"
         }
       });
 
@@ -81,11 +112,35 @@ Deno.serve(async (req) => {
         ? `https://cdn.discordapp.com/avatars/${data.id}/${data.avatar}.png`
         : undefined;
 
+      let finalAvatarUrl = avatarUrl;
+      if (avatarUrl) {
+        const localPath = await downloadAvatar(discordId, avatarUrl);
+        if (localPath) {
+          finalAvatarUrl = localPath;
+          
+          let dbClient;
+          try {
+            dbClient = await pool.connect();
+            await dbClient.queryArray(
+              `UPDATE ${SCHEMA}.users 
+               SET avatar_url = $1 
+               WHERE discord_id = $2 AND (avatar_url IS NULL OR avatar_url != $1)`,
+              [localPath, discordId]
+            );
+            console.log(`[Avatar Downloader] Updated DB avatar_url to ${localPath} for discord_id=${discordId}`);
+          } catch (dbErr) {
+            console.error(`[Avatar Downloader] DB update failed for discord_id=${discordId}:`, dbErr);
+          } finally {
+            if (dbClient) dbClient.release();
+          }
+        }
+      }
+
       return new Response(JSON.stringify({
         username: data.username,
         global_name: data.global_name || undefined,
-        avatar: avatarUrl ? { link: avatarUrl } : undefined,
-        avatarUrl: avatarUrl
+        avatar: finalAvatarUrl ? { link: finalAvatarUrl } : undefined,
+        avatarUrl: finalAvatarUrl
       }), {
         status: 200,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
@@ -227,7 +282,7 @@ Deno.serve(async (req) => {
          FROM ${SCHEMA}.sessions s
          JOIN ${SCHEMA}.users u ON u.id = s.user_id
          WHERE s.token = $1 AND s.expires_at > NOW() AND u.is_whitelisted = true`,
-        [token]
+         [token]
       );
 
       if (sessionRes.rows.length === 0) {
@@ -323,4 +378,8 @@ Deno.serve(async (req) => {
       client.release();
     }
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handler);
+}

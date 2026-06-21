@@ -17,6 +17,8 @@ import {
   Instructors,
   TestingSystem,
   TestingHistory,
+  Simulator,
+  Flashcards,
 } from "@/components/academy/Sections";
 import { User } from "@/lib/api";
 
@@ -34,7 +36,7 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
     let initialSection: Section = isInstr ? "instructor" : "dashboard";
     if (tabParam) {
       const candidateSection = tabParam as Section;
-      if ((candidateSection === "promotions" || candidateSection === "dashboard") && isInstr) {
+      if (candidateSection === "dashboard" && isInstr) {
         initialSection = "instructor";
       } else {
         initialSection = candidateSection;
@@ -77,7 +79,7 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
   const navigateTo = (s: Section, requestId?: number, targetCadet?: User) => {
     const isInstr = authUser.role !== "cadet";
     let targetSection = s;
-    if (isInstr && (s === "dashboard" || s === "promotions")) {
+    if (isInstr && s === "dashboard") {
       targetSection = "instructor";
     }
     // Authorization check
@@ -203,6 +205,8 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
       case "instructor": return <InstructorPanel authUser={authUser} highlightRequestId={highlightRequestId} highlightReportId={highlightReportId} onViewProfile={(cadet) => navigateTo("profile", undefined, cadet)} />;
       case "testing": return <TestingSystem />;
       case "testing-history": return <TestingHistory />;
+      case "simulator": return <Simulator authUser={authUser} />;
+      case "flashcards": return <Flashcards authUser={authUser} />;
     }
   };
 

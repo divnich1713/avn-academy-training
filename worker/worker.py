@@ -14,6 +14,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres@lo
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 SCHEMA = os.environ.get("SCHEMA", "t_p29017774_avn_academy_training")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 
 # Initialize Redis
 print(f"Connecting to Redis at {REDIS_URL}...")
@@ -126,7 +127,7 @@ def analyze_essay_openai(answer_text: str, criteria_list: list) -> tuple[float, 
     }
 
     try:
-        resp = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=15)
+        resp = requests.post(f"{OPENAI_BASE_URL}/chat/completions", headers=headers, json=payload, timeout=15)
         if resp.status_code == 200:
             result = resp.json()
             content = json.loads(result["choices"][0]["message"]["content"])

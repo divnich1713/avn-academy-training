@@ -18,3 +18,6 @@ export const PromotionSection = lazy(() => import("./Promotions").then(m => ({ d
 export const TestingSystem = lazy(() => import("./TestingSystem").then(m => ({ default: m.TestingSystem })));
 export const TestingHistory = lazy(() => import("./TestingHistory").then(m => ({ default: m.TestingHistory })));
 export const TestingAdmin = lazy(() => import("./TestingAdmin").then(m => ({ default: m.TestingAdmin })));
+export const Simulator = lazy(() => import("./Simulator").then(m => ({ default: m.Simulator })));
+export const Flashcards = lazy(() => import("./Flashcards").then(m => ({ default: m.Flashcards })));
+

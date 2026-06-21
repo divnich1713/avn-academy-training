@@ -31,7 +31,7 @@ async function getUserByToken(client: Client, token: string | null) {
   return null;
 }
 
-Deno.serve(async (req) => {
+export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response("", { headers: CORS_HEADERS, status: 200 });
   }
@@ -88,6 +88,12 @@ Deno.serve(async (req) => {
     }
 
     if (method === "GET") {
+      const countRes = await client.queryObject<{ count: number }>(
+        `SELECT COUNT(*)::int as count FROM ${SCHEMA}.notifications WHERE user_id = $1 AND is_read = FALSE`,
+        [user.id]
+      );
+      const unread_count = countRes.rows.length > 0 ? Number(countRes.rows[0].count) : 0;
+
       const res = await client.queryObject<{
         id: number;
         type: string;
@@ -95,10 +101,8 @@ Deno.serve(async (req) => {
         message: string;
         is_read: boolean;
         created_at: Date;
-        unread_count: number;
       }>(
-        `SELECT id, type, title, message, is_read, created_at,
-                (SELECT COUNT(*)::int FROM ${SCHEMA}.notifications WHERE user_id = $1 AND is_read = FALSE) as unread_count
+        `SELECT id, type, title, message, is_read, created_at
          FROM ${SCHEMA}.notifications
          WHERE user_id = $1
          ORDER BY created_at DESC
@@ -106,8 +110,7 @@ Deno.serve(async (req) => {
         [user.id]
       );
 
-      const unread_count = res.rows.length > 0 ? Number(res.rows[0].unread_count) : 0;
-      const notifications = res.rows.map(({ unread_count: _, ...row }) => ({
+      const notifications = res.rows.map(row => ({
         ...row,
         created_at: row.created_at.toISOString()
       }));
@@ -165,4 +168,8 @@ Deno.serve(async (req) => {
       client.release();
     }
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handler);
+}

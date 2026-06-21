@@ -8,14 +8,24 @@ import {
   PromotionReport,
   checkPromotionRequirements,
   fetchPromotionReports,
+  fetchGrades,
   createPromotionReport,
   reviewPromotionReport,
+  InstructorPromotionReport,
+  fetchInstructorPromotionReports,
+  submitInstructorPromotionReport,
+  reviewInstructorPromotionReport,
 } from "@/lib/api";
 import { fmt, Spinner, Empty, fmtStaticId } from "./SectionsShared";
-import { sendPromotionReportDiscord, sendPromotionApprovedDiscord } from "@/lib/discord";
+import {
+  sendPromotionReportDiscord,
+  sendPromotionReviewedDiscord,
+  sendInstructorPromotionReportDiscord,
+  sendInstructorPromotionReviewedDiscord,
+} from "@/lib/discord";
 
 const PROMOTION_LABELS: Record<PromotionType, string> = {
-  junior_sergeant: "Мл. Сержант",
+  junior_sergeant: "Младший Сержант",
   sergeant: "Сержант",
 };
 
@@ -36,77 +46,82 @@ export function MilitaryReport({
   const currentRank = isSergeant ? "Младший Сержант" : "Рядовой";
   const targetRank = isSergeant ? "Сержант" : "Младший Сержант";
 
+  const formattedCurrentRank = isSergeant ? "младший сержант полиции" : "рядовой полиции";
+  const formattedTargetRank = isSergeant ? "Сержант полиции" : "Младший сержант полиции";
+
   return (
-    <div className="bg-white border border-gray-200 text-black p-6 font-mono text-[11px] space-y-4 max-w-2xl mx-auto shadow-[0_4px_12px_rgba(0,0,0,0.15)] leading-relaxed select-all">
-      {/* Top Header */}
-      <div className="text-center font-bold pb-2 space-y-0.5 uppercase tracking-wide text-black">
-        <p>ФЕДЕРАЛЬНАЯ СЛУЖБА ВОЙСК НАЦИОНАЛЬНОЙ ГВАРДИИ</p>
-        <p>РОССИЙСКОЙ ФЕДЕРАЦИИ (ФСВНГ России)</p>
-        <p>Академия Войск Национальной Гвардии (АВНГ)</p>
+    <div className="bg-white border border-gray-200 text-black p-8 font-mono text-[11px] max-w-2xl mx-auto shadow-[0_4px_12px_rgba(0,0,0,0.15)] leading-relaxed select-all space-y-4 text-left">
+      <div className="space-y-4">
+        <p className="font-bold">ФЕДЕРАЛЬНАЯ СЛУЖБА ВОЙСК НАЦИОНАЛЬНОЙ ГВАРДИИ</p>
+        <p className="font-bold">РОССИЙСКОЙ ФЕДЕРАЦИИ (ФСВНГ России)</p>
+        <p className="font-bold">Академия войск национальной гвардии (АВНГ)</p>
       </div>
 
-      {/* Addressed To (Right aligned) */}
-      <div className="flex justify-end pt-2">
-        <div className="text-left space-y-0.5 max-w-md text-black">
-          <p className="font-semibold">Начальнику Академии Войск Национальной Гвардии</p>
-          <p>подполковнику — Нач.АВНГ | Артем Панарин</p>
-          <p className="text-gray-500 pt-1">Копия:</p>
-          <p>Заместителю начальника АВНГ — Зам.Нач.АВНГ | Данила Моралис</p>
-          <p>Заместителю начальника АВНГ — Зам.Нач.АВНГ | Илья Росса</p>
-          <p>Заместителю начальника АВНГ — Зам.Нач.АВНГ | Иван Андрейченко</p>
-        </div>
+      <div className="pt-2 space-y-4">
+        <p className="font-semibold">Начальнику Академии войск Национальной гвардии</p>
+        <p>подполковнику — нач. АВНГ | Артем Панарин</p>
       </div>
 
-      {/* From Cadet */}
-      <div className="space-y-0.5 pt-4 text-black border-t border-gray-200">
-        <p><span className="text-gray-500">От курсанта:</span> {cadetName}</p>
-        <p><span className="text-gray-500">Табельный номер:</span> {fmtStaticId(cadetStaticId)}</p>
-        <p><span className="text-gray-500">Звание:</span> {currentRank}</p>
+      <div className="pt-2 space-y-4">
+        <p className="font-semibold">Копия:</p>
+        <p>заместителю начальника АВНГ — зам. нач. АВНГ | Данила Моралис</p>
+        <p>заместителю начальника АВНГ — зам. нач. АВНГ | Илья Росса</p>
+        <p>заместителю начальника АВНГ — зам. нач. АВНГ | Иван Андрейченко</p>
       </div>
 
-      {/* Title */}
-      <div className="text-center font-bold text-sm tracking-widest pt-4 uppercase text-black">
-        РАПОРТ
+      <div className="pt-2 space-y-4">
+        <p>От курсанта: {cadetName}</p>
+        <p>Порядковый номер: {fmtStaticId(cadetStaticId)}</p>
+        <p>Звание: {currentRank}</p>
       </div>
 
-      {/* Content */}
-      <div className="space-y-4 text-black">
-        <p className="indent-8">
-          Прошу Вашего ходатайства перед вышестоящим командованием
-          о присвоении мне очередного воинского звания «{targetRank}».
+      <div className="text-center font-bold text-sm tracking-widest pt-4 uppercase">
+        Рапорт
+      </div>
+
+      <div className="space-y-4">
+        <p>
+          Я, {formattedCurrentRank} {cadetName}. Прошу рассмотреть мой рапорт о повышении по службе в Академии Войск Национальной Гвардии УФСВНГ России, согласно установленной системе. В соответствии с правилами системы повышения, к рапорту прилагаю:
         </p>
+        <p className="font-semibold">Выполненные условия для повышения: </p>
         <p className="font-semibold">К рапорту прилагаю:</p>
         {isSergeant ? (
-          <ul className="space-y-2 pl-4">
+          <ul className="space-y-4">
             <li>• Отчёт о патрулировании прилегающей территорий;</li>
             <li>• Наряд на КПП-1;</li>
             <li>• Наряд на КПП-2 (Внутренний пост);</li>
             <li>• Участие в государственной поставке в количестве 4-ёх шт. В сопровождение инструктора АВНГ | СС;</li>
-            <li>• Принять участие в досмотровых мероприятиях на двух собеседованиях.</li>
+            <li>• Принять участие в досмотровых мероприятиях на двух собеседованиях;</li>
             <li>• Отчёт о прослушанных лекциях "УК, ПК, КоАП";</li>
-            <li>• Лекция: О ФЗ закрытых территорий</li>
+            <li>• Лекция: О ФЗ закрытых территорий;</li>
             <li>• Отчёт о прохождений практического экзамена "Штраф, Задержание, Арест";</li>
             <li>• Отчёт о сдаче тестов УК/ПК/КоАП;</li>
           </ul>
         ) : (
-          <ul className="space-y-2 pl-4">
+          <ul className="space-y-4">
             <li>• Вступительная лекция;</li>
-            <li>• Лекция ФЗ о ФСВНГ и Уставу;</li>
+            <li>• Лекция о Федеральном законе о Федеральной службе войск национальной гвардии и Уставе;</li>
             <li>• Строевая, физическая и огневая подготовка;</li>
             <li>• Присяга;</li>
-            <li>• Вышка — 30 мин (доклад каждые 10 мин);</li>
-            <li>• Патруль по территории — 30 мин (доклад каждые 10 мин);</li>
+            <li>• Вышка — 30 минут (доклад каждые 10 минут);</li>
+            <li>• Патрулирование территории — 30 минут (доклад каждые 10 минут);</li>
             <li>• Заполнение личного дела;</li>
-            <li>• Тест: ФЗ о ФСВНГ и Внутреннему Уставу;</li>
+            <li>• Тест: Федеральный закон о Федеральной службе войск национальной гвардии и Устав;</li>
           </ul>
         )}
+
+        <p>
+          Согласно установленной системе, мною были выполнены необходимые критерии, что дает мне право претендовать на присвоение очередного специального звания {formattedTargetRank}. Прошу учесть мои заслуги и присвоить очередное специальное звание.
+        </p>
+        <p>
+          Даю согласие, в случае обмана руководства, понести за это наказание, в виде дисциплинарных взысканий вплоть до понижения в звании.
+        </p>
       </div>
 
-      {/* Footer */}
-      <div className="flex justify-between items-center pt-6 font-mono text-xs text-black border-t border-gray-200">
-        <p><span className="text-gray-500">Дата:</span> {date}</p>
+      <div className="pt-4 space-y-4">
+        <p>Дата: {date}</p>
         <p>
-          <span className="text-gray-500">Подпись:</span>{" "}
+          Подпись:{" "}
           <span className="italic border-b border-black/60 px-4 min-w-[100px] inline-block text-center text-black">
             {cadetName.split(" ")[0]}
           </span>
@@ -120,6 +135,12 @@ export function MilitaryReport({
 // PROMOTION SECTION (CADET VIEW)
 // ═══════════════════════════════════════════════════════════════════════════════
 export function PromotionSection({ authUser }: { authUser: User }) {
+  const isInstructor = authUser.role !== "cadet";
+
+  if (isInstructor) {
+    return <InstructorPromotionSection authUser={authUser} />;
+  }
+
   const [selected, setSelected] = useState<PromotionType | null>(null);
   const [checkResult, setCheckResult] = useState<PromotionCheckResult | null>(null);
   const [reports, setReports] = useState<PromotionReport[]>([]);
@@ -129,8 +150,6 @@ export function PromotionSection({ authUser }: { authUser: User }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [submittedReportLink, setSubmittedReportLink] = useState("");
-
-  const isInstructor = authUser.role !== "cadet";
 
   const loadReports = useCallback(async () => {
     setReportsLoading(true);
@@ -177,6 +196,7 @@ export function PromotionSection({ authUser }: { authUser: User }) {
         staticId: authUser.static_id,
         promotionType: selected,
         promotionTypeLabel: PROMOTION_LABELS[selected],
+        cadetDiscordId: authUser.discord_id || undefined,
       }).catch(err => console.error("Discord error:", err));
 
       const reportId = res?.id || Date.now();
@@ -229,7 +249,7 @@ export function PromotionSection({ authUser }: { authUser: User }) {
                 onClick={() => {
                   if (isInstructor) return;
                   if (isLocked) {
-                    setError("Подача рапорта на звание Сержант доступна только в звании Мл. Сержант");
+                    setError("Подача рапорта на звание Сержант доступна только в звании Младший Сержант");
                     setSuccess("");
                     setSelected(null);
                     setCheckResult(null);
@@ -267,7 +287,7 @@ export function PromotionSection({ authUser }: { authUser: User }) {
                     </p>
                     {isLocked ? (
                       <span className="inline-flex items-center gap-1 mt-1 text-xs text-red-400 font-mono">
-                        <Icon name="Lock" size={11} /> Требуется звание Мл. Сержант
+                        <Icon name="Lock" size={11} /> Требуется звание Младший Сержант
                       </span>
                     ) : hasPending ? (
                       <span className="inline-flex items-center gap-1 mt-1 text-xs text-yellow-400 font-mono">
@@ -536,6 +556,1085 @@ export function PromotionSection({ authUser }: { authUser: User }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// INSTRUCTOR PROMOTION SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const INSTRUCTOR_RANKS = [
+  "Сержант",
+  "Старший Сержант",
+  "Старшина",
+  "Прапорщик",
+  "Старший Прапорщик",
+  "Младший Лейтенант",
+  "Лейтенант",
+  "Старший Лейтенант",
+  "Капитан"
+];
+
+const INSTRUCTOR_POINTS_CONFIG = [
+  { num: 1, name: "Участие в ГМП", points: 40, desc: "3 и более фракций, включая ФСВНГ в т.ч отбитие нападения на ИК, похищения, теракты и т.д." },
+  { num: 2, name: "Участие в поставке", points: 35 },
+  { num: 3, name: "Участие в отбитии налёта/ограбления", points: 20, hasSubPoints: true, bonusPoints: 15, bonusLabel: "Успешное отбитие (+15 баллов)" },
+  { num: 4, name: "Участие в отбитии КРАЗА", points: 20, hasSubPoints: true, bonusPoints: 15, bonusLabel: "Успешная доставка КРАЗА (+15 баллов)", desc: "Фотокарточка грузовика + скрин доставления грузовика на наш титул" },
+  { num: 5, name: "Проведение тренировки", points: 15 },
+  { num: 7, name: "Арест человека", points: 20, desc: "Фотокарточка посадки в тюрьму" },
+  { num: 8, name: "Штраф", points: 15, desc: "Фотокарточка оплаты штрафа" },
+  { num: 10, name: "Провести лекцию", points: 10 },
+  { num: 11, name: "Пост на территории ФСВНГ КПП или Вышки", points: 30, desc: "в час, доклады каждые 20 минут" },
+  { num: 12, name: "Присутствие на вечерней поверке", points: 10, desc: "Фотокарточка начала и конца поверки" },
+  { num: 13, name: "Участие в собеседовании", points: 40 },
+  { num: 14, name: "Экзамен", points: 15 },
+  { num: 15, name: "Проверка рапорта на повышение", points: 15 },
+  { num: 17, name: "Принятие присяги", points: 10 },
+];
+
+const INSTRUCTOR_RANKS_FLOW = [
+  {
+    from: "Сержант",
+    to: "Старший Сержант",
+    points: 300,
+    mandatory: [
+      { num: 2, count: 3, name: "Участие в поставке" },
+      { num: 14, count: 3, name: "Экзамен" },
+      { num: 10, count: 3, name: "Провести лекцию" }
+    ]
+  },
+  {
+    from: "Старший Сержант",
+    to: "Старшина",
+    points: 400,
+    mandatory: [
+      { num: 2, count: 5, name: "Участие в поставке" },
+      { num: 3, count: 1, name: "Участие в отбитии налёта/ограбления" },
+      { num: 13, count: 3, name: "Участие в собеседовании" },
+      { num: 14, count: 4, name: "Экзамен" },
+      { num: 10, count: 3, name: "Провести лекцию" }
+    ]
+  },
+  {
+    from: "Старшина",
+    to: "Прапорщик",
+    points: 500,
+    mandatory: [
+      { num: 2, count: 7, name: "Участие в поставке" },
+      { num: 3, count: 2, name: "Участие в отбитии налёта/ограбления" },
+      { num: 13, count: 4, name: "Участие в собеседовании" },
+      { num: 14, count: 5, name: "Экзамен" },
+      { num: 10, count: 3, name: "Провести лекцию" }
+    ]
+  },
+  {
+    from: "Прапорщик",
+    to: "Старший Прапорщик",
+    points: 600,
+    mandatory: [
+      { num: 2, count: 9, name: "Участие в поставке" },
+      { num: 3, count: 3, name: "Участие в отбитии налёта/ограбления" },
+      { num: 13, count: 8, name: "Участие в собеседовании" },
+      { num: 14, count: 7, name: "Экзамен" },
+      { num: 10, count: 4, name: "Провести лекцию" }
+    ]
+  },
+  {
+    from: "Старший Прапорщик",
+    to: "Младший Лейтенант",
+    points: 700,
+    mandatory: [
+      { num: 2, count: 11, name: "Участие в поставке" },
+      { num: 3, count: 3, name: "Участие в отбитии налёта/ограбления" },
+      { num: 13, count: 10, name: "Участие в собеседовании" },
+      { num: 14, count: 8, name: "Экзамен" },
+      { num: 10, count: 5, name: "Провести лекцию" }
+    ]
+  },
+  {
+    from: "Младший Лейтенант",
+    to: "Лейтенант",
+    points: 800,
+    mandatory: [
+      { num: 2, count: 12, name: "Участие в поставке" },
+      { num: 3, count: 3, name: "Участие в отбитии налёта/ограбления" },
+      { num: 13, count: 13, name: "Участие в собеседовании" },
+      { num: 14, count: 9, name: "Экзамен" },
+      { num: 10, count: 6, name: "Провести лекцию" }
+    ]
+  },
+  {
+    from: "Лейтенант",
+    to: "Старший Лейтенант",
+    points: 900,
+    mandatory: [
+      { num: 2, count: 13, name: "Участие в поставке" },
+      { num: 3, count: 3, name: "Участие в отбитии налёта/ограбления" },
+      { num: 13, count: 15, name: "Участие в собеседовании" },
+      { num: 14, count: 10, name: "Экзамен" },
+      { num: 10, count: 5, name: "Провести лекцию" }
+    ]
+  },
+  {
+    from: "Старший Лейтенант",
+    to: "Капитан",
+    points: 1200,
+    mandatory: [
+      { num: 2, count: 15, name: "Участие в поставке" },
+      { num: 3, count: 5, name: "Участие в отбитии налёта/ограбления" },
+      { num: 13, count: 15, name: "Участие в собеседовании" },
+      { num: 14, count: 15, name: "Экзамен" },
+      { num: 10, count: 10, name: "Провести лекцию" }
+    ]
+  }
+];
+
+export function InstructorMilitaryReport({
+  name,
+  staticId,
+  currentRank,
+  targetRank,
+  totalPoints,
+  entries,
+  gratitude,
+  gratitudeLink,
+  date,
+}: {
+  name: string;
+  staticId: string;
+  currentRank: string;
+  targetRank: string;
+  totalPoints: number;
+  entries: any[];
+  gratitude: boolean;
+  gratitudeLink: string;
+  date: string;
+}) {
+  const flow = INSTRUCTOR_RANKS_FLOW.find(f => f.from === currentRank && f.to === targetRank);
+  const neededPoints = flow ? flow.points : 0;
+
+  const formattedCurrentRank = `${currentRank.toLowerCase()} полиции`;
+  const formattedTargetRank = targetRank ? `${targetRank.charAt(0).toUpperCase() + targetRank.slice(1).toLowerCase()} полиции` : "";
+
+  return (
+    <div className="bg-white border border-gray-200 text-black p-8 font-mono text-[11px] max-w-2xl mx-auto shadow-[0_4px_12px_rgba(0,0,0,0.15)] leading-relaxed select-all space-y-4 text-left">
+      <div className="space-y-4">
+        <p className="font-bold">ФЕДЕРАЛЬНАЯ СЛУЖБА ВОЙСК НАЦИОНАЛЬНОЙ ГВАРДИИ</p>
+        <p className="font-bold">РОССИЙСКОЙ ФЕДЕРАЦИИ (ФСВНГ России)</p>
+        <p className="font-bold">Академия войск национальной гвардии (АВНГ)</p>
+      </div>
+
+      <div className="pt-2 space-y-4">
+        <p className="font-semibold">Начальнику Академии войск Национальной гвардии</p>
+        <p>подполковнику — нач. АВНГ | Артем Панарин</p>
+      </div>
+
+      <div className="pt-2 space-y-4">
+        <p className="font-semibold">Копия:</p>
+        <p>заместителю начальника АВНГ — зам. нач. АВНГ | Данила Моралис</p>
+        <p>заместителю начальника АВНГ — зам. нач. АВНГ | Илья Росса</p>
+        <p>заместителю начальника АВНГ — зам. нач. АВНГ | Иван Андрейченко</p>
+      </div>
+
+      <div className="pt-2 space-y-4">
+        <p>От инструктора: {name}</p>
+        <p>Порядковый номер: {fmtStaticId(staticId)}</p>
+        <p>Звание: {currentRank}</p>
+      </div>
+
+      <div className="text-center font-bold text-sm tracking-widest pt-4 uppercase">
+        Рапорт
+      </div>
+
+      <div className="space-y-4">
+        <p>
+          Я, {formattedCurrentRank} {name}. Прошу рассмотреть мой рапорт о повышении по службе в Академии Войск Национальной Гвардии УФСВНГ России, согласно установленной системе. В соответствии с правилами системы повышения, к рапорту прилагаю:
+        </p>
+        <p className="font-semibold">Выполненные условия для повышения: </p>
+        <p className="font-semibold">К рапорту прилагаю:</p>
+        <ul className="space-y-4">
+          {entries.map((e, idx) => {
+            const config = INSTRUCTOR_POINTS_CONFIG.find(c => c.num === e.num);
+            if (!config) return null;
+            const successText = config.hasSubPoints && e.successCount > 0 ? `, успешных: ${e.successCount}` : "";
+            return (
+              <li key={idx} className="space-y-1">
+                <p>• {config.name} ({e.count} шт{successText}) — {e.count * config.points + e.successCount * (config.bonusPoints || 0)} б.;</p>
+                <div className="pl-4 text-black space-y-0.5 font-mono">
+                  {e.links.map((link: string, lIdx: number) => (
+                    <p key={lIdx} className="break-all">- Доказательство {lIdx + 1}: {link || "(ссылка отсутствует)"}</p>
+                  ))}
+                </div>
+              </li>
+            );
+          })}
+          {gratitude && (
+            <li className="space-y-1">
+              <p>• Благодарность от старшего состава — 50 б.;</p>
+              <p className="pl-4 text-black break-all font-mono">- Ссылка: {gratitudeLink || "(ссылка отсутствует)"}</p>
+            </li>
+          )}
+        </ul>
+        <p className="font-bold pt-2">Итого:  всего {totalPoints} ({neededPoints} нужно)</p>
+        <p>
+          Согласно установленной системе, мною были выполнены необходимые критерии, что дает мне право претендовать на присвоение очередного специального звания {formattedTargetRank}. Прошу учесть мои заслуги и присвоить очередное специальное звание.
+        </p>
+        <p>
+          Даю согласие, в случае обмана руководства, понести за это наказание, в виде дисциплинарных взысканий вплоть до понижения в звании.
+        </p>
+      </div>
+
+      <div className="pt-4 space-y-4">
+        <p>Дата: {date}</p>
+        <p>
+          Подпись:{" "}
+          <span className="italic border-b border-black/60 px-4 min-w-[100px] inline-block text-center text-black">
+            {name.split(" ")[0]}
+          </span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export function InstructorPromotionSection({ authUser }: { authUser: User }) {
+  const [activeSubTab, setActiveSubTab] = useState<"submit" | "review">("submit");
+  const [reports, setReports] = useState<InstructorPromotionReport[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [reviewLoading, setReviewLoading] = useState<Record<number, boolean>>({});
+  const [reviewComment, setReviewComment] = useState<Record<number, string>>({});
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  
+  const [currentRank, setCurrentRank] = useState<string>(() => {
+    const matched = INSTRUCTOR_RANKS.find(r => r.toLowerCase() === authUser.rank.toLowerCase());
+    return matched || "Сержант";
+  });
+  
+  const [targetRank, setTargetRank] = useState<string>("Старший Сержант");
+  const [gratitude, setGratitude] = useState(false);
+  const [gratitudeLink, setGratitudeLink] = useState("");
+  
+  const [entries, setEntries] = useState<Array<{
+    id: string;
+    num: number;
+    count: number;
+    successCount: number;
+    links: string[];
+    isAuto?: boolean;
+  }>>([]);
+
+  const [autoLoading, setAutoLoading] = useState(true);
+
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [submittedReportLink, setSubmittedReportLink] = useState("");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const isLeadership = ["head_avng", "chief_instructor", "deputy_head"].includes(authUser.role);
+
+  useEffect(() => {
+    const idx = INSTRUCTOR_RANKS.indexOf(currentRank);
+    if (idx !== -1 && idx < INSTRUCTOR_RANKS.length - 1) {
+      setTargetRank(INSTRUCTOR_RANKS[idx + 1]);
+    }
+  }, [currentRank]);
+
+  const loadData = useCallback(async () => {
+    setReportsLoading(true);
+    setAutoLoading(true);
+    try {
+      const [allGrades, allCadetReports, allInstReports] = await Promise.all([
+        fetchGrades().catch(() => []),
+        fetchPromotionReports().catch(() => []),
+        fetchInstructorPromotionReports().catch(() => [])
+      ]);
+      setReports(allInstReports);
+
+      // Find last approved report for this instructor to use as cutoff date
+      const approvedInstReports = allInstReports.filter(
+        (r) => r.user_id === authUser.id && r.status === "approved"
+      );
+      let cutoffDate = new Date(authUser.created_at || 0);
+      if (approvedInstReports.length > 0) {
+        approvedInstReports.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        cutoffDate = new Date(approvedInstReports[0].created_at);
+      }
+
+      // Count grades given by this instructor after cutoff date
+      const myGrades = allGrades.filter(
+        (g) => g.instructor_name === authUser.name && new Date(g.graded_at) > cutoffDate
+      );
+
+      const lecturesCount = myGrades.filter((g) => g.type === "lecture").length;
+      const examsCount = myGrades.filter((g) => g.type === "exam").length;
+      const oathsCount = myGrades.filter(
+        (g) => g.type === "practice" && g.subject.toLowerCase().includes("присяга")
+      ).length;
+
+      // Count cadet reports reviewed by this instructor after cutoff date
+      const myReviewsCount = allCadetReports.filter(
+        (r) =>
+          r.reviewer_name === authUser.name &&
+          r.status !== "pending" &&
+          new Date(r.reviewed_at || r.created_at) > cutoffDate
+      ).length;
+
+      const autoEntries: typeof entries = [];
+
+      if (lecturesCount > 0) {
+        autoEntries.push({
+          id: "auto_lecture",
+          num: 10,
+          count: lecturesCount,
+          successCount: 0,
+          links: Array(lecturesCount).fill("[Автоподтверждение из БД]"),
+          isAuto: true,
+        });
+      }
+      if (examsCount > 0) {
+        autoEntries.push({
+          id: "auto_exam",
+          num: 14,
+          count: examsCount,
+          successCount: 0,
+          links: Array(examsCount).fill("[Автоподтверждение из БД]"),
+          isAuto: true,
+        });
+      }
+      if (myReviewsCount > 0) {
+        autoEntries.push({
+          id: "auto_review",
+          num: 15,
+          count: myReviewsCount,
+          successCount: 0,
+          links: Array(myReviewsCount).fill("[Автоподтверждение из БД]"),
+          isAuto: true,
+        });
+      }
+      if (oathsCount > 0) {
+        autoEntries.push({
+          id: "auto_oath",
+          num: 17,
+          count: oathsCount,
+          successCount: 0,
+          links: Array(oathsCount).fill("[Автоподтверждение из БД]"),
+          isAuto: true,
+        });
+      }
+
+      setEntries((prev) => {
+        const manualEntries = prev.filter((e) => !e.isAuto);
+        return [...autoEntries, ...manualEntries];
+      });
+    } catch (err) {
+      console.error("Failed to load promotion data:", err);
+    } finally {
+      setReportsLoading(false);
+      setAutoLoading(false);
+    }
+  }, [authUser]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const instReportIdParam = params.get("instructorReportId");
+    if (instReportIdParam && reports.length > 0) {
+      setExpandedId(Number(instReportIdParam));
+      setActiveSubTab("review");
+    }
+  }, [reports]);
+
+  const addEntry = () => {
+    setEntries(prev => [
+      ...prev,
+      {
+        id: Math.random().toString(),
+        num: 2, // default to Поставка
+        count: 1,
+        successCount: 0,
+        links: [""]
+      }
+    ]);
+  };
+
+  const updateEntryField = (id: string, field: string, value: any) => {
+    setEntries(prev => prev.map(entry => {
+      if (entry.id !== id || entry.isAuto) return entry;
+      const updated = { ...entry, [field]: value };
+      if (field === "count") {
+        const newCount = Math.max(1, Number(value));
+        updated.count = newCount;
+        const newLinks = [...entry.links];
+        while (newLinks.length < newCount) newLinks.push("");
+        if (newLinks.length > newCount) newLinks.length = newCount;
+        updated.links = newLinks;
+        if (updated.successCount > newCount) updated.successCount = newCount;
+      }
+      return updated;
+    }));
+  };
+
+  const removeEntry = (id: string) => {
+    setEntries(prev => prev.filter(entry => entry.id !== id || entry.isAuto));
+  };
+
+  const totalPoints = useMemo(() => {
+    let pts = 0;
+    entries.forEach(e => {
+      const config = INSTRUCTOR_POINTS_CONFIG.find(c => c.num === e.num);
+      if (!config) return;
+      pts += e.count * config.points;
+      if (config.hasSubPoints) {
+        pts += e.successCount * (config.bonusPoints || 0);
+      }
+    });
+    if (gratitude) {
+      pts += 50;
+    }
+    return pts;
+  }, [entries, gratitude]);
+
+  const activeFlowConfig = useMemo(() => {
+    return INSTRUCTOR_RANKS_FLOW.find(f => f.from === currentRank && f.to === targetRank);
+  }, [currentRank, targetRank]);
+
+  const checklistStatus = useMemo(() => {
+    if (!activeFlowConfig) return { allCompleted: true, pointsCompleted: true, items: [] };
+    
+    let allCompleted = true;
+    const items = activeFlowConfig.mandatory.map(m => {
+      const matchingEntries = entries.filter(e => e.num === m.num);
+      const totalEnteredCount = matchingEntries.reduce((sum, e) => sum + e.count, 0);
+      const linksCount = matchingEntries.reduce((sum, e) => sum + e.links.filter(link => link.trim().length > 0).length, 0);
+      const completed = totalEnteredCount >= m.count && linksCount >= m.count;
+      
+      if (!completed) allCompleted = false;
+      
+      return {
+        ...m,
+        enteredCount: totalEnteredCount,
+        linksCount,
+        completed
+      };
+    });
+    
+    const pointsCompleted = totalPoints >= activeFlowConfig.points;
+    if (!pointsCompleted) allCompleted = false;
+    
+    return {
+      allCompleted,
+      pointsCompleted,
+      items
+    };
+  }, [activeFlowConfig, entries, totalPoints]);
+
+  const handleSubmit = async () => {
+    if (!checklistStatus.allCompleted) return;
+    setSubmitLoading(true);
+    setError("");
+    setSuccess("");
+    setSubmittedReportLink("");
+    
+    let itemsText = "";
+    entries.forEach((e) => {
+      const config = INSTRUCTOR_POINTS_CONFIG.find(c => c.num === e.num);
+      if (!config) return;
+      const successText = config.hasSubPoints && e.successCount > 0 ? `, успешных: ${e.successCount}` : "";
+      itemsText += `• ${config.name} (${e.count} шт${successText}) — ${e.count * config.points + e.successCount * (config.bonusPoints || 0)} б.;\n`;
+      e.links.forEach((link, lIdx) => {
+        itemsText += `  - Доказательство ${lIdx + 1}: ${link || "(ссылка отсутствует)"}\n`;
+      });
+    });
+    if (gratitude) {
+      itemsText += `• Благодарность от старшего состава — 50 б.;\n  - Ссылка: ${gratitudeLink || "(ссылка отсутствует)"}\n`;
+    }
+
+    try {
+      const res = await submitInstructorPromotionReport({
+        current_rank: currentRank,
+        target_rank: targetRank,
+        total_points: totalPoints,
+        items_completed: entries.map(e => ({
+          num: e.num,
+          count: e.count,
+          successCount: e.successCount,
+          links: e.links
+        })).concat(gratitude ? [{ num: 99, count: 1, successCount: 0, links: [gratitudeLink] }] : [])
+      });
+
+      sendInstructorPromotionReportDiscord({
+        name: authUser.name,
+        rank: currentRank,
+        staticId: authUser.static_id,
+        targetRank,
+        totalPoints,
+        itemsListText: itemsText,
+        instructorDiscordId: authUser.discord_id || undefined
+      }).catch(err => console.error("Discord error:", err));
+
+      const reportId = res?.id || Date.now();
+      const link = `${window.location.origin}/?tab=promotions&instructorReportId=${reportId}`;
+      setSubmittedReportLink(link);
+      setSuccess("Рапорт на повышение успешно подан!");
+      setEntries([]);
+      setGratitude(false);
+      setGratitudeLink("");
+      await loadData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Ошибка подачи рапорта");
+    }
+    setSubmitLoading(false);
+  };
+
+  const handleReviewClick = async (report: InstructorPromotionReport, status: "approved" | "rejected") => {
+    setReviewLoading(prev => ({ ...prev, [report.id]: true }));
+    try {
+      await reviewInstructorPromotionReport(report.id, status, reviewComment[report.id] || "");
+      
+      sendInstructorPromotionReviewedDiscord({
+        name: report.instructor_name || "",
+        staticId: report.instructor_static_id || "",
+        targetRank: report.target_rank,
+        status,
+        comment: reviewComment[report.id] || "",
+        reportId: report.id,
+        instructorDiscordId: report.instructor_discord_id || undefined
+      }).catch(err => console.error("Discord error:", err));
+
+      await loadData();
+      setExpandedId(null);
+    } catch (err: any) {
+      alert("Ошибка проверки: " + err.message);
+    }
+    setReviewLoading(prev => ({ ...prev, [report.id]: false }));
+  };
+
+  const hasPendingReport = reports.some(r => r.instructor_id === authUser.id && r.status === "pending");
+
+  const filteredReports = useMemo(() => {
+    return reports.filter(r => {
+      if (filterStatus !== "all" && r.status !== filterStatus) return false;
+      return true;
+    });
+  }, [reports, filterStatus]);
+
+  const maxRankReached = currentRank === "Капитан";
+
+  return (
+    <div className="animate-fade-in space-y-6">
+      <SectionHeader
+        title="Повышение инструкторского состава"
+        sub="Балловая система повышения квалификации и воинских званий"
+      />
+
+      {/* Sub Tabs for Leadership */}
+      {isLeadership && (
+        <div className="flex border-b border-tactical-border/60">
+          <button
+            onClick={() => setActiveSubTab("submit")}
+            className={`px-4 py-2 text-xs tracking-wider uppercase font-oswald border-b-2 transition-colors ${
+              activeSubTab === "submit"
+                ? "border-primary text-foreground font-semibold"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Подать рапорт
+          </button>
+          <button
+            onClick={() => setActiveSubTab("review")}
+            className={`px-4 py-2 text-xs tracking-wider uppercase font-oswald border-b-2 transition-colors relative ${
+              activeSubTab === "review"
+                ? "border-primary text-foreground font-semibold"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Проверка рапортов
+            {reports.filter(r => r.status === "pending").length > 0 && (
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+            )}
+          </button>
+        </div>
+      )}
+
+      {activeSubTab === "submit" ? (
+        maxRankReached ? (
+          <div className="bg-tactical-card border border-tactical-border p-6 text-center text-yellow-500 corner-mark">
+            <Icon name="Award" className="mx-auto text-yellow-500 mb-2" size={32} />
+            <h3 className="font-oswald text-lg uppercase tracking-wider">Максимальное звание</h3>
+            <p className="text-xs font-mono mt-1 text-muted-foreground">Вы уже достигли максимального воинского звания Капитан!</p>
+          </div>
+        ) : (
+          <div className="grid lg:grid-cols-12 gap-6 items-start">
+            {/* Left side - input form */}
+            <div className="lg:col-span-7 space-y-6">
+              <div className="bg-tactical-card border border-tactical-border/60 p-6 corner-mark space-y-4">
+                <h3 className="font-oswald text-sm tracking-widest uppercase text-muted-foreground border-b border-tactical-border pb-2">
+                  1. Звание для повышения
+                </h3>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase font-mono text-muted-foreground">Текущее звание</label>
+                    <input
+                      readOnly
+                      value={currentRank}
+                      className="w-full bg-tactical-panel/50 border border-tactical-border px-3 py-2 text-xs text-muted-foreground font-ibm focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase font-mono text-muted-foreground">Целевое звание</label>
+                    <input
+                      readOnly
+                      value={targetRank}
+                      className="w-full bg-tactical-panel/50 border border-tactical-border px-3 py-2 text-xs text-muted-foreground font-ibm focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Point Calculator items */}
+              <div className="bg-tactical-card border border-tactical-border/60 p-6 corner-mark space-y-6">
+                <div className="flex items-center justify-between border-b border-tactical-border pb-2">
+                  <h3 className="font-oswald text-sm tracking-widest uppercase text-muted-foreground">
+                    2. Выполненная работа
+                  </h3>
+                  <button
+                    onClick={addEntry}
+                    className="rank-badge text-primary border border-primary px-3 py-1 hover:bg-primary/10 transition-all flex items-center gap-1 text-[10px]"
+                  >
+                    <Icon name="Plus" size={10} /> Добавить пункт
+                  </button>
+                </div>
+
+                {entries.length === 0 ? (
+                  <div className="text-center p-8 border border-dashed border-tactical-border/40 text-muted-foreground">
+                    <p className="text-xs font-ibm">Нет добавленной работы. Нажмите кнопку выше для добавления записей.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {entries.map((entry) => {
+                      const selectedConfig = INSTRUCTOR_POINTS_CONFIG.find(c => c.num === entry.num);
+                      return (
+                        <div key={entry.id} className={`bg-tactical-panel border p-4 relative space-y-3 ${entry.isAuto ? "border-green-500/40" : "border-tactical-border/80"}`}>
+                          {!entry.isAuto ? (
+                            <button
+                              onClick={() => removeEntry(entry.id)}
+                              title="Удалить запись"
+                              className="absolute top-3 right-3 text-muted-foreground hover:text-red-500 transition-colors"
+                            >
+                              <Icon name="Trash2" size={14} />
+                            </button>
+                          ) : (
+                            <span className="absolute top-3 right-3 rank-badge text-green-400 border border-green-800 bg-green-950/40 px-1.5 py-0.5 text-[9px] flex items-center gap-0.5 select-none">
+                              <Icon name="CheckCircle" size={9} />
+                              Автоподтверждено
+                            </span>
+                          )}
+
+                          <div className="grid sm:grid-cols-12 gap-3 pr-6">
+                            <div className="sm:col-span-8 space-y-1">
+                              <label className="text-[9px] uppercase font-mono text-muted-foreground">Тип активности</label>
+                              <select
+                                value={entry.num}
+                                disabled={entry.isAuto}
+                                onChange={(e) => updateEntryField(entry.id, "num", Number(e.target.value))}
+                                className={`w-full bg-tactical-panel border border-tactical-border px-2 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary ${
+                                  entry.isAuto ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+                                }`}
+                              >
+                                {INSTRUCTOR_POINTS_CONFIG.map(c => (
+                                  <option key={c.num} value={c.num}>
+                                    Пункт {c.num}. {c.name} ({c.points} б.)
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="sm:col-span-4 space-y-1">
+                              <label className="text-[9px] uppercase font-mono text-muted-foreground">Количество</label>
+                              <input
+                                type="number"
+                                min="1"
+                                disabled={entry.isAuto}
+                                value={entry.count}
+                                onChange={(e) => updateEntryField(entry.id, "count", Number(e.target.value))}
+                                className={`w-full bg-tactical-panel border border-tactical-border px-2 py-1 text-xs text-foreground font-mono focus:outline-none focus:border-primary ${
+                                  entry.isAuto ? "opacity-60 cursor-not-allowed" : ""
+                                }`}
+                              />
+                            </div>
+                          </div>
+
+                          {selectedConfig?.desc && (
+                            <p className="text-[10px] text-muted-foreground italic font-ibm">{selectedConfig.desc}</p>
+                          )}
+
+                          {/* Sub points (Success bonus) */}
+                          {selectedConfig?.hasSubPoints && (
+                            <div className="flex items-center gap-3">
+                              <label className="text-[10px] uppercase font-mono text-muted-foreground">
+                                {selectedConfig.bonusLabel || "Успешные:"}
+                              </label>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  disabled={entry.isAuto}
+                                  onClick={() => updateEntryField(entry.id, "successCount", Math.max(0, entry.successCount - 1))}
+                                  className={`w-5 h-5 border border-tactical-border bg-tactical-panel flex items-center justify-center text-xs hover:border-primary ${
+                                    entry.isAuto ? "opacity-40 cursor-not-allowed" : ""
+                                  }`}
+                                >
+                                  -
+                                </button>
+                                <span className="font-mono text-xs w-6 text-center">{entry.successCount}</span>
+                                <button
+                                  disabled={entry.isAuto}
+                                  onClick={() => updateEntryField(entry.id, "successCount", Math.min(entry.count, entry.successCount + 1))}
+                                  className={`w-5 h-5 border border-tactical-border bg-tactical-panel flex items-center justify-center text-xs hover:border-primary ${
+                                    entry.isAuto ? "opacity-40 cursor-not-allowed" : ""
+                                  }`}
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <span className="text-[10px] text-muted-foreground">(макс. {entry.count})</span>
+                            </div>
+                          )}
+
+                          {/* Links block */}
+                          <div className="space-y-1.5 border-t border-tactical-border/40 pt-2">
+                            <span className="text-[9px] uppercase font-mono text-muted-foreground block">Ссылки на скриншоты (доказательства)</span>
+                            {entry.links.map((link, linkIdx) => (
+                              <input
+                                key={linkIdx}
+                                type={entry.isAuto ? "text" : "url"}
+                                placeholder={`Ссылка на скриншот №${linkIdx + 1}...`}
+                                disabled={entry.isAuto}
+                                value={link}
+                                onChange={(e) => {
+                                  const newLinks = [...entry.links];
+                                  newLinks[linkIdx] = e.target.value;
+                                  updateEntryField(entry.id, "links", newLinks);
+                                }}
+                                className={`w-full bg-tactical-panel border border-tactical-border px-2 py-1 text-xs text-foreground font-mono focus:outline-none focus:border-primary ${
+                                  entry.isAuto ? "opacity-60 cursor-not-allowed" : ""
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Gratitude item */}
+                <div className="border-t border-tactical-border/60 pt-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="gratitude_checkbox"
+                      checked={gratitude}
+                      onChange={(e) => setGratitude(e.target.checked)}
+                      className="rounded border-tactical-border text-primary focus:ring-primary bg-tactical-panel"
+                    />
+                    <label htmlFor="gratitude_checkbox" className="text-xs font-ibm text-foreground cursor-pointer select-none">
+                      Использовать благодарность от старшего состава (+50 баллов, не более одной)
+                    </label>
+                  </div>
+                  {gratitude && (
+                    <input
+                      type="url"
+                      placeholder="Ссылка на скриншот благодарности..."
+                      value={gratitudeLink}
+                      onChange={(e) => setGratitudeLink(e.target.value)}
+                      className="w-full bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-mono focus:outline-none focus:border-primary"
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right side - status and preview */}
+            <div className="lg:col-span-5 space-y-6">
+              {/* Checklist and points */}
+              {activeFlowConfig && (
+                <div className="bg-tactical-card border border-tactical-border/60 p-6 corner-mark space-y-4">
+                  <h3 className="font-oswald text-sm tracking-widest uppercase text-muted-foreground border-b border-tactical-border pb-2">
+                    Требования для повышения
+                  </h3>
+                  
+                  {/* Points requirement */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center text-xs font-mono">
+                      <span>Набрано баллов:</span>
+                      <span className={checklistStatus.pointsCompleted ? "text-green-400 font-bold" : "text-primary"}>
+                        {totalPoints} / {activeFlowConfig.points}
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-tactical-panel border border-tactical-border rounded-sm overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-300 ${
+                          checklistStatus.pointsCompleted ? "bg-green-500" : "bg-primary"
+                        }`}
+                        style={{ width: `${Math.min(100, (totalPoints / activeFlowConfig.points) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Mandatory items checklist */}
+                  <div className="space-y-2 pt-2 border-t border-tactical-border/40">
+                    <span className="text-[10px] uppercase font-mono text-muted-foreground block">Обязательное выполнение пунктов:</span>
+                    <div className="space-y-1.5">
+                      {checklistStatus.items.map((item, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Icon
+                              name={item.completed ? "CheckSquare" : "Square"}
+                              size={12}
+                              className={item.completed ? "text-green-400" : "text-muted-foreground/30"}
+                            />
+                            <span className={item.completed ? "text-green-300" : ""}>
+                              Пункт {item.num}. {item.name}
+                            </span>
+                          </div>
+                          <span className={`font-mono font-bold ${item.completed ? "text-green-400" : "text-red-400"}`}>
+                            {item.enteredCount} / {item.count}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Military Report preview */}
+              <div className="bg-tactical-card border border-tactical-border/60 p-4 corner-mark space-y-3">
+                <h4 className="font-oswald text-xs tracking-widest uppercase text-muted-foreground">
+                  Предпросмотр документа
+                </h4>
+                <InstructorMilitaryReport
+                  name={authUser.name}
+                  staticId={authUser.static_id}
+                  currentRank={currentRank}
+                  targetRank={targetRank}
+                  totalPoints={totalPoints}
+                  entries={entries}
+                  gratitude={gratitude}
+                  gratitudeLink={gratitudeLink}
+                  date={new Date().toLocaleDateString("ru-RU")}
+                />
+              </div>
+
+              {/* Error messages */}
+              {error && (
+                <div className="flex items-center gap-2 bg-red-900/20 border border-red-800 px-4 py-3">
+                  <Icon name="AlertTriangle" size={14} className="text-red-400" />
+                  <p className="text-xs text-red-400 font-ibm">{error}</p>
+                </div>
+              )}
+
+              {/* Success box */}
+              {success && (
+                <div className="flex flex-col gap-3 bg-green-900/20 border border-green-800 px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Icon name="CheckCircle" size={14} className="text-green-400" />
+                    <p className="text-xs text-green-400 font-semibold font-ibm">{success}</p>
+                  </div>
+                  {submittedReportLink && (
+                    <div className="space-y-1.5 bg-black/40 p-3 border border-tactical-border/60">
+                      <p className="text-[10px] text-muted-foreground font-mono">
+                        Ссылка на рапорт (скопируйте и отправьте в Discord):
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          readOnly
+                          value={submittedReportLink}
+                          className="bg-tactical-panel border border-tactical-border px-2 py-1 text-xs text-foreground font-mono flex-1 select-all focus:outline-none"
+                        />
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(submittedReportLink);
+                            alert("Ссылка скопирована!");
+                          }}
+                          className="bg-primary text-primary-foreground font-oswald text-[10px] tracking-wider uppercase px-2.5 py-1 hover:bg-primary/90 transition-colors flex items-center gap-0.5"
+                        >
+                          <Icon name="Copy" size={10} />
+                          Копировать
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Action Submit Button */}
+              <button
+                onClick={handleSubmit}
+                disabled={!checklistStatus.allCompleted || submitLoading || hasPendingReport}
+                className="w-full bg-primary text-primary-foreground font-oswald text-xs tracking-widest uppercase py-3.5 px-8 hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 corner-mark"
+              >
+                <Icon name="Send" size={12} />
+                {submitLoading ? "Отправка..." : hasPendingReport ? "Рапорт на рассмотрении" : "Подать рапорт"}
+              </button>
+            </div>
+          </div>
+        )
+      ) : (
+        /* Review instructor promotion reports list */
+        <div className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <p className="text-xs text-muted-foreground font-ibm">
+              Всего рапортов: {filteredReports.length}
+            </p>
+            <div className="flex gap-2">
+              <select
+                className="bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="all">Все статусы</option>
+                <option value="pending">На рассмотрении</option>
+                <option value="approved">Одобренные</option>
+                <option value="rejected">Отклонённые</option>
+              </select>
+            </div>
+          </div>
+
+          {reportsLoading ? (
+            <Spinner />
+          ) : filteredReports.length === 0 ? (
+            <Empty text="Рапортов инструкторов не найдено" />
+          ) : (
+            <div className="space-y-3">
+              {filteredReports.map((r) => {
+                const isExpanded = expandedId === r.id;
+                
+                return (
+                  <div
+                    key={r.id}
+                    className={`bg-green-950/20 border transition-colors ${
+                      isExpanded ? "border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.2)]" : "border-green-500/30 hover:border-green-500/60"
+                    }`}
+                  >
+                    <div
+                      className="p-4 cursor-pointer flex items-start justify-between gap-3"
+                      onClick={() => setExpandedId(isExpanded ? null : r.id)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-green-950 border border-green-500 text-green-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <Icon name="Star" size={14} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-ibm text-sm font-medium text-green-200">
+                              {r.instructor_name}
+                            </h4>
+                            <span className="rank-badge text-green-400 border border-green-800 bg-green-950/40 px-1.5 py-0.5 text-[10px]">
+                              {r.current_rank} → {r.target_rank}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                            ID: {r.instructor_static_id} · {fmt(r.created_at)} · {r.total_points} баллов
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status={r.status} />
+                        <Icon
+                          name={isExpanded ? "ChevronUp" : "ChevronDown"}
+                          size={14}
+                          className="text-muted-foreground"
+                        />
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="border-t border-tactical-border divide-y divide-tactical-border animate-fade-in">
+                        <div className="p-4 bg-tactical-panel/30 border-b border-tactical-border space-y-2">
+                          <div className="flex justify-between items-center mb-2">
+                            <h4 className="font-oswald text-[10px] tracking-widest uppercase text-muted-foreground">
+                              Документ рапорта
+                            </h4>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const reportLink = `${window.location.origin}/?tab=promotions&instructorReportId=${r.id}`;
+                                navigator.clipboard.writeText(reportLink);
+                                alert("Ссылка скопирована!");
+                              }}
+                              className="text-[10px] text-primary hover:underline font-mono uppercase tracking-wider flex items-center gap-1"
+                            >
+                              <Icon name="Copy" size={10} />
+                              Скопировать ссылку для Discord
+                            </button>
+                          </div>
+                          
+                          {/* Formal document component */}
+                          <InstructorMilitaryReport
+                            name={r.instructor_name || "Инструктор"}
+                            staticId={r.instructor_static_id || ""}
+                            currentRank={r.current_rank}
+                            targetRank={r.target_rank}
+                            totalPoints={r.total_points}
+                            entries={r.items_completed.filter(e => e.num !== 99)}
+                            gratitude={r.items_completed.some(e => e.num === 99)}
+                            gratitudeLink={r.items_completed.find(e => e.num === 99)?.links[0] || ""}
+                            date={new Date(r.created_at).toLocaleDateString("ru-RU")}
+                          />
+                        </div>
+
+                        {/* Review actions */}
+                        {r.status === "pending" && (
+                          <div className="p-4 bg-tactical-panel/50 space-y-2">
+                            <input
+                              className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-ibm focus:outline-none focus:border-primary transition-colors"
+                              placeholder="Комментарий руководства (необязательно)..."
+                              value={reviewComment[r.id] || ""}
+                              onChange={(e) => setReviewComment(prev => ({ ...prev, [r.id]: e.target.value }))}
+                            />
+                            <div className="flex items-center gap-2">
+                              <button
+                                disabled={reviewLoading[r.id]}
+                                onClick={() => handleReviewClick(r, "approved")}
+                                className="rank-badge text-green-400 border border-green-800 px-3 py-1.5 hover:bg-green-900/30 transition-colors disabled:opacity-50 flex items-center gap-1 text-xs"
+                              >
+                                <Icon name="Check" size={12} /> Одобрить и повысить
+                              </button>
+                              <button
+                                disabled={reviewLoading[r.id]}
+                                onClick={() => handleReviewClick(r, "rejected")}
+                                className="rank-badge text-red-400 border border-red-800 px-3 py-1.5 hover:bg-red-900/30 transition-colors disabled:opacity-50 flex items-center gap-1 text-xs"
+                              >
+                                <Icon name="X" size={12} /> Отклонить
+                              </button>
+                              {reviewLoading[r.id] && (
+                                <Icon name="Loader2" size={14} className="text-primary animate-spin" />
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Reviewed by */}
+                        {r.status !== "pending" && r.reviewer_name && (
+                          <div className="px-4 py-3 bg-tactical-panel/10">
+                            <p className="text-xs text-muted-foreground font-mono">
+                              Рассмотрел: {r.reviewer_name}
+                              {r.instructor_comment && ` · Комментарий: "${r.instructor_comment}"`}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PromotionInstructorTab({
   highlightReportId,
   onReviewSuccess,
@@ -614,14 +1713,15 @@ export function PromotionInstructorTab({
     try {
       await reviewPromotionReport(report.id, status, reviewComment[report.id] || "");
       
-      if (status === "approved") {
-        sendPromotionApprovedDiscord({
-          name: report.cadet_name,
-          staticId: report.cadet_static_id,
-          promotionType: report.promotion_type,
-          reportId: report.id,
-        }).catch((err) => console.error("Discord error:", err));
-      }
+      sendPromotionReviewedDiscord({
+        name: report.cadet_name,
+        staticId: report.cadet_static_id,
+        promotionType: report.promotion_type,
+        status,
+        comment: reviewComment[report.id] || "",
+        reportId: report.id,
+        cadetDiscordId: report.cadet_discord_id || undefined,
+      }).catch((err) => console.error("Discord error:", err));
 
       await loadReports();
       setExpandedId(null);

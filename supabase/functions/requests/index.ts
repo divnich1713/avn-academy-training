@@ -33,7 +33,7 @@ async function getUserByToken(client: Client, token: string | null) {
   return null;
 }
 
-Deno.serve(async (req) => {
+export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response("", { headers: CORS_HEADERS, status: 200 });
   }
@@ -64,24 +64,30 @@ Deno.serve(async (req) => {
         query = `
           SELECT r.id, r.type, r.subject, r.description, r.preferred_date,
                  r.status, r.instructor_comment, r.created_at, r.updated_at,
+                 r.instructor_id,
                  u.name as cadet_name, u.rank as cadet_rank, u.static_id as cadet_static_id,
-                 u.id as cadet_id,
-                 rv.name as reviewer_name
+                 u.id as cadet_id, u.discord_id as cadet_discord_id,
+                 rv.name as reviewer_name,
+                 inst.name as target_instructor_name, inst.rank as target_instructor_rank
           FROM ${SCHEMA}.requests r
           JOIN ${SCHEMA}.users u ON r.user_id = u.id
           LEFT JOIN ${SCHEMA}.users rv ON r.reviewed_by = rv.id
+          LEFT JOIN ${SCHEMA}.users inst ON r.instructor_id = inst.id
           ORDER BY r.created_at DESC
         `;
       } else {
         query = `
           SELECT r.id, r.type, r.subject, r.description, r.preferred_date,
                  r.status, r.instructor_comment, r.created_at, r.updated_at,
+                 r.instructor_id,
                  u.name as cadet_name, u.rank as cadet_rank, u.static_id as cadet_static_id,
-                 u.id as cadet_id,
-                 rv.name as reviewer_name
+                 u.id as cadet_id, u.discord_id as cadet_discord_id,
+                 rv.name as reviewer_name,
+                 inst.name as target_instructor_name, inst.rank as target_instructor_rank
           FROM ${SCHEMA}.requests r
           JOIN ${SCHEMA}.users u ON r.user_id = u.id
           LEFT JOIN ${SCHEMA}.users rv ON r.reviewed_by = rv.id
+          LEFT JOIN ${SCHEMA}.users inst ON r.instructor_id = inst.id
           WHERE r.user_id = $1
           ORDER BY r.created_at DESC
         `;
@@ -110,6 +116,7 @@ Deno.serve(async (req) => {
       const subject = String(body.subject || "").trim();
       const description = String(body.description || "").trim();
       const preferred_date = body.preferred_date || null;
+      const instructor_id = body.instructor_id ? Number(body.instructor_id) : null;
 
       if (!req_type || !["lecture", "practice", "exam", "report"].includes(req_type)) {
         return new Response(JSON.stringify({ error: "Неверный тип запроса" }), {
@@ -128,15 +135,30 @@ Deno.serve(async (req) => {
       const discord_channel_id = body.discord_channel_id || null;
 
       const insertRes = await client.queryObject<{ id: number }>(
-        `INSERT INTO ${SCHEMA}.requests (user_id, type, subject, description, preferred_date, discord_message_id, discord_channel_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-        [user.id, req_type, subject, description || null, preferred_date, discord_message_id, discord_channel_id]
+        `INSERT INTO ${SCHEMA}.requests (user_id, type, subject, description, preferred_date, discord_message_id, discord_channel_id, instructor_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+        [user.id, req_type, subject, description || null, preferred_date, discord_message_id, discord_channel_id, instructor_id]
       );
       const newId = insertRes.rows[0].id;
 
       // Уведомление всем инструкторам
       const typeMap: Record<string, string> = { lecture: "лекция", practice: "практика", exam: "экзамен", report: "рапорт" };
       const typeText = typeMap[req_type] || req_type;
+
+      let instName = "";
+      if (instructor_id) {
+        const instRes = await client.queryObject<{ name: string }>(
+          `SELECT name FROM ${SCHEMA}.users WHERE id = $1`,
+          [instructor_id]
+        );
+        if (instRes.rows.length > 0) {
+          instName = instRes.rows[0].name;
+        }
+      }
+
+      const msgText = instName 
+        ? `${user.rank} ${user.name} подал запрос на тему "${subject}" (${typeText}). Выбранный инструктор: ${instName}.`
+        : `${user.rank} ${user.name} подал запрос на тему "${subject}" (${typeText}).`;
 
       await client.queryArray(
         `INSERT INTO ${SCHEMA}.notifications (user_id, type, title, message)
@@ -145,7 +167,7 @@ Deno.serve(async (req) => {
          WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head', 'senior_ufsvng')`,
         [
           `Новый запрос: ${typeText}`,
-          `${user.rank} ${user.name} подал запрос на тему "${subject}" (${typeText}).`
+          msgText
         ]
       );
 
@@ -182,6 +204,20 @@ Deno.serve(async (req) => {
           status: 400,
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
         });
+      }
+
+      const checkRes = await client.queryObject<{ instructor_id: number | null }>(
+        `SELECT instructor_id FROM ${SCHEMA}.requests WHERE id = $1`,
+        [Number(requestId)]
+      );
+      if (checkRes.rows.length > 0) {
+        const targetInstId = checkRes.rows[0].instructor_id;
+        if (targetInstId && targetInstId !== user.id) {
+          return new Response(JSON.stringify({ error: "Этот запрос адресован конкретному инструктору" }), {
+            status: 403,
+            headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+          });
+        }
       }
 
       await client.queryArray(
@@ -221,28 +257,36 @@ Deno.serve(async (req) => {
           [cadetId, "request_reviewed", `Запрос ${statusText}`, notifMessage]
         );
 
-        // Add ❌ reaction to original Discord message if the request is a rejected dismissal report
+        // Add ❌ reaction to original Discord message if the request is a rejected dismissal report (non-blocking)
         if (status === "rejected" && subject === "Рапорт на увольнение из академии" && msgId && chanId) {
           const botToken = Deno.env.get("DISCORD_BOT_TOKEN");
           if (botToken) {
-            try {
-              const url = `https://discord.com/api/v10/channels/${chanId}/messages/${msgId}/reactions/%E2%9D%8C/@me`;
-              const dRes = await fetch(url, {
-                method: "PUT",
-                headers: {
-                  "Authorization": `Bot ${botToken}`,
-                  "Content-Type": "application/json"
+            (async () => {
+              try {
+                const url = `https://discord.com/api/v10/channels/${chanId}/messages/${msgId}/reactions/%E2%9D%8C/@me`;
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000); // 3-second timeout limit
+                
+                const dRes = await fetch(url, {
+                  method: "PUT",
+                  headers: {
+                    "Authorization": `Bot ${botToken}`,
+                    "Content-Type": "application/json"
+                  },
+                  signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                
+                if (!dRes.ok) {
+                  const errText = await dRes.text();
+                  console.error(`Discord reaction error: ${dRes.status} ${errText}`);
+                } else {
+                  console.log(`Successfully reacted ❌ to message ${msgId} in channel ${chanId}`);
                 }
-              });
-              if (!dRes.ok) {
-                const errText = await dRes.text();
-                console.error(`Discord reaction error: ${dRes.status} ${errText}`);
-              } else {
-                console.log(`Successfully reacted ❌ to message ${msgId} in channel ${chanId}`);
+              } catch (err) {
+                console.error(`Failed to add Discord reaction: ${err.message}`);
               }
-            } catch (err) {
-              console.error(`Failed to add Discord reaction: ${err.message}`);
-            }
+            })();
           } else {
             console.warn("DISCORD_BOT_TOKEN not found in environment, skipped Discord reaction");
           }
@@ -412,4 +456,8 @@ Deno.serve(async (req) => {
       client.release();
     }
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handler);
+}

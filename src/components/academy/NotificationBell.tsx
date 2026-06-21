@@ -5,25 +5,9 @@ import { Section } from "./types";
 
 function playNotificationSound() {
   try {
-    const ctx = new AudioContext();
-    const o1 = ctx.createOscillator();
-    const o2 = ctx.createOscillator();
-    const gain = ctx.createGain();
-    o1.connect(gain);
-    o2.connect(gain);
-    gain.connect(ctx.destination);
-    o1.type = "sine";
-    o2.type = "sine";
-    o1.frequency.setValueAtTime(880, ctx.currentTime);
-    o1.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.15);
-    o2.frequency.setValueAtTime(1100, ctx.currentTime + 0.18);
-    o2.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.35);
-    gain.gain.setValueAtTime(0.25, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-    o1.start(ctx.currentTime);
-    o1.stop(ctx.currentTime + 0.18);
-    o2.start(ctx.currentTime + 0.18);
-    o2.stop(ctx.currentTime + 0.4);
+    const audio = new Audio("/shutdown-beep.mp3");
+    audio.volume = 0.45;
+    audio.play();
   } catch (_e) { /* silent */ }
 }
 

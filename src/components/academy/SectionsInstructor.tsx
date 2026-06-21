@@ -74,6 +74,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   const [reviewEndScreenshot, setReviewEndScreenshot] = useState<Record<number, string>>({});
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("pending");
+  const [filterInstructor, setFilterInstructor] = useState<string>("all");
 
 
 
@@ -129,7 +130,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
           setReviewLoading((prev) => ({ ...prev, [id]: false }));
           return;
         }
-        finalComment = `[Начало практики: ${start}] [Конец практики: ${end}] ${finalComment}`.trim();
+        finalComment = `[Начало практики: ${start}]\n[Конец практики: ${end}]${finalComment ? '\n' + finalComment : ''}`.trim();
       }
 
       await reviewRequest(id, status, finalComment).catch(() => {});
@@ -147,7 +148,8 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
               subject: req.subject,
               status: status,
               reviewerName: `${authUser.rank} ${authUser.name}`,
-              comment: finalComment
+              comment: finalComment,
+              cadetDiscordId: req.cadet_discord_id || undefined
             });
           } catch (err) {
             console.error("Failed to send review to Discord:", err);
@@ -312,10 +314,13 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
           const dateStr = new Date(r.created_at).toLocaleDateString("ru-RU");
           if (dateStr !== selectedReqDate) return false;
         }
+        if (filterInstructor === "me") {
+          if (r.instructor_id !== authUser.id) return false;
+        }
         return true;
       })
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [allRequestsPlusDismissals, filterType, filterStatus, selectedReqDate]);
+  }, [allRequestsPlusDismissals, filterType, filterStatus, selectedReqDate, filterInstructor, authUser.id]);
 
   const pendingCount = allRequestsPlusDismissals.filter((r) => r.status === "pending").length;
 
@@ -567,6 +572,11 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                 {fmt(r.created_at)}
                 {r.preferred_date && fmt(r.created_at) !== fmt(r.preferred_date) && ` · Дата: ${fmt(r.preferred_date)}`}
               </p>
+              {r.target_instructor_name && (
+                <p className="text-xs font-mono mt-1 text-yellow-500">
+                  Желаемый инструктор: {r.instructor_id === authUser.id ? <span className="text-primary font-bold">Вы ({r.target_instructor_name})</span> : r.target_instructor_name}
+                </p>
+              )}
               {r.description && (
                 <div className="text-xs text-muted-foreground mt-1 bg-tactical-panel border border-tactical-border/60 p-2 font-mono whitespace-pre-line text-[11px] leading-relaxed">
                   {r.description.split("\n").map((line, idx) => {
@@ -598,6 +608,16 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
           <StatusBadge status={r.status} />
         </div>
         {r.status === "pending" && (() => {
+          const isAssignedToOther = r.instructor_id && r.instructor_id !== authUser.id;
+          if (isAssignedToOther) {
+            return (
+              <div className="border-t border-tactical-border pt-3">
+                <p className="text-xs text-muted-foreground font-mono italic">
+                  Запрос адресован конкретному инструктору и может быть принят только им.
+                </p>
+              </div>
+            );
+          }
           const isPracticeExam = r.subject.includes("Штраф — Задержание — Арест") || r.subject.includes("Штраф, Задержание, Арест");
           return (
             <div className="border-t border-tactical-border pt-3 space-y-2">
@@ -779,6 +799,14 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                 <option value="approved">Одобренные</option>
                 <option value="rejected">Отклонённые</option>
                 <option value="all">Все статусы</option>
+              </select>
+              <select
+                className="bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary cursor-pointer transition-colors"
+                value={filterInstructor}
+                onChange={(e) => setFilterInstructor(e.target.value)}
+              >
+                <option value="all">Все адресаты</option>
+                <option value="me">Адресованные мне</option>
               </select>
               <select
                 className="bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary cursor-pointer transition-colors"
