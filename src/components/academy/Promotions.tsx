@@ -990,12 +990,22 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
           new Date(r.reviewed_at || r.created_at) > cutoffDate
       ).length;
 
+      const lectureConfig = pointsConfig.find(c => c.name.toLowerCase().includes("лекци"));
+      const examConfig = pointsConfig.find(c => c.name.toLowerCase().includes("экзамен"));
+      const reviewConfig = pointsConfig.find(c => c.name.toLowerCase().includes("рапорт") || c.name.toLowerCase().includes("рапортов"));
+      const oathConfig = pointsConfig.find(c => c.name.toLowerCase().includes("присяг"));
+
+      const lectureNum = lectureConfig ? lectureConfig.num : 10;
+      const examNum = examConfig ? examConfig.num : 14;
+      const reviewNum = reviewConfig ? reviewConfig.num : 15;
+      const oathNum = oathConfig ? oathConfig.num : 17;
+
       const autoEntries: typeof entries = [];
 
       if (lecturesCount > 0) {
         autoEntries.push({
           id: "auto_lecture",
-          num: 10,
+          num: lectureNum,
           count: lecturesCount,
           successCount: 0,
           links: Array(lecturesCount).fill("[Автоподтверждение из БД]"),
@@ -1005,7 +1015,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       if (examsCount > 0) {
         autoEntries.push({
           id: "auto_exam",
-          num: 14,
+          num: examNum,
           count: examsCount,
           successCount: 0,
           links: Array(examsCount).fill("[Автоподтверждение из БД]"),
@@ -1015,7 +1025,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       if (myReviewsCount > 0) {
         autoEntries.push({
           id: "auto_review",
-          num: 15,
+          num: reviewNum,
           count: myReviewsCount,
           successCount: 0,
           links: Array(myReviewsCount).fill("[Автоподтверждение из БД]"),
@@ -1025,7 +1035,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       if (oathsCount > 0) {
         autoEntries.push({
           id: "auto_oath",
-          num: 17,
+          num: oathNum,
           count: oathsCount,
           successCount: 0,
           links: Array(oathsCount).fill("[Автоподтверждение из БД]"),
@@ -1043,7 +1053,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       setReportsLoading(false);
       setAutoLoading(false);
     }
-  }, [authUser]);
+  }, [authUser, pointsConfig]);
 
   useEffect(() => {
     loadData();
