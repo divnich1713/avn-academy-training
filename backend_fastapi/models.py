@@ -107,3 +107,14 @@ class TestSettings(Base):
     time_limit_per_question = Column(Integer, nullable=False, default=0)
     passing_score_percent = Column(Integer, nullable=False, default=80)
 
+
+class CustomMaterial(Base):
+    __tablename__ = "custom_materials"
+    __table_args__ = {"schema": settings.SCHEMA}
+
+    id = Column(Integer, primary_key=True, index=True)
+    material_type = Column(String(50), unique=True, nullable=False)
+    data = Column(JSONB, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from database import get_db
-from models import User, Session, TestQuestion, TestAttempt, TestAnswer, StudentElo, TestSettings
+from models import User, Session, TestQuestion, TestAttempt, TestAnswer, StudentElo, TestSettings, CustomMaterial
 from elo import update_elo
 from redis_client import redis_client, check_rate_limit
 
@@ -131,6 +131,14 @@ async def get_active_session(
         from sqlalchemy import text
         await db.execute(text(f"ALTER TABLE {settings.SCHEMA}.test_settings ADD COLUMN IF NOT EXISTS time_limit_per_question INTEGER DEFAULT 0;"))
         await db.execute(text(f"ALTER TABLE {settings.SCHEMA}.test_settings ADD COLUMN IF NOT EXISTS passing_score_percent INTEGER DEFAULT 80;"))
+        await db.execute(text(f"""
+            CREATE TABLE IF NOT EXISTS {settings.SCHEMA}.custom_materials (
+                id SERIAL PRIMARY KEY,
+                material_type VARCHAR(50) NOT NULL UNIQUE,
+                data JSONB NOT NULL,
+                updated_at TIMESTAMP DEFAULT NOW()
+            );
+        """))
         await db.commit()
     except Exception as mig_err:
         print(f"FastAPI active-session inline migration warning: {mig_err}")
@@ -845,4 +853,80 @@ async def update_settings_admin(
     await db.commit()
     await db.refresh(settings_row)
     return settings_row
+
+
+class SaveCustomMaterialRequest(BaseModel):
+    type: str
+    data: Any
+
+
+@router.get("/custom-materials")
+async def get_custom_materials(
+    type: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        from sqlalchemy import text
+        await db.execute(text(f"""
+            CREATE TABLE IF NOT EXISTS {settings.SCHEMA}.custom_materials (
+                id SERIAL PRIMARY KEY,
+                material_type VARCHAR(50) NOT NULL UNIQUE,
+                data JSONB NOT NULL,
+                updated_at TIMESTAMP DEFAULT NOW()
+            );
+        """))
+        await db.commit()
+    except Exception as mig_err:
+        print(f"FastAPI custom-materials inline migration warning: {mig_err}")
+
+    stmt = select(CustomMaterial).where(CustomMaterial.material_type == type)
+    res = await db.execute(stmt)
+    material = res.scalar_one_or_none()
+    if not material:
+        return None
+    return material.data
+
+
+@router.post("/custom-materials")
+async def save_custom_materials(
+    payload: SaveCustomMaterialRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        from sqlalchemy import text
+        await db.execute(text(f"""
+            CREATE TABLE IF NOT EXISTS {settings.SCHEMA}.custom_materials (
+                id SERIAL PRIMARY KEY,
+                material_type VARCHAR(50) NOT NULL UNIQUE,
+                data JSONB NOT NULL,
+                updated_at TIMESTAMP DEFAULT NOW()
+            );
+        """))
+        await db.commit()
+    except Exception as mig_err:
+        print(f"FastAPI custom-materials inline migration warning: {mig_err}")
+
+    allowed_mutators = ["head_avng", "deputy_head", "chief_instructor", "senior_ufsvng"]
+    if user.role not in allowed_mutators:
+        raise HTTPException(status_code=403, detail="Недостаточно прав для сохранения материалов")
+        
+    stmt = select(CustomMaterial).where(CustomMaterial.material_type == payload.type)
+    res = await db.execute(stmt)
+    material = res.scalar_one_or_none()
+    
+    if material:
+        material.data = payload.data
+        material.updated_at = datetime.utcnow()
+    else:
+        material = CustomMaterial(
+            material_type=payload.type,
+            data=payload.data
+        )
+        db.add(material)
+        
+    await db.commit()
+    return {"success": True}
+
 

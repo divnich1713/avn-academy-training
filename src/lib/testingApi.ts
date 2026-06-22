@@ -1,6 +1,7 @@
 import { getToken } from "./api";
 
 const TESTING_API_URL = import.meta.env.VITE_TESTING_API_URL || "/supabase-api/testing";
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
 
 async function request(path: string, options: RequestInit = {}) {
   const token = getToken();
@@ -225,6 +226,27 @@ export const testingApi = {
 
   async getAttemptDetails(attemptId: number): Promise<{ questions: AttemptDetailQuestion[] }> {
     return request(`/api/tests/attempt-details?attempt_id=${attemptId}`);
+  },
+
+  async getCustomMaterials(type: string): Promise<any> {
+    if (USE_MOCK) {
+      const key = type === "flashcards" ? "avng_custom_flashcards_decks" : "avng_custom_scenarios";
+      const saved = localStorage.getItem(key);
+      return saved ? JSON.parse(saved) : null;
+    }
+    return request(`/api/tests/custom-materials?type=${type}`);
+  },
+
+  async saveCustomMaterials(type: string, data: any): Promise<any> {
+    if (USE_MOCK) {
+      const key = type === "flashcards" ? "avng_custom_flashcards_decks" : "avng_custom_scenarios";
+      localStorage.setItem(key, JSON.stringify(data));
+      return { success: true };
+    }
+    return request("/api/tests/custom-materials", {
+      method: "POST",
+      body: JSON.stringify({ type, data }),
+    });
   },
 };
 

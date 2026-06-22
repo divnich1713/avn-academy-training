@@ -98,7 +98,9 @@ export function calculateUserXP({
         parsedDecks.forEach((d: any) => {
           deckSizes[d.id] = (d.cards || []).length;
         });
-      } catch {}
+      } catch (err) {
+        console.warn("Failed to parse saved decks for XP calculation:", err);
+      }
     }
     Object.keys(deckSizes).forEach((deckId) => {
       const totalCards = deckSizes[deckId];

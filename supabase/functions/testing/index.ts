@@ -289,6 +289,14 @@ export default async function handler(req: Request): Promise<Response> {
         ALTER TABLE ${SCHEMA}.test_settings 
         ADD COLUMN IF NOT EXISTS passing_score_percent INTEGER DEFAULT 80;
       `);
+      await client.queryArray(`
+        CREATE TABLE IF NOT EXISTS ${SCHEMA}.custom_materials (
+          id SERIAL PRIMARY KEY,
+          material_type VARCHAR(50) NOT NULL UNIQUE,
+          data JSONB NOT NULL,
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `);
     } catch (migErr) {
       console.error("Deno DB migration error: ", migErr);
     }
@@ -1271,6 +1279,70 @@ export default async function handler(req: Request): Promise<Response> {
         }
         
         return new Response(JSON.stringify(settingsRow), {
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // ==========================================
+    // 15. Custom Materials: /api/tests/custom-materials
+    // ==========================================
+    if (path === "/api/tests/custom-materials") {
+      // GET /api/tests/custom-materials?type={type}
+      if (req.method === "GET") {
+        const type = url.searchParams.get("type");
+        if (!type) {
+          return new Response(JSON.stringify({ error: "Missing type parameter" }), {
+            status: 400,
+            headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+          });
+        }
+        
+        const res = await client.queryObject<any>(
+          `SELECT data FROM ${SCHEMA}.custom_materials WHERE material_type = $1`,
+          [type]
+        );
+        
+        if (res.rows.length === 0) {
+          return new Response(JSON.stringify(null), {
+            headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+          });
+        }
+        
+        return new Response(JSON.stringify(res.rows[0].data), {
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
+
+      // POST /api/tests/custom-materials
+      if (req.method === "POST") {
+        const allowedMutators = ["head_avng", "deputy_head", "chief_instructor", "senior_ufsvng"];
+        if (!allowedMutators.includes(user.role)) {
+          return new Response(JSON.stringify({ error: "Недостаточно прав для сохранения материалов" }), {
+            status: 403,
+            headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+          });
+        }
+
+        const body = await req.json();
+        const { type, data } = body;
+        
+        if (!type || data === undefined) {
+          return new Response(JSON.stringify({ error: "Missing type or data" }), {
+            status: 400,
+            headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+          });
+        }
+
+        await client.queryArray(
+          `INSERT INTO ${SCHEMA}.custom_materials (material_type, data, updated_at)
+           VALUES ($1, $2, NOW())
+           ON CONFLICT (material_type) DO UPDATE
+           SET data = EXCLUDED.data, updated_at = NOW()`,
+          [type, JSON.stringify(data)]
+        );
+
+        return new Response(JSON.stringify({ success: true }), {
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
         });
       }

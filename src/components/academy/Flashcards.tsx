@@ -268,7 +268,9 @@ export function Flashcards({ authUser }: { authUser?: User }) {
   const [decks, setDecks] = useState<Deck[]>(() => {
     try {
       const saved = localStorage.getItem("avng_custom_flashcards_decks");
-      return saved ? JSON.parse(saved) : DEFAULT_DECKS;
+      if (!saved) return DEFAULT_DECKS;
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_DECKS;
     } catch {
       return DEFAULT_DECKS;
     }
@@ -283,25 +285,36 @@ export function Flashcards({ authUser }: { authUser?: User }) {
   useEffect(() => {
     testingApi.getCustomMaterials("flashcards")
       .then((data) => {
-        if (data && Array.isArray(data)) {
+        if (data && Array.isArray(data) && data.length > 0) {
           setDecks(data);
           localStorage.setItem("avng_custom_flashcards_decks", JSON.stringify(data));
-        } else if (!data) {
+        } else {
+          // If DB returned null or empty, check local storage
           const local = localStorage.getItem("avng_custom_flashcards_decks");
-          if (local && isAdmin) {
+          if (local) {
             try {
               const parsed = JSON.parse(local);
               if (Array.isArray(parsed) && parsed.length > 0) {
-                testingApi.saveCustomMaterials("flashcards", parsed)
-                  .then(() => console.log("Successfully auto-uploaded local flashcards to DB"))
-                  .catch((err) => console.error("Auto-upload flashcards failed:", err));
+                setDecks(parsed);
+                if (isAdmin) {
+                  testingApi.saveCustomMaterials("flashcards", parsed)
+                    .then(() => console.log("Successfully auto-uploaded local flashcards to DB"))
+                    .catch((err) => console.error("Auto-upload flashcards failed:", err));
+                }
+                return;
               }
-            } catch {}
+            } catch (err) {
+              console.warn("Failed to parse local flashcards:", err);
+            }
           }
+          // If both DB and localStorage are empty/invalid, reset to default
+          setDecks(DEFAULT_DECKS);
+          localStorage.setItem("avng_custom_flashcards_decks", JSON.stringify(DEFAULT_DECKS));
         }
       })
       .catch((err) => {
         console.error("Failed to load flashcards from DB:", err);
+        setDecks((prev) => Array.isArray(prev) && prev.length > 0 ? prev : DEFAULT_DECKS);
       });
   }, [isAdmin]);
 
@@ -371,7 +384,7 @@ export function Flashcards({ authUser }: { authUser?: User }) {
     const deck = decks.find((d) => d.id === deckId);
     if (!deck) return;
 
-    let cardsToUse = [...deck.cards];
+    const cardsToUse = [...deck.cards];
     if (cardsToUse.length === 0) {
       toast.warning("В этой колоде пока нет карточек!");
       return;

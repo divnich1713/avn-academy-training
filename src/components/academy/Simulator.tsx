@@ -316,7 +316,9 @@ export function Simulator({ authUser }: { authUser?: User }) {
   const [scenarios, setScenarios] = useState<Scenario[]>(() => {
     try {
       const saved = localStorage.getItem("avng_custom_scenarios");
-      return saved ? JSON.parse(saved) : DEFAULT_SCENARIOS;
+      if (!saved) return DEFAULT_SCENARIOS;
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_SCENARIOS;
     } catch {
       return DEFAULT_SCENARIOS;
     }
@@ -331,25 +333,36 @@ export function Simulator({ authUser }: { authUser?: User }) {
   useEffect(() => {
     testingApi.getCustomMaterials("scenarios")
       .then((data) => {
-        if (data && Array.isArray(data)) {
+        if (data && Array.isArray(data) && data.length > 0) {
           setScenarios(data);
           localStorage.setItem("avng_custom_scenarios", JSON.stringify(data));
-        } else if (!data) {
+        } else {
+          // If DB returned null or empty, check local storage
           const local = localStorage.getItem("avng_custom_scenarios");
-          if (local && isAdmin) {
+          if (local) {
             try {
               const parsed = JSON.parse(local);
               if (Array.isArray(parsed) && parsed.length > 0) {
-                testingApi.saveCustomMaterials("scenarios", parsed)
-                  .then(() => console.log("Successfully auto-uploaded local scenarios to DB"))
-                  .catch((err) => console.error("Auto-upload scenarios failed:", err));
+                setScenarios(parsed);
+                if (isAdmin) {
+                  testingApi.saveCustomMaterials("scenarios", parsed)
+                    .then(() => console.log("Successfully auto-uploaded local scenarios to DB"))
+                    .catch((err) => console.error("Auto-upload scenarios failed:", err));
+                }
+                return;
               }
-            } catch {}
+            } catch (err) {
+              console.warn("Failed to parse local scenarios:", err);
+            }
           }
+          // If both DB and localStorage are empty/invalid, reset to default
+          setScenarios(DEFAULT_SCENARIOS);
+          localStorage.setItem("avng_custom_scenarios", JSON.stringify(DEFAULT_SCENARIOS));
         }
       })
       .catch((err) => {
         console.error("Failed to load scenarios from DB:", err);
+        setScenarios((prev) => Array.isArray(prev) && prev.length > 0 ? prev : DEFAULT_SCENARIOS);
       });
   }, [isAdmin]);
 

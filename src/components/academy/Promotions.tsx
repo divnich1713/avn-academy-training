@@ -136,11 +136,14 @@ export function MilitaryReport({
 // PROMOTION SECTION (CADET VIEW)
 // ═══════════════════════════════════════════════════════════════════════════════
 export function PromotionSection({ authUser }: { authUser: User }) {
-  const isInstructor = authUser.role !== "cadet";
-
-  if (isInstructor) {
+  if (authUser.role !== "cadet") {
     return <InstructorPromotionSection authUser={authUser} />;
   }
+  return <CadetPromotionSection authUser={authUser} />;
+}
+
+function CadetPromotionSection({ authUser }: { authUser: User }) {
+  const isInstructor = false;
 
   const [selected, setSelected] = useState<PromotionType | null>(null);
   const [checkResult, setCheckResult] = useState<PromotionCheckResult | null>(null);
