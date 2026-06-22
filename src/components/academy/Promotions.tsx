@@ -702,8 +702,6 @@ export function InstructorMilitaryReport({
   date,
   pointsConfig = DEFAULT_INSTRUCTOR_POINTS_CONFIG,
   ranksFlow = DEFAULT_INSTRUCTOR_RANKS_FLOW,
-  replacements,
-  replacementLinks,
 }: {
   name: string;
   staticId: string;
@@ -716,8 +714,6 @@ export function InstructorMilitaryReport({
   date: string;
   pointsConfig?: any[];
   ranksFlow?: any[];
-  replacements?: Record<number, number>;
-  replacementLinks?: Record<number, string>;
 }) {
   const flow = ranksFlow.find(f => f.from === currentRank && f.to === targetRank);
   const neededPoints = flow ? flow.points : 0;
@@ -781,30 +777,6 @@ export function InstructorMilitaryReport({
             <li className="space-y-1">
               <p>• Благодарность от старшего состава — 50 б.;</p>
               <p className="pl-4 text-black break-all font-mono">- Ссылка: {gratitudeLink || "(ссылка отсутствует)"}</p>
-            </li>
-          )}
-          {replacements && Object.keys(replacements).length > 0 && (
-            <li className="space-y-1">
-              <p className="font-semibold">• Замены обязательных пунктов:</p>
-              <div className="pl-4 text-black space-y-1 font-mono text-[10px]">
-                {Object.entries(replacements).map(([origStr, replStr]) => {
-                  const origNum = Number(origStr);
-                  const replNum = Number(replStr);
-                  const origConf = pointsConfig.find(p => p.num === origNum);
-                  const replConf = pointsConfig.find(p => p.num === replNum);
-                  const origName = origConf ? origConf.name : `Пункт ${origNum}`;
-                  const replName = replConf ? replConf.name : `Пункт ${replNum}`;
-                  const link = replacementLinks?.[origNum];
-                  return (
-                    <div key={origNum}>
-                      <p>{origName} ➔ Заменен на: {replName}</p>
-                      <p className="pl-2 text-gray-600 break-all">
-                        - Доказательство замены: {link || "(ссылка отсутствует)"}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
             </li>
           )}
         </ul>
@@ -1022,17 +994,6 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
     return {};
   });
 
-  const [replacementLinks, setReplacementLinks] = useState<Record<number, string>>(() => {
-    try {
-      const saved = localStorage.getItem(`instructor_promo_draft_${authUser.id}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.replacementLinks) return parsed.replacementLinks;
-      }
-    } catch (_) {}
-    return {};
-  });
-
   useEffect(() => {
     try {
       const draft = {
@@ -1041,14 +1002,13 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
         gratitude,
         gratitudeLink,
         entries: entries.filter(e => !e.isAuto),
-        replacements,
-        replacementLinks
+        replacements
       };
       localStorage.setItem(`instructor_promo_draft_${authUser.id}`, JSON.stringify(draft));
     } catch (e) {
       console.warn("Failed to save promotion draft", e);
     }
-  }, [currentRank, targetRank, gratitude, gratitudeLink, entries, replacements, replacementLinks, authUser.id]);
+  }, [currentRank, targetRank, gratitude, gratitudeLink, entries, replacements, authUser.id]);
 
   const isLeadership = ["head_avng", "chief_instructor", "deputy_head"].includes(authUser.role);
 
@@ -1061,7 +1021,6 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
 
   useEffect(() => {
     setReplacements({});
-    setReplacementLinks({});
   }, [currentRank, targetRank]);
 
   const loadData = useCallback(async () => {
@@ -1245,11 +1204,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       const matchingEntries = entries.filter(e => e.num === resolvedNum);
       const totalEnteredCount = matchingEntries.reduce((sum, e) => sum + e.count, 0);
       const linksCount = matchingEntries.reduce((sum, e) => sum + e.links.filter(link => link.trim().length > 0).length, 0);
-      
-      const replacementActive = replacements[m.num] && replacements[m.num] !== m.num;
-      const replacementLinkValid = !replacementActive || (replacementLinks[m.num] && replacementLinks[m.num].trim().length > 0);
-      
-      const completed = totalEnteredCount >= m.count && linksCount >= m.count && replacementLinkValid;
+      const completed = totalEnteredCount >= m.count && linksCount >= m.count;
       
       if (!completed) allCompleted = false;
       
@@ -1279,7 +1234,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       pointsCompleted,
       items
     };
-  }, [activeFlowConfig, entries, totalPoints, pointsConfig, replacements, replacementLinks]);
+  }, [activeFlowConfig, entries, totalPoints, pointsConfig, replacements]);
 
   const handleSubmit = async () => {
     if (!checklistStatus.allCompleted) return;
@@ -1312,8 +1267,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
         const replConf = pointsConfig.find(p => p.num === replNum);
         const origName = origConf ? origConf.name : `Пункт ${origNum}`;
         const replName = replConf ? replConf.name : `Пункт ${replNum}`;
-        const screenshotLink = replacementLinks[origNum] || "(ссылка отсутствует)";
-        itemsText += `• ${origName} ➔ Заменен на: ${replName}\n  - Доказательство замены: ${screenshotLink}\n`;
+        itemsText += `• ${origName} ➔ Заменен на: ${replName}\n`;
       });
     }
 
@@ -1339,7 +1293,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
         count: 0,
         successCount: 0,
         links: [],
-        metadata: { replacements, replacementLinks }
+        metadata: { replacements }
       } as any);
     }
 
@@ -1367,7 +1321,6 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       setSuccess("Рапорт на повышение успешно подан!");
       setEntries([]);
       setReplacements({});
-      setReplacementLinks({});
       setGratitude(false);
       setGratitudeLink("");
       try {
@@ -1727,11 +1680,6 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                                       const updated = { ...replacements };
                                       delete updated[item.num];
                                       setReplacements(updated);
-                                      setReplacementLinks(prev => {
-                                        const next = { ...prev };
-                                        delete next[item.num];
-                                        return next;
-                                      });
                                     } else {
                                       setReplacements(prev => ({ ...prev, [item.num]: val }));
                                     }
@@ -1757,23 +1705,6 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                                 </select>
                               </div>
                             </div>
-
-                            {replacements[item.num] && replacements[item.num] !== item.num && (
-                              <div className="pl-5 pt-1.5 space-y-1">
-                                <label className="text-[9px] uppercase font-mono text-muted-foreground block">
-                                  Ссылка на скриншот (подтверждение замены)
-                                </label>
-                                <input
-                                  type="url"
-                                  placeholder="Ссылка на скриншот..."
-                                  value={replacementLinks[item.num] || ""}
-                                  onChange={(e) => {
-                                    setReplacementLinks(prev => ({ ...prev, [item.num]: e.target.value }));
-                                  }}
-                                  className="w-full bg-tactical-panel border border-tactical-border px-2 py-1 text-xs text-foreground font-mono focus:outline-none focus:border-primary"
-                                />
-                              </div>
-                            )}
                           </div>
                         );
                       })}
@@ -1799,8 +1730,6 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                   date={new Date().toLocaleDateString("ru-RU")}
                   pointsConfig={pointsConfig}
                   ranksFlow={ranksFlow}
-                  replacements={replacements}
-                  replacementLinks={replacementLinks}
                 />
               </div>
 
@@ -1948,61 +1877,50 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                             </button>
                           </div>
                           
-                          {/* Replacement warning alert & formal document */}
+                          {/* Replacement warning alert */}
                           {(() => {
                             const metadataEntry = r.items_completed.find(e => e.num === 100);
                             const reportReplacements = metadataEntry?.metadata?.replacements || {};
-                            const reportReplacementLinks = metadataEntry?.metadata?.replacementLinks || {};
                             const hasReplacements = Object.keys(reportReplacements).length > 0;
+                            if (!hasReplacements) return null;
                             return (
-                              <>
-                                {hasReplacements && (
-                                  <div className="mb-4 p-3 bg-yellow-950/20 border border-yellow-800/60 rounded text-xs space-y-1 text-left">
-                                    <p className="font-semibold text-yellow-400 flex items-center gap-1.5">
-                                      <Icon name="AlertTriangle" size={13} className="text-yellow-400" />
-                                      Внимание: В рапорте произведены замены обязательных пунктов!
-                                    </p>
-                                    <ul className="list-disc pl-4 space-y-0.5 text-yellow-200/80 font-mono text-[11px]">
-                                      {Object.entries(reportReplacements).map(([origStr, replStr]) => {
-                                        const origNum = Number(origStr);
-                                        const replNumVal = Number(replStr);
-                                        const origConf = pointsConfig.find(p => p.num === origNum);
-                                        const replConf = pointsConfig.find(p => p.num === replNumVal);
-                                        const link = reportReplacementLinks[origNum];
-                                        return (
-                                          <li key={origNum}>
-                                            {origConf ? origConf.name : `Пункт ${origNum}`} ➔ Заменен на: {replConf ? replConf.name : `Пункт ${replNumVal}`}
-                                            {link && (
-                                              <span className="block pl-3 text-[10px] text-yellow-400/70 font-mono break-all">
-                                                Скриншот: <a href={link} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">{link}</a>
-                                              </span>
-                                            )}
-                                          </li>
-                                        );
-                                      })}
-                                    </ul>
-                                  </div>
-                                )}
-
-                                {/* Formal document component */}
-                                <InstructorMilitaryReport
-                                  name={r.instructor_name || "Инструктор"}
-                                  staticId={r.instructor_static_id || ""}
-                                  currentRank={r.current_rank}
-                                  targetRank={r.target_rank}
-                                  totalPoints={r.total_points}
-                                  entries={r.items_completed.filter(e => e.num !== 99 && e.num !== 100)}
-                                  gratitude={r.items_completed.some(e => e.num === 99)}
-                                  gratitudeLink={r.items_completed.find(e => e.num === 99)?.links[0] || ""}
-                                  date={new Date(r.created_at).toLocaleDateString("ru-RU")}
-                                  pointsConfig={pointsConfig}
-                                  ranksFlow={ranksFlow}
-                                  replacements={reportReplacements}
-                                  replacementLinks={reportReplacementLinks}
-                                />
-                              </>
+                              <div className="mb-4 p-3 bg-yellow-950/20 border border-yellow-800/60 rounded text-xs space-y-1 text-left">
+                                <p className="font-semibold text-yellow-400 flex items-center gap-1.5">
+                                  <Icon name="AlertTriangle" size={13} className="text-yellow-400" />
+                                  Внимание: В рапорте произведены замены обязательных пунктов!
+                                </p>
+                                <ul className="list-disc pl-4 space-y-0.5 text-yellow-200/80 font-mono text-[11px]">
+                                  {Object.entries(reportReplacements).map(([origStr, replStr]) => {
+                                    const origNum = Number(origStr);
+                                    const replNum = Number(replacedStr => replacedStr || replStr); // wait, replStr is the actual value
+                                    const replNumVal = Number(replStr);
+                                    const origConf = pointsConfig.find(p => p.num === origNum);
+                                    const replConf = pointsConfig.find(p => p.num === replNumVal);
+                                    return (
+                                      <li key={origNum}>
+                                        {origConf ? origConf.name : `Пункт ${origNum}`} ➔ Заменен на: {replConf ? replConf.name : `Пункт ${replNumVal}`}
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
                             );
                           })()}
+
+                          {/* Formal document component */}
+                          <InstructorMilitaryReport
+                            name={r.instructor_name || "Инструктор"}
+                            staticId={r.instructor_static_id || ""}
+                            currentRank={r.current_rank}
+                            targetRank={r.target_rank}
+                            totalPoints={r.total_points}
+                            entries={r.items_completed.filter(e => e.num !== 99 && e.num !== 100)}
+                            gratitude={r.items_completed.some(e => e.num === 99)}
+                            gratitudeLink={r.items_completed.find(e => e.num === 99)?.links[0] || ""}
+                            date={new Date(r.created_at).toLocaleDateString("ru-RU")}
+                            pointsConfig={pointsConfig}
+                            ranksFlow={ranksFlow}
+                          />
                         </div>
 
                         {/* Review actions */}
