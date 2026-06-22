@@ -85,10 +85,27 @@ export function OnlineStatus({ lastSeen }: { lastSeen?: string }) {
       </span>
     );
   }
+
+  const timeStr = lastSeenDate.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  
+  let dateText = "";
+  if (lastSeenDate.toDateString() === today.toDateString()) {
+    dateText = `сегодня в ${timeStr}`;
+  } else if (lastSeenDate.toDateString() === yesterday.toDateString()) {
+    dateText = `вчера в ${timeStr}`;
+  } else {
+    const formattedDate = lastSeenDate.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+    dateText = `${formattedDate} в ${timeStr}`;
+  }
+
   return (
     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
       <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
-      был(а) {lastSeenDate.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
+      был(а) {dateText}
     </span>
   );
 }
