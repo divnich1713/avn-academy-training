@@ -911,11 +911,13 @@ export function TestingSystem() {
                 className="w-full bg-tactical-panel border border-tactical-border text-foreground font-mono text-xs p-2.5 focus:outline-none focus:border-primary"
               >
                 <option value="">Любой инструктор</option>
-                {instructors.map((inst) => (
-                  <option key={inst.id} value={String(inst.id)}>
-                    {inst.rank ? `${inst.rank} ` : ""}{inst.name}
-                  </option>
-                ))}
+                {instructors
+                  .filter((inst) => ["instructor", "chief_instructor", "senior_instructor", "junior_instructor"].includes(inst.role))
+                  .map((inst) => (
+                    <option key={inst.id} value={String(inst.id)}>
+                      {inst.rank ? `${inst.rank} ` : ""}{inst.name}
+                    </option>
+                  ))}
               </select>
             </div>
           )}

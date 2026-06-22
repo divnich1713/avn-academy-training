@@ -423,11 +423,13 @@ export function RequestForm({
               onChange={(e) => setSelectedInstructorId(e.target.value)}
             >
               <option value="">Любой инструктор</option>
-              {instructors.map((inst) => (
-                <option key={inst.id} value={String(inst.id)}>
-                  {inst.rank ? `${inst.rank} ` : ""}{inst.name}
-                </option>
-              ))}
+              {instructors
+                .filter((inst) => ["instructor", "chief_instructor", "senior_instructor", "junior_instructor"].includes(inst.role))
+                .map((inst) => (
+                  <option key={inst.id} value={String(inst.id)}>
+                    {inst.rank ? `${inst.rank} ` : ""}{inst.name}
+                  </option>
+                ))}
             </select>
           </div>
         )}

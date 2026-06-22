@@ -16,6 +16,7 @@ import {
   BarChart3, TrendingUp, Settings, Home, ChevronsUpDown,
   PanelLeft, MoreVertical, Copy, RefreshCw,
   History, LineChart, LayoutDashboard, ArrowRight, CornerDownLeft, Play, Coffee,
+  Volume2, VolumeX,
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, React.FC<LucideProps>> = {
@@ -31,6 +32,7 @@ const ICON_MAP: Record<string, React.FC<LucideProps>> = {
   BarChart3, TrendingUp, Settings, Home, ChevronsUpDown,
   PanelLeft, MoreVertical, Copy, RefreshCw,
   History, LineChart, LayoutDashboard, ArrowRight, CornerDownLeft, Play, Coffee,
+  Volume2, VolumeX,
 };
 
 interface IconProps extends LucideProps {

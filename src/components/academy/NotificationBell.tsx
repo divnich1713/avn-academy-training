@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, MouseEvent } from "react";
 import Icon from "@/components/ui/icon";
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead, Notification } from "@/lib/api";
 import { Section } from "./types";
 
 function playNotificationSound() {
   try {
+    const enabled = localStorage.getItem("avng_notification_sound") !== "false";
+    if (!enabled) return;
     const audio = new Audio("/shutdown-beep.mp3");
     audio.volume = 0.45;
     audio.play();
@@ -94,8 +96,24 @@ export function NotificationBell({ onNavigate }: { onNavigate: (section: Section
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [ringing, setRinging] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      const val = localStorage.getItem("avng_notification_sound");
+      return val !== "false";
+    }
+    return true;
+  });
   const prevUnreadRef = useRef<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+
+  const toggleSound = (e: MouseEvent) => {
+    e.stopPropagation();
+    setSoundEnabled((prev) => {
+      const next = !prev;
+      localStorage.setItem("avng_notification_sound", String(next));
+      return next;
+    });
+  };
 
   const load = async () => {
     try {
@@ -204,9 +222,18 @@ export function NotificationBell({ onNavigate }: { onNavigate: (section: Section
       {open && (
         <div className="absolute right-0 top-8 w-80 bg-tactical-panel border border-tactical-border shadow-2xl z-50">
           <div className="flex items-center justify-between px-3 py-2 border-b border-tactical-border">
-            <span className="font-ibm text-xs font-semibold uppercase tracking-widest text-foreground">
-              Уведомления
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-ibm text-xs font-semibold uppercase tracking-widest text-foreground">
+                Уведомления
+              </span>
+              <button
+                onClick={toggleSound}
+                className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded flex items-center justify-center"
+                title={soundEnabled ? "Выключить звук уведомлений" : "Включить звук уведомлений"}
+              >
+                <Icon name={soundEnabled ? "Volume2" : "VolumeX"} size={14} />
+              </button>
+            </div>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAll}
