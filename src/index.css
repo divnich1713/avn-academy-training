@@ -61,7 +61,7 @@
         rgba(140, 30, 40, 0.015) 4px
       ),
       linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)),
-      url("/academy_bg.jpg");
+      url("/academy_bg.webp");
     background-attachment: fixed;
     background-size: cover;
     background-position: center;

@@ -584,13 +584,14 @@ const DEFAULT_INSTRUCTOR_POINTS_CONFIG = [
   { num: 5, name: "Проведение тренировки", points: 15 },
   { num: 7, name: "Арест человека", points: 20, desc: "Фотокарточка посадки в тюрьму" },
   { num: 8, name: "Штраф", points: 15, desc: "Фотокарточка оплаты штрафа" },
-  { num: 10, name: "Провести лекцию", points: 10 },
+  { num: 10, name: "Проведение лекций (дополнительно)", points: 10 },
   { num: 11, name: "Пост на территории ФСВНГ КПП или Вышки", points: 30, desc: "в час, доклады каждые 20 минут" },
   { num: 12, name: "Присутствие на вечерней поверке", points: 10, desc: "Фотокарточка начала и конца поверки" },
   { num: 13, name: "Участие в собеседовании", points: 40 },
-  { num: 14, name: "Экзамен", points: 15 },
-  { num: 15, name: "Проверка рапорта на повышение", points: 15 },
-  { num: 17, name: "Принятие присяги", points: 10 },
+  { num: 14, name: "Проведение экзамена (дополнительно)", points: 15 },
+  { num: 15, name: "Проверка рапорта на повышение (дополнительно)", points: 5 },
+  { num: 17, name: "Принятие присяги (дополнительно)", points: 10 },
+  { num: 18, name: "Проведение практики (дополнительно)", points: 10 },
 ];
 
 const DEFAULT_INSTRUCTOR_RANKS_FLOW = [
@@ -600,8 +601,8 @@ const DEFAULT_INSTRUCTOR_RANKS_FLOW = [
     points: 300,
     mandatory: [
       { num: 2, count: 3, name: "Участие в поставке" },
-      { num: 14, count: 3, name: "Экзамен" },
-      { num: 10, count: 3, name: "Провести лекцию" }
+      { num: 14, count: 3, name: "Проведение экзамена (дополнительно)" },
+      { num: 10, count: 3, name: "Проведение лекций (дополнительно)" }
     ]
   },
   {
@@ -612,8 +613,8 @@ const DEFAULT_INSTRUCTOR_RANKS_FLOW = [
       { num: 2, count: 5, name: "Участие в поставке" },
       { num: 3, count: 1, name: "Участие в отбитии налёта/ограбления" },
       { num: 13, count: 3, name: "Участие в собеседовании" },
-      { num: 14, count: 4, name: "Экзамен" },
-      { num: 10, count: 3, name: "Провести лекцию" }
+      { num: 14, count: 4, name: "Проведение экзамена (дополнительно)" },
+      { num: 10, count: 3, name: "Проведение лекций (дополнительно)" }
     ]
   },
   {
@@ -624,8 +625,8 @@ const DEFAULT_INSTRUCTOR_RANKS_FLOW = [
       { num: 2, count: 7, name: "Участие в поставке" },
       { num: 3, count: 2, name: "Участие в отбитии налёта/ограбления" },
       { num: 13, count: 4, name: "Участие в собеседовании" },
-      { num: 14, count: 5, name: "Экзамен" },
-      { num: 10, count: 3, name: "Провести лекцию" }
+      { num: 14, count: 5, name: "Проведение экзамена (дополнительно)" },
+      { num: 10, count: 3, name: "Проведение лекций (дополнительно)" }
     ]
   },
   {
@@ -636,8 +637,8 @@ const DEFAULT_INSTRUCTOR_RANKS_FLOW = [
       { num: 2, count: 9, name: "Участие в поставке" },
       { num: 3, count: 3, name: "Участие в отбитии налёта/ограбления" },
       { num: 13, count: 8, name: "Участие в собеседовании" },
-      { num: 14, count: 7, name: "Экзамен" },
-      { num: 10, count: 4, name: "Провести лекцию" }
+      { num: 14, count: 7, name: "Проведение экзамена (дополнительно)" },
+      { num: 10, count: 4, name: "Проведение лекций (дополнительно)" }
     ]
   },
   {
@@ -648,8 +649,8 @@ const DEFAULT_INSTRUCTOR_RANKS_FLOW = [
       { num: 2, count: 11, name: "Участие в поставке" },
       { num: 3, count: 3, name: "Участие в отбитии налёта/ограбления" },
       { num: 13, count: 10, name: "Участие в собеседовании" },
-      { num: 14, count: 8, name: "Экзамен" },
-      { num: 10, count: 5, name: "Провести лекцию" }
+      { num: 14, count: 8, name: "Проведение экзамена (дополнительно)" },
+      { num: 10, count: 5, name: "Проведение лекций (дополнительно)" }
     ]
   },
   {
@@ -660,8 +661,8 @@ const DEFAULT_INSTRUCTOR_RANKS_FLOW = [
       { num: 2, count: 12, name: "Участие в поставке" },
       { num: 3, count: 3, name: "Участие в отбитии налёта/ограбления" },
       { num: 13, count: 13, name: "Участие в собеседовании" },
-      { num: 14, count: 9, name: "Экзамен" },
-      { num: 10, count: 6, name: "Провести лекцию" }
+      { num: 14, count: 9, name: "Проведение экзамена (дополнительно)" },
+      { num: 10, count: 6, name: "Проведение лекций (дополнительно)" }
     ]
   },
   {
@@ -672,8 +673,8 @@ const DEFAULT_INSTRUCTOR_RANKS_FLOW = [
       { num: 2, count: 13, name: "Участие в поставке" },
       { num: 3, count: 3, name: "Участие в отбитии налёта/ограбления" },
       { num: 13, count: 15, name: "Участие в собеседовании" },
-      { num: 14, count: 10, name: "Экзамен" },
-      { num: 10, count: 5, name: "Провести лекцию" }
+      { num: 14, count: 10, name: "Проведение экзамена (дополнительно)" },
+      { num: 10, count: 5, name: "Проведение лекций (дополнительно)" }
     ]
   },
   {
@@ -684,8 +685,8 @@ const DEFAULT_INSTRUCTOR_RANKS_FLOW = [
       { num: 2, count: 15, name: "Участие в поставке" },
       { num: 3, count: 5, name: "Участие в отбитии налёта/ограбления" },
       { num: 13, count: 15, name: "Участие в собеседовании" },
-      { num: 14, count: 15, name: "Экзамен" },
-      { num: 10, count: 10, name: "Провести лекцию" }
+      { num: 14, count: 15, name: "Проведение экзамена (дополнительно)" },
+      { num: 10, count: 10, name: "Проведение лекций (дополнительно)" }
     ]
   }
 ];
@@ -1095,6 +1096,9 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       const oathsCount = myGrades.filter(
         (g) => g.type === "practice" && g.subject.toLowerCase().includes("присяга")
       ).length;
+      const practicesCount = myGrades.filter(
+        (g) => g.type === "practice" && !g.subject.toLowerCase().includes("присяга")
+      ).length;
 
       // Count cadet reports reviewed by this instructor after cutoff date
       const myReviewsCount = allCadetReports.filter(
@@ -1104,19 +1108,21 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
           new Date(r.reviewed_at || r.created_at) > cutoffDate
       ).length;
 
-      const lectureConfig = pointsConfig.find(c => c.name.toLowerCase().includes("лекци"));
-      const examConfig = pointsConfig.find(c => c.name.toLowerCase().includes("экзамен"));
-      const reviewConfig = pointsConfig.find(c => c.name.toLowerCase().includes("рапорт") || c.name.toLowerCase().includes("рапортов"));
+      const lectureConfig = pointsConfig.find(c => c.name.toLowerCase().includes("лекц"));
+      const examConfig = pointsConfig.find(c => c.name.toLowerCase().includes("экзамен") || c.name.toLowerCase().includes("аттестац"));
+      const reviewConfig = pointsConfig.find(c => c.name.toLowerCase().includes("рапорт"));
       const oathConfig = pointsConfig.find(c => c.name.toLowerCase().includes("присяг"));
+      const practiceConfig = pointsConfig.find(c => c.name.toLowerCase().includes("практик"));
 
       const lectureNum = lectureConfig ? lectureConfig.num : 10;
       const examNum = examConfig ? examConfig.num : 14;
       const reviewNum = reviewConfig ? reviewConfig.num : 15;
       const oathNum = oathConfig ? oathConfig.num : 17;
+      const practiceNum = practiceConfig ? practiceConfig.num : 18;
 
       const autoEntries: typeof entries = [];
 
-      if (lecturesCount > 0) {
+      if (lecturesCount > 0 && lectureConfig) {
         autoEntries.push({
           id: "auto_lecture",
           num: lectureNum,
@@ -1126,7 +1132,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
           isAuto: true,
         });
       }
-      if (examsCount > 0) {
+      if (examsCount > 0 && examConfig) {
         autoEntries.push({
           id: "auto_exam",
           num: examNum,
@@ -1136,7 +1142,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
           isAuto: true,
         });
       }
-      if (myReviewsCount > 0) {
+      if (myReviewsCount > 0 && reviewConfig) {
         autoEntries.push({
           id: "auto_review",
           num: reviewNum,
@@ -1146,13 +1152,23 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
           isAuto: true,
         });
       }
-      if (oathsCount > 0) {
+      if (oathsCount > 0 && oathConfig) {
         autoEntries.push({
           id: "auto_oath",
           num: oathNum,
           count: oathsCount,
           successCount: 0,
           links: Array(oathsCount).fill("[Автоподтверждение из БД]"),
+          isAuto: true,
+        });
+      }
+      if (practicesCount > 0 && practiceConfig) {
+        autoEntries.push({
+          id: "auto_practice",
+          num: practiceNum,
+          count: practicesCount,
+          successCount: 0,
+          links: Array(practicesCount).fill("[Автоподтверждение из БД]"),
           isAuto: true,
         });
       }
@@ -1696,9 +1712,9 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                             <div className="flex items-start justify-between text-xs gap-2">
                               <div className="flex items-start gap-2 text-muted-foreground flex-1 min-w-0">
                                 <Icon
-                                  name={item.completed ? "CheckSquare" : "Square"}
-                                  size={12}
-                                  className={`mt-0.5 flex-shrink-0 ${item.completed ? "text-green-400" : "text-muted-foreground/30"}`}
+                                  name={item.completed ? "CheckCircle2" : "Circle"}
+                                  size={14}
+                                  className={`mt-0.5 flex-shrink-0 ${item.completed ? "text-green-400" : "text-muted-foreground/40"}`}
                                 />
                                 <div className="min-w-0">
                                   <span className={item.completed ? "text-green-300" : "text-foreground"}>
@@ -1711,7 +1727,11 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                                   )}
                                 </div>
                               </div>
-                              <span className={`font-mono font-bold flex-shrink-0 ml-2 ${item.completed ? "text-green-400" : "text-red-400"}`}>
+                              <span className={`font-mono text-xs px-2.5 py-1 rounded border font-extrabold flex-shrink-0 ml-2 shadow-[0_0_10px_rgba(0,0,0,0.3)] ${
+                                item.completed 
+                                  ? "bg-green-500/25 text-green-400 border-green-500/60 shadow-[0_0_10px_rgba(34,197,94,0.25)]" 
+                                  : "bg-red-500/20 text-red-400 border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.2)]"
+                              }`}>
                                 {item.enteredCount} / {item.count}
                               </span>
                             </div>
@@ -2349,45 +2369,49 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                           <div className="space-y-2">
                             {flow.mandatory.map((m: any, mIdx: number) => (
                               <div key={mIdx} className="bg-tactical-panel/40 p-3 border border-tactical-border/40 space-y-2 rounded-sm">
-                                <div className="flex items-center gap-2">
-                                  <select
-                                    value={m.num}
-                                    onChange={(e) => {
-                                      const updated = [...editRanks];
-                                      updated[flowIdx].mandatory[mIdx].num = Number(e.target.value);
-                                      const currentAlts = updated[flowIdx].mandatory[mIdx].allowedAlternatives || [];
-                                      updated[flowIdx].mandatory[mIdx].allowedAlternatives = currentAlts.filter((n: number) => n !== Number(e.target.value));
-                                      setEditRanks(updated);
-                                    }}
-                                    className="bg-tactical-card border border-tactical-border px-2 py-1 text-xs text-foreground font-ibm flex-1 focus:outline-none focus:border-primary"
-                                  >
-                                    {editPoints.map(p => (
-                                      <option key={p.num} value={p.num}>
-                                        Пункт {p.num}. {p.name}
-                                      </option>
-                                    ))}
-                                  </select>
+                                <div className="flex items-end gap-3">
+                                  <div className="flex-1 min-w-0 space-y-1 text-left">
+                                    <label className="text-[10px] uppercase font-mono text-muted-foreground block font-bold">Активность</label>
+                                    <select
+                                      value={m.num}
+                                      onChange={(e) => {
+                                        const updated = [...editRanks];
+                                        updated[flowIdx].mandatory[mIdx].num = Number(e.target.value);
+                                        const currentAlts = updated[flowIdx].mandatory[mIdx].allowedAlternatives || [];
+                                        updated[flowIdx].mandatory[mIdx].allowedAlternatives = currentAlts.filter((n: number) => n !== Number(e.target.value));
+                                        setEditRanks(updated);
+                                      }}
+                                      className="w-full bg-tactical-card border border-tactical-border px-2.5 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary cursor-pointer rounded-sm"
+                                    >
+                                      {editPoints.map(p => (
+                                        <option key={p.num} value={p.num}>
+                                          Пункт {p.num}. {p.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
 
-                                  <div className="flex items-center gap-1 w-20">
-                                    <label className="text-[8px] uppercase font-mono text-muted-foreground">Кол-во</label>
+                                  <div className="w-24 space-y-1 flex-shrink-0 text-left">
+                                    <label className="text-[10px] uppercase font-mono text-muted-foreground block font-bold">Кол-во (шт)</label>
                                     <input
                                       type="number"
+                                      min="1"
                                       value={m.count}
                                       onChange={(e) => {
                                         const updated = [...editRanks];
                                         updated[flowIdx].mandatory[mIdx].count = Math.max(1, Number(e.target.value));
                                         setEditRanks(updated);
                                       }}
-                                      className="w-full bg-tactical-card border border-tactical-border px-1.5 py-0.5 text-xs text-foreground font-mono focus:outline-none focus:border-primary"
+                                      className="w-full bg-tactical-card border border-tactical-border px-2 py-1.5 text-xs text-foreground font-mono font-bold text-center focus:outline-none focus:border-primary rounded-sm"
                                     />
                                   </div>
 
                                   <button
                                     onClick={() => deleteMandatory(flowIdx, mIdx)}
                                     title="Удалить обязательное условие"
-                                    className="text-muted-foreground hover:text-red-500 transition-colors p-1"
+                                    className="text-muted-foreground hover:text-red-500 hover:bg-red-500/10 p-2 border border-transparent hover:border-red-500/30 rounded transition-all flex-shrink-0 mb-0.5"
                                   >
-                                    <Icon name="Trash2" size={12} />
+                                    <Icon name="Trash2" size={14} />
                                   </button>
                                 </div>
 

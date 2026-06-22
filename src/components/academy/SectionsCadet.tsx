@@ -209,7 +209,7 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
   const passRate = myGrades.length
     ? `${Math.round((approvedCount / myGrades.length) * 100)}%`
     : "—";
-  const pendingCount = requests.filter((r) => r.status === "pending").length;
+  const pendingCount = requests.filter((r) => r.status === "created" || r.status === "pending").length;
   const mockRecentRequests = [
     { id: 101, subject: "Экзамен теоретические тесты — Устав ФСВНГ — ФЗ о ФСВНГ", type: "exam" as const, status: "approved" as const, cadet_id: authUser.id, created_at: "", updated_at: "", cadet_name: "", cadet_rank: "", cadet_static_id: "", description: "", preferred_date: "", instructor_comment: "", reviewer_name: "" },
     { id: 102, subject: "Вышка — 30 мин", type: "practice" as const, status: "approved" as const, cadet_id: authUser.id, created_at: "", updated_at: "", cadet_name: "", cadet_rank: "", cadet_static_id: "", description: "", preferred_date: "", instructor_comment: "", reviewer_name: "" },
@@ -255,11 +255,11 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
       <div className="relative overflow-hidden border border-tactical-border/60 bg-tactical-panel h-52 flex flex-col justify-end p-6 md:p-8 corner-mark">
         <div 
           className="absolute inset-0 bg-cover bg-center opacity-85"
-          style={{ backgroundImage: 'url("/classroom_banner.png?v=3")' }}
+          style={{ backgroundImage: 'url("/classroom_banner.webp")' }}
         />
         <div 
           className="absolute right-0 top-0 bottom-0 w-80 bg-contain bg-right bg-no-repeat opacity-30 pointer-events-none z-0"
-          style={{ backgroundImage: 'url("/rosgvardia_emblem.png")' }}
+          style={{ backgroundImage: 'url("/rosgvardia_emblem_color.webp")' }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
         <div className="relative z-10 flex items-start gap-4">
@@ -440,7 +440,7 @@ export function Dashboard({ authUser, onNavigate }: { authUser: User; onNavigate
             <div className="relative border border-tactical-border/60 bg-tactical-card/30 p-4 h-28 overflow-hidden flex flex-col justify-between">
               <div 
                 className="absolute inset-0 bg-cover bg-center opacity-10 pointer-events-none"
-                style={{ backgroundImage: 'url("/patrol_tower.png?v=2")' }}
+                style={{ backgroundImage: 'url("/patrol_tower.webp")' }}
               />
               <div className="flex justify-between items-start">
                 <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">АКТИВНЫХ ЗАПРОСОВ</span>

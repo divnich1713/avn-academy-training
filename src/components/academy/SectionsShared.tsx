@@ -396,7 +396,7 @@ export function RequestForm({
       <h3 className="font-oswald text-sm tracking-widest uppercase text-primary">
         Новый запрос — {TYPE_LABEL[type]}
       </h3>
-      <div className={`grid grid-cols-1 ${type === "report" ? "md:grid-cols-2" : "md:grid-cols-3"} gap-3`}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <label className="rank-badge text-muted-foreground block mb-1">Тема</label>
           <select
@@ -414,25 +414,6 @@ export function RequestForm({
             })}
           </select>
         </div>
-        {type !== "report" && (
-          <div>
-            <label className="rank-badge text-muted-foreground block mb-1">Инструктор (необязательно)</label>
-            <select
-              className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-sm text-foreground font-ibm focus:outline-none focus:border-primary transition-colors"
-              value={selectedInstructorId}
-              onChange={(e) => setSelectedInstructorId(e.target.value)}
-            >
-              <option value="">Любой инструктор</option>
-              {instructors
-                .filter((inst) => ["instructor", "chief_instructor", "senior_instructor", "junior_instructor"].includes(inst.role))
-                .map((inst) => (
-                  <option key={inst.id} value={String(inst.id)}>
-                    {inst.rank ? `${inst.rank} ` : ""}{inst.name}
-                  </option>
-                ))}
-            </select>
-          </div>
-        )}
         <div>
           <label className="rank-badge text-muted-foreground block mb-1">Предпочтительная дата</label>
           <input

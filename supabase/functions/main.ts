@@ -5,6 +5,7 @@ import notificationsHandler from "./notifications/index.ts";
 import promotionsHandler from "./promotions/index.ts";
 import ratingsHandler from "./ratings/index.ts";
 import testingHandler from "./testing/index.ts";
+import weeklyReportsHandler from "./weekly-reports/index.ts";
 
 const handlers: Record<string, (req: Request) => Promise<Response>> = {
   "auth": authHandler,
@@ -14,10 +15,13 @@ const handlers: Record<string, (req: Request) => Promise<Response>> = {
   "promotions": promotionsHandler,
   "ratings": ratingsHandler,
   "testing": testingHandler,
+  "weekly-reports": weeklyReportsHandler,
 };
 
+const CORS_ORIGIN = Deno.env.get("CORS_ORIGIN") || "https://avn-academy.ru";
+
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": CORS_ORIGIN,
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, X-Session-Token",
 };

@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, MouseEvent } from "react";
 import Icon from "@/components/ui/icon";
-import { fetchNotifications, markAllNotificationsRead, markNotificationRead, Notification } from "@/lib/api";
+import { markAllNotificationsRead, markNotificationRead, Notification } from "@/lib/api";
+import { useNotifications, queryKeys } from "@/lib/useQueries";
+import { useQueryClient } from "@tanstack/react-query";
 import { Section } from "./types";
 
 function playNotificationSound() {
@@ -92,8 +94,14 @@ function getNotifStyles(n: Notification) {
 }
 
 export function NotificationBell({ onNavigate }: { onNavigate: (section: Section, requestId?: number) => void }) {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  // P1-7: Use shared React Query hook instead of manual polling.
+  // useNotifications() already does refetchInterval: 30_000 and deduplicates
+  // requests across all components using the same query key.
+  const { data: notifData } = useNotifications();
+  const qc = useQueryClient();
+  const notifications = notifData?.notifications ?? [];
+  const unreadCount = notifData?.unread_count ?? 0;
+
   const [open, setOpen] = useState(false);
   const [ringing, setRinging] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(() => {
@@ -106,6 +114,16 @@ export function NotificationBell({ onNavigate }: { onNavigate: (section: Section
   const prevUnreadRef = useRef<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
+  // Play sound when new unread notifications arrive
+  useEffect(() => {
+    if (prevUnreadRef.current !== null && unreadCount > prevUnreadRef.current) {
+      playNotificationSound();
+      setRinging(true);
+      setTimeout(() => setRinging(false), 1200);
+    }
+    prevUnreadRef.current = unreadCount;
+  }, [unreadCount]);
+
   const toggleSound = (e: MouseEvent) => {
     e.stopPropagation();
     setSoundEnabled((prev) => {
@@ -114,29 +132,6 @@ export function NotificationBell({ onNavigate }: { onNavigate: (section: Section
       return next;
     });
   };
-
-  const load = async () => {
-    try {
-      const data = await fetchNotifications();
-      setNotifications(data.notifications);
-      setUnreadCount((_prev) => {
-        const incoming = data.unread_count;
-        if (prevUnreadRef.current !== null && incoming > prevUnreadRef.current) {
-          playNotificationSound();
-          setRinging(true);
-          setTimeout(() => setRinging(false), 1200);
-        }
-        prevUnreadRef.current = incoming;
-        return incoming;
-      });
-    } catch (_e) { /* silent */ }
-  };
-
-  useEffect(() => {
-    load();
-    const interval = setInterval(load, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -150,21 +145,14 @@ export function NotificationBell({ onNavigate }: { onNavigate: (section: Section
 
   const handleMarkAll = async () => {
     await markAllNotificationsRead();
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    setUnreadCount(0);
     prevUnreadRef.current = 0;
+    qc.invalidateQueries({ queryKey: queryKeys.notifications });
   };
 
   const handleMarkOne = async (id: number) => {
     await markNotificationRead(id);
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
-    );
-    setUnreadCount((c) => {
-      const next = Math.max(0, c - 1);
-      prevUnreadRef.current = next;
-      return next;
-    });
+    prevUnreadRef.current = Math.max(0, unreadCount - 1);
+    qc.invalidateQueries({ queryKey: queryKeys.notifications });
   };
 
   const formatTime = (iso: string) => {

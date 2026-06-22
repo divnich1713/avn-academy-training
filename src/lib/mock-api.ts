@@ -14,6 +14,9 @@ import type {
   Grade,
   Notification,
   RequestType,
+  WeeklyReport,
+  WeeklyReportItem,
+  ActivityDef,
 } from "./api";
 
 // ─── Хранилище (в памяти, сбрасывается при перезагрузке) ────────────────────
@@ -79,6 +82,17 @@ const USERS: (AdminUser & { password: string })[] = [
     discord_id: "156119565555466240",
     created_at: "2026-01-12T08:30:00Z",
   },
+  {
+    id: 6,
+    static_id: "819399",
+    password: "admin",
+    name: "Нач.АВНГ Панрин.А.И.",
+    rank: "Полковник",
+    unit: "Командный состав",
+    role: "head_avng",
+    is_whitelisted: true,
+    created_at: "2026-01-10T08:00:00Z",
+  },
 ];
 
 let nextRequestId = 10;
@@ -124,7 +138,7 @@ const REQUESTS: TrainingRequest[] = [
     subject: "Экзамен теоретические тесты — Устав ФСВНГ — ФЗ о ФСВНГ",
     description: "Готов к сдаче",
     preferred_date: "2026-06-25",
-    status: "pending",
+    status: "created",
     instructor_comment: null,
     created_at: "2026-06-13T09:00:00Z",
     updated_at: "2026-06-13T09:00:00Z",
@@ -203,7 +217,7 @@ export async function apiLogin(static_id: string, password: string): Promise<{ t
   await delay();
   const user = USERS.find((u) => u.static_id === static_id && u.password === password);
   if (!user) throw new Error("Неверный Static ID или пароль");
-  if (!user.is_whitelisted) throw new Error("Вы не в вайтлисте. Обратитесь к инструктору");
+  if (!user.is_whitelisted) throw new Error("Ваша заявка ожидает подтверждения инструктором. Пожалуйста, подождите.");
 
   mockToken = "mock-token-" + Date.now();
   currentUserId = user.id;
@@ -212,6 +226,32 @@ export async function apiLogin(static_id: string, password: string): Promise<{ t
 
   const { password: _, is_whitelisted: __, ...u } = user;
   return { token: mockToken, user: u };
+}
+
+export async function apiRegister(static_id: string, password: string, name: string): Promise<{ ok: boolean; message: string }> {
+  await delay();
+  if (!static_id || !password || !name) throw new Error("Заполните все обязательные поля");
+  if (static_id.length !== 6 || !/^\d+$/.test(static_id)) throw new Error("Static ID должен содержать 6 цифр");
+  if (password.length < 4) throw new Error("Пароль должен содержать минимум 4 символа");
+
+  if (USERS.find((u) => u.static_id === static_id)) {
+    throw new Error("Пользователь с таким Static ID уже существует");
+  }
+
+  const newUser = {
+    id: Math.max(...USERS.map((u) => u.id)) + 1,
+    static_id,
+    password,
+    name,
+    rank: "Рядовой",
+    unit: "",
+    role: "cadet" as const,
+    is_whitelisted: false,
+    created_at: new Date().toISOString(),
+  };
+  USERS.push(newUser);
+
+  return { ok: true, message: "Заявка отправлена. Ожидайте подтверждения инструктором." };
 }
 
 export async function apiMe(): Promise<User | null> {
@@ -360,7 +400,7 @@ export async function createRequest(payload: {
     subject: payload.subject,
     description: payload.description || null,
     preferred_date: payload.preferred_date || null,
-    status: "pending",
+    status: "created",
     instructor_comment: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -389,6 +429,38 @@ export async function reviewRequest(id: number, status: "approved" | "rejected",
   req.instructor_comment = comment || null;
   req.reviewer_name = user ? `${user.rank} ${user.name}` : null;
   req.updated_at = new Date().toISOString();
+  return { ok: true };
+}
+
+export async function startReviewRequest(id: number) {
+  await delay();
+  const req = REQUESTS.find((r) => r.id === id);
+  if (!req) throw new Error("Запрос не найден");
+  const user = getUser();
+  req.status = "pending";
+  req.instructor_id = user ? user.id : null;
+  req.reviewer_name = user ? `${user.rank} ${user.name}` : null;
+  req.updated_at = new Date().toISOString();
+
+  // Add mock notification to the cadet
+  let channelName = "кабинет руководства";
+  if (req.type === "lecture") {
+    channelName = "Ожидание лекций";
+  } else if (req.type === "practice") {
+    channelName = "Ожидание практик";
+  } else if (req.type === "exam") {
+    channelName = "Ожидание экзамена";
+  }
+  
+  NOTIFICATIONS.push({
+    id: NOTIFICATIONS.length + 1,
+    type: "request_reviewed",
+    title: "Заявка на рассмотрении",
+    message: `Инструктор ${user ? user.name : "Инструктор"} принял ваш запрос на тему "${req.subject}" на рассмотрение. Пожалуйста, зайдите в голосовой канал "${channelName}".`,
+    is_read: false,
+    created_at: new Date().toISOString(),
+  });
+  
   return { ok: true };
 }
 
@@ -469,7 +541,7 @@ export async function fetchRatings(timeframe: "daily" | "weekly" | "monthly" | "
   // Calculate mock point statistics
   // Let's generate some mock numbers based on instructor ID
   const instructors: import("./api").InstructorRating[] = USERS
-    .filter((u) => u.role === "instructor")
+    .filter((u) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(u.role))
     .map((u) => {
       // Seed with pseudo-random numbers
       const seed = u.id * 3;
@@ -711,5 +783,280 @@ export async function fetchDiscordProfile(discordId: string) {
   } catch {
     return { username: "discord_user", global_name: "Пользователь Discord" };
   }
+}
+
+// ─── Weekly Reports Mock Implementation ──────────────────────────────────────
+
+const DEFAULT_MOCK_ACTIVITIES: ActivityDef[] = [
+  { key: "raid", label: "Принять участие в рейде на криминальную организацию", points: 40 },
+  { key: "excursion", label: "Провести экскурсию с лекцией о службе для гражданских лиц по территории ФСВНГ длительностью минимум в 30 минут", points: 20 },
+  { key: "terror_prevention", label: "Принять участие в предотвращении теракта", points: 10 },
+  { key: "global_event", label: "Участие в глобальном мероприятии между 3 фракциями", points: 15 },
+  { key: "faction_event", label: "Участие во фракционном мероприятии (вечерка, лекция с 5+ участниками, любое внутрефракционное мероприятие с 5+ участниками, тренировка)", points: 5 },
+  { key: "supply", label: "Принять участие в поставке", points: 20 },
+  { key: "robbery_defense", label: "Успешное отбитие ограбления (скрин с краймовской матовозкой)", points: 7 },
+  { key: "raid_defense", label: "Успешное отбитие налета", points: 7 },
+  { key: "certification", label: "Проведение аттестации (дополнительно)", points: 10, isAdditional: true },
+  { key: "interview", label: "Проведение собеседования (дополнительно)", points: 10, isAdditional: true },
+  { key: "accept_to_unit", label: "Принятие в подразделение (дополнительно)", points: 10, isAdditional: true },
+  { key: "promotion_report_check", label: "Проверка рапорта на повышение (дополнительно)", points: 10, isAdditional: true },
+  { key: "oath", label: "Принятие присяги (дополнительно)", points: 5, isAdditional: true },
+  { key: "lecture", label: "Проведение лекций (дополнительно)", points: 10, isAdditional: true },
+];
+
+let mockWeeklyReportActivities: ActivityDef[] = [...DEFAULT_MOCK_ACTIVITIES];
+try {
+  const storedFormula = localStorage.getItem("avng_mock_weekly_report_formula");
+  if (storedFormula) {
+    const parsed = JSON.parse(storedFormula);
+    if (Array.isArray(parsed)) {
+      mockWeeklyReportActivities = parsed;
+    } else if (parsed && typeof parsed === "object") {
+      mockWeeklyReportActivities = Object.entries(parsed).map(([key, points]) => {
+        const def = DEFAULT_MOCK_ACTIVITIES.find(a => a.key === key);
+        return {
+          key,
+          label: def ? def.label : key,
+          points: Number(points),
+          isAdditional: def ? !!def.isAdditional : false
+        };
+      });
+    }
+  }
+} catch (_) {}
+
+let WEEKLY_REPORTS: WeeklyReport[] = [];
+let nextWeeklyReportId = 100;
+
+try {
+  const stored = localStorage.getItem("avng_mock_weekly_reports");
+  if (stored) {
+    WEEKLY_REPORTS = JSON.parse(stored);
+    if (WEEKLY_REPORTS.length > 0) {
+      nextWeeklyReportId = Math.max(...WEEKLY_REPORTS.map(r => r.id)) + 1;
+    }
+  } else {
+    WEEKLY_REPORTS = [
+      {
+        id: 1,
+        user_id: 2, // Воронов В.И.
+        instructor_name: "Воронов В.И.",
+        instructor_rank: "Капитан",
+        instructor_static_id: "000002",
+        week_start: "2026-06-15",
+        items: {
+          raid: { count: 3, links: ["https://i.imgur.com/example1.png", "https://i.imgur.com/example2.png", "https://i.imgur.com/example3.png"] },
+          excursion: { count: 1, links: ["https://i.imgur.com/example4.png"] },
+          lecture: { count: 5, links: ["https://i.imgur.com/example5.png", "https://i.imgur.com/example6.png", "https://i.imgur.com/example7.png"] },
+        },
+        total_points: 190,
+        status: "approved",
+        reviewer_comment: "Хорошая работа на прошлой неделе!",
+        reviewer_name: "Кузнецов А.П.",
+        reviewed_at: new Date().toISOString(),
+        created_at: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString(),
+      },
+      {
+        id: 2,
+        user_id: 2,
+        instructor_name: "Воронов В.И.",
+        instructor_rank: "Капитан",
+        instructor_static_id: "000002",
+        week_start: "2026-06-22",
+        items: {
+          raid: { count: 8, links: Array(8).fill("https://i.imgur.com/example.png") },
+        },
+        total_points: 320,
+        status: "pending",
+        reviewer_comment: null,
+        reviewer_name: null,
+        reviewed_at: null,
+        created_at: new Date().toISOString(),
+      }
+    ];
+    localStorage.setItem("avng_mock_weekly_reports", JSON.stringify(WEEKLY_REPORTS));
+  }
+} catch (_) {}
+
+function saveWeeklyReports() {
+  localStorage.setItem("avng_mock_weekly_reports", JSON.stringify(WEEKLY_REPORTS));
+}
+
+export async function fetchWeeklyReports(): Promise<WeeklyReport[]> {
+  await delay();
+  const user = USERS.find(u => u.id === currentUserId);
+  if (!user) return [];
+
+  if (user.role === "head_avng") {
+    return WEEKLY_REPORTS;
+  }
+  return WEEKLY_REPORTS.filter(r => r.user_id === currentUserId);
+}
+
+export async function submitWeeklyReport(weekStart: string, items: Record<string, WeeklyReportItem>): Promise<{ success: boolean; id: number }> {
+  await delay();
+  const user = USERS.find(u => u.id === currentUserId);
+  if (!user) throw new Error("Не авторизован");
+
+
+
+  // Calculate points
+  let totalPoints = 0;
+  for (const [key, val] of Object.entries(items)) {
+    const count = Math.max(0, val.count || 0);
+    const act = mockWeeklyReportActivities.find(a => a.key === key);
+    const weight = act ? act.points : 0;
+    totalPoints += count * weight;
+  }
+
+  const newReport: WeeklyReport = {
+    id: nextWeeklyReportId++,
+    user_id: user.id,
+    instructor_name: user.name,
+    instructor_rank: user.rank,
+    instructor_static_id: user.static_id,
+    week_start: weekStart,
+    items,
+    total_points: totalPoints,
+    status: "pending",
+    reviewer_comment: null,
+    reviewer_name: null,
+    reviewed_at: null,
+    created_at: new Date().toISOString()
+  };
+
+  WEEKLY_REPORTS.unshift(newReport);
+  saveWeeklyReports();
+
+  // Add notification to leadership
+  const leadershipUsers = USERS.filter(u => ["head_avng", "chief_instructor", "deputy_head"].includes(u.role));
+  for (const leader of leadershipUsers) {
+    NOTIFICATIONS.unshift({
+      id: nextNotifId++,
+      user_id: leader.id,
+      type: "weekly_report_submitted",
+      title: "Новый еженедельный отчёт",
+      message: `Инструктор ${user.name} подал еженедельный отчёт за неделю с ${weekStart} (${totalPoints} баллов).`,
+      is_read: false,
+      created_at: new Date().toISOString(),
+    });
+  }
+
+  return { success: true, id: newReport.id };
+}
+
+export async function reviewWeeklyReport(
+  id: number,
+  status: "approved" | "rejected",
+  comment?: string,
+  items?: Record<string, WeeklyReportItem>
+): Promise<{ success: boolean }> {
+  await delay();
+  const reviewer = USERS.find(u => u.id === currentUserId);
+  if (!reviewer) throw new Error("Не авторизован");
+  if (reviewer.role !== "head_avng") {
+    throw new Error("Доступ запрещен. Только Начальник АВНГ может проверять отчёты.");
+  }
+
+  const report = WEEKLY_REPORTS.find(r => r.id === id);
+  if (!report) throw new Error("Отчет не найден");
+
+  if (report.status !== "pending") {
+    throw new Error("Отчет уже проверен");
+  }
+
+  if (items && typeof items === "object") {
+    report.items = items;
+    let totalPoints = 0;
+    for (const [key, val] of Object.entries(items)) {
+      const count = Math.max(0, val.count || 0);
+      const act = mockWeeklyReportActivities.find(a => a.key === key);
+      const weight = act ? act.points : 0;
+      totalPoints += count * weight;
+    }
+    report.total_points = totalPoints;
+  }
+
+  report.status = status;
+  report.reviewer_comment = comment || null;
+  report.reviewer_name = reviewer.name;
+  report.reviewed_at = new Date().toISOString();
+
+  saveWeeklyReports();
+
+  // Notify instructor
+  const statusText = status === "approved" ? "одобрен" : "отклонён";
+  NOTIFICATIONS.unshift({
+    id: nextNotifId++,
+    user_id: report.user_id,
+    type: "weekly_report_reviewed",
+    title: `Отчёт ${statusText}`,
+    message: `Ваш еженедельный отчёт за неделю с ${report.week_start} (${report.total_points} баллов) был ${statusText} проверяющим ${reviewer.name}.${comment ? ` Комментарий: ${comment}` : ""}`,
+    is_read: false,
+    created_at: new Date().toISOString(),
+  });
+
+  return { success: true };
+}
+
+export async function getWeeklyReportsAutoFill(weekStart: string): Promise<{
+  counts: Record<string, number>;
+}> {
+  await delay();
+  const user = USERS.find(u => u.id === currentUserId);
+  if (!user) throw new Error("Не авторизован");
+
+  const t1 = new Date(weekStart).getTime();
+  const t2 = t1 + 7 * 24 * 3600 * 1000;
+  const lastName = user.name.split(" ")[0] || "";
+
+  const userGrades = GRADES.filter(g => {
+    const isInstr = g.instructor_name && g.instructor_name.includes(lastName);
+    const gTime = new Date(g.graded_at).getTime();
+    return isInstr && gTime >= t1 && gTime < t2;
+  });
+
+  const lectureCount = userGrades.filter(g => g.type === "lecture").length;
+  const examCount = userGrades.filter(g => g.type === "exam").length;
+  const oathCount = userGrades.filter(g => g.type === "practice" && g.subject === "Присяга").length;
+  const practiceCount = userGrades.filter(g => g.type === "practice" && g.subject !== "Присяга").length;
+  
+  const promoCheckCount = REQUESTS.filter(r => {
+    const isReport = r.type === "report";
+    const isReviewed = r.status !== "pending";
+    const isReviewer = r.reviewer_name && r.reviewer_name.includes(lastName);
+    const rTime = new Date(r.updated_at || r.created_at).getTime();
+    return isReport && isReviewed && isReviewer && rTime >= t1 && rTime < t2;
+  }).length;
+
+  const counts: Record<string, number> = {};
+  mockWeeklyReportActivities.forEach(act => {
+    const labelLower = act.label.toLowerCase();
+    if (labelLower.includes("экзамен") || labelLower.includes("аттестац")) {
+      counts[act.key] = examCount;
+    } else if (labelLower.includes("присяг")) {
+      counts[act.key] = oathCount;
+    } else if (labelLower.includes("практик")) {
+      counts[act.key] = practiceCount;
+    } else if (labelLower.includes("лекц") && !labelLower.includes("экскурси") && !labelLower.includes("мероприяти")) {
+      counts[act.key] = lectureCount;
+    } else if (labelLower.includes("рапорт") && labelLower.includes("повышен")) {
+      counts[act.key] = promoCheckCount;
+    }
+  });
+
+  return { counts };
+}
+
+export async function fetchWeeklyReportsSettings(): Promise<{ activities: ActivityDef[] }> {
+  await delay();
+  return { activities: mockWeeklyReportActivities };
+}
+
+export async function saveWeeklyReportsSettings(activities: ActivityDef[]): Promise<{ success: boolean }> {
+  await delay();
+  mockWeeklyReportActivities = [...activities];
+  localStorage.setItem("avng_mock_weekly_report_formula", JSON.stringify(mockWeeklyReportActivities));
+  return { success: true };
 }
 

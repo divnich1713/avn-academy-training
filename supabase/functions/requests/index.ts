@@ -177,6 +177,75 @@ export default async function handler(req: Request): Promise<Response> {
       });
     }
 
+    // ===== PUT /requests?action=start_review — инструктор берет на рассмотрение =====
+    if (method === "PUT" && action === "start_review") {
+      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"].includes(r);
+      if (!isInstructor(user.role)) {
+        return new Response(JSON.stringify({ error: "Только для инструкторов" }), {
+          status: 403,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      const requestId = url.searchParams.get("id");
+      if (!requestId || !/^\d+$/.test(requestId)) {
+        return new Response(JSON.stringify({ error: "Неверный ID запроса" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      // Check current request status
+      const checkRes = await client.queryObject<{ status: string, user_id: number, subject: string, type: string }>(
+        `SELECT status, user_id, subject, type FROM ${SCHEMA}.requests WHERE id = $1`,
+        [Number(requestId)]
+      );
+      if (checkRes.rows.length === 0) {
+        return new Response(JSON.stringify({ error: "Запрос не найден" }), {
+          status: 404,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      const reqInfo = checkRes.rows[0];
+
+      // Update request: set status to pending and instructor_id to current instructor
+      await client.queryArray(
+        `UPDATE ${SCHEMA}.requests
+         SET status = 'pending', instructor_id = $1, reviewed_by = $1, updated_at = NOW()
+         WHERE id = $2`,
+        [user.id, Number(requestId)]
+      );
+
+      // Create notification for cadet with Surname, Name and channel instructions
+      const cadetId = reqInfo.user_id;
+      const subject = reqInfo.subject;
+      const reqType = reqInfo.type;
+
+      let channelName = "кабинет руководства";
+      if (reqType === "lecture") {
+        channelName = "Ожидание лекций";
+      } else if (reqType === "practice") {
+        channelName = "Ожидание практик";
+      } else if (reqType === "exam") {
+        channelName = "Ожидание экзамена";
+      }
+
+      const notifTitle = "Заявка на рассмотрении";
+      const notifMessage = `Инструктор ${user.name} принял ваш запрос на тему "${subject}" на рассмотрение. Пожалуйста, зайдите в голосовой канал "${channelName}".`;
+
+      await client.queryArray(
+        `INSERT INTO ${SCHEMA}.notifications (user_id, type, title, message)
+         VALUES ($1, $2, $3, $4)`,
+        [cadetId, "request_reviewed", notifTitle, notifMessage]
+      );
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    }
+
     // ===== PUT /requests?action=review — инструктор одобряет/отклоняет =====
     if (method === "PUT" && action === "review") {
       const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"].includes(r);

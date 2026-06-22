@@ -2,6 +2,7 @@ import {defineConfig, loadEnv} from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import {componentTagger} from "pp-tagger";
+import viteCompression from "vite-plugin-compression";
 
 // DDoS Guard требует двусторонний app-level keepalive чаще 30s.
 // Сервер: text-frame {type:'ping'} каждые 5-9s (рандом — чтобы DDoS Guard
@@ -34,6 +35,14 @@ export default defineConfig(({mode}) => {
             hmrKeepalive,
             mode === 'development' &&
             componentTagger(),
+            // P0: Pre-compress JS/CSS to .gz files at build time.
+            // nginx gzip_static on; will serve these without CPU overhead.
+            mode === 'production' && viteCompression({
+                algorithm: 'gzip',
+                ext: '.gz',
+                threshold: 1024,      // Only compress files > 1KB
+                deleteOriginFile: false,
+            }),
         ].filter(Boolean),
         resolve: {
             alias: {

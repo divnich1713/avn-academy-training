@@ -19,6 +19,7 @@ import {
   TestingHistory,
   Simulator,
   Flashcards,
+  WeeklyReports,
 } from "@/components/academy/Sections";
 import { User } from "@/lib/api";
 
@@ -207,6 +208,7 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
       case "testing-history": return <TestingHistory />;
       case "simulator": return <Simulator authUser={authUser} />;
       case "flashcards": return <Flashcards authUser={authUser} />;
+      case "weekly-reports": return <WeeklyReports authUser={authUser} />;
     }
   };
 
@@ -215,7 +217,7 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
       {/* Russia Guard watermark right side background */}
       <div 
         className="fixed top-12 right-0 w-[500px] h-[500px] bg-contain bg-right-top bg-no-repeat opacity-5 pointer-events-none z-0"
-        style={{ backgroundImage: 'url("/rosgvardia_emblem.png")' }}
+        style={{ backgroundImage: 'url("/rosgvardia_emblem_color.webp")' }}
       />
       <div 
         className="fixed inset-0 bg-cover bg-center opacity-10 pointer-events-none z-0"
@@ -266,7 +268,7 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
                     <div className="relative border border-red-950/60 bg-tactical-card/25 p-3.5 h-36 overflow-hidden flex flex-col justify-between corner-mark card-glow z-10">
                       <div 
                         className="absolute right-0 top-0 bottom-0 w-full bg-contain bg-right bg-no-repeat opacity-25 pointer-events-none" 
-                        style={{ backgroundImage: 'url("/rosgvardia_emblem.png")' }} 
+                        style={{ backgroundImage: 'url("/rosgvardia_emblem_color.webp")' }} 
                       />
                       <div className="relative z-10">
                         <span className="text-[9px] font-mono text-yellow-500/80 tracking-widest uppercase block">ШТАБ АВНГ</span>

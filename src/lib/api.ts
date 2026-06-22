@@ -21,6 +21,7 @@ const REQUESTS_URL = `${API_BASE}/requests`;
 const NOTIFICATIONS_URL = `${API_BASE}/notifications`;
 const PROMOTIONS_URL = `${API_BASE}/promotions`;
 const RATINGS_URL = `${API_BASE}/ratings`;
+const WEEKLY_REPORTS_URL = `${API_BASE}/weekly-reports`;
 
 export function getToken(): string | null {
   return localStorage.getItem("avng_token");
@@ -68,6 +69,18 @@ export async function apiLogin(static_id: string, password: string) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ static_id, password }),
+  });
+}
+
+export async function apiRegister(static_id: string, password: string, name: string) {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.apiRegister(static_id, password, name);
+  }
+  return safeFetch(`${AUTH_URL}/?action=register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ static_id, password, name }),
   });
 }
 
@@ -198,7 +211,7 @@ export interface AdminUser extends User {
 }
 
 export type RequestType = "lecture" | "practice" | "exam" | "report" | "dismissal";
-export type RequestStatus = "pending" | "approved" | "rejected";
+export type RequestStatus = "created" | "pending" | "approved" | "rejected";
 
 export interface TrainingRequest {
   id: number;
@@ -273,6 +286,17 @@ export async function reviewRequest(id: number, status: "approved" | "rejected",
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ status, comment }),
+  });
+}
+
+export async function startReviewRequest(id: number) {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.startReviewRequest(id);
+  }
+  return safeFetch(`${REQUESTS_URL}?action=start_review&id=${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
   });
 }
 
@@ -539,4 +563,106 @@ export async function fetchDiscordProfile(discordId: string) {
     return mock.fetchDiscordProfile(discordId);
   }
   return safeFetch(`${AUTH_URL}/?action=discord&id=${discordId}`);
+}
+
+export interface WeeklyReportItem {
+  count: number;
+  links: string[];
+}
+
+export interface WeeklyReport {
+  id: number;
+  user_id: number;
+  instructor_name: string;
+  instructor_rank: string;
+  instructor_static_id: string;
+  week_start: string;
+  items: Record<string, WeeklyReportItem>;
+  total_points: number;
+  status: "pending" | "approved" | "rejected";
+  reviewer_comment: string | null;
+  reviewer_name: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+export async function fetchWeeklyReports(): Promise<WeeklyReport[]> {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.fetchWeeklyReports();
+  }
+  const data = await safeFetch(WEEKLY_REPORTS_URL, {
+    headers: authHeaders(),
+  });
+  return data.reports || [];
+}
+
+export async function submitWeeklyReport(weekStart: string, items: Record<string, WeeklyReportItem>): Promise<{ success: boolean; id: number }> {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.submitWeeklyReport(weekStart, items);
+  }
+  return safeFetch(WEEKLY_REPORTS_URL, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ week_start: weekStart, items }),
+  });
+}
+
+export async function reviewWeeklyReport(
+  id: number,
+  status: "approved" | "rejected",
+  comment?: string,
+  items?: Record<string, WeeklyReportItem>
+): Promise<{ success: boolean }> {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.reviewWeeklyReport(id, status, comment, items);
+  }
+  return safeFetch(`${WEEKLY_REPORTS_URL}?action=review&id=${id}`, {
+    method: "PUT",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ status, comment, items }),
+  });
+}
+
+export async function getWeeklyReportsAutoFill(weekStart: string): Promise<{
+  counts: Record<string, number>;
+}> {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.getWeeklyReportsAutoFill(weekStart);
+  }
+  return safeFetch(`${WEEKLY_REPORTS_URL}?action=auto_fill&week_start=${weekStart}`, {
+    headers: authHeaders(),
+  });
+}
+
+export interface ActivityDef {
+  key: string;
+  label: string;
+  points: number;
+  isAdditional?: boolean;
+}
+
+export async function fetchWeeklyReportsSettings(): Promise<{ activities: ActivityDef[] }> {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.fetchWeeklyReportsSettings();
+  }
+  return safeFetch(`${WEEKLY_REPORTS_URL}?action=get_settings`, {
+    headers: authHeaders(),
+  });
+}
+
+export async function saveWeeklyReportsSettings(activities: ActivityDef[]): Promise<{ success: boolean }> {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.saveWeeklyReportsSettings(activities);
+  }
+  return safeFetch(`${WEEKLY_REPORTS_URL}?action=save_settings`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ activities }),
+  });
 }

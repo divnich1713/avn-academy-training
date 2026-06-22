@@ -157,6 +157,62 @@ export default async function handler(req: Request): Promise<Response> {
   try {
     client = await pool.connect();
 
+    // ===== REGISTER =====
+    if (action === "register" && req.method === "POST") {
+      const body = await req.json().catch(() => ({}));
+      const static_id = String(body.static_id || "").trim();
+      const password = String(body.password || "").trim();
+      const name = String(body.name || "").trim();
+
+      if (!static_id || !password || !name) {
+        return new Response(JSON.stringify({ error: "Заполните все обязательные поля" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      if (static_id.length !== 6 || !/^\d+$/.test(static_id)) {
+        return new Response(JSON.stringify({ error: "Static ID должен содержать 6 цифр" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      if (password.length < 4) {
+        return new Response(JSON.stringify({ error: "Пароль должен содержать минимум 4 символа" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      // Check if static_id already taken
+      const existingRes = await client.queryObject<{ id: number }>(
+        `SELECT id FROM ${SCHEMA}.users WHERE static_id = $1`,
+        [static_id]
+      );
+      if (existingRes.rows.length > 0) {
+        return new Response(JSON.stringify({ error: "Пользователь с таким Static ID уже существует" }), {
+          status: 409,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      const passHash = await hashPassword(password);
+      await client.queryArray(
+        `INSERT INTO ${SCHEMA}.users (static_id, password_hash, name, rank, unit, role, is_whitelisted) VALUES ($1, $2, $3, 'Рядовой', '', 'cadet', false)`,
+        [static_id, passHash, name]
+      );
+
+      return new Response(JSON.stringify({
+        ok: true,
+        message: "Заявка отправлена. Ожидайте подтверждения инструктором."
+      }), {
+        status: 200,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    }
+
+    // ===== LOGIN =====
     if (action === "login" && req.method === "POST") {
       const body = await req.json().catch(() => ({}));
       const static_id = String(body.static_id || "").trim();
@@ -201,7 +257,7 @@ export default async function handler(req: Request): Promise<Response> {
 
       const user = userRes.rows[0];
       if (!user.is_whitelisted) {
-        return new Response(JSON.stringify({ error: "Вы не в вайтлисте. Обратитесь к инструктору" }), {
+        return new Response(JSON.stringify({ error: "Ваша заявка ожидает подтверждения инструктором. Пожалуйста, подождите." }), {
           status: 403,
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
         });

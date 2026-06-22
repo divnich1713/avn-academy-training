@@ -241,7 +241,7 @@ export function TestingSystem() {
       matchingReqs.sort((a, b) => b.id - a.id);
       
       const latestReq = matchingReqs[0] || null;
-      setPendingRequest(latestReq && latestReq.status === "pending" ? latestReq : null);
+      setPendingRequest(latestReq && (latestReq.status === "created" || latestReq.status === "pending") ? latestReq : null);
       
       if (latestReq && latestReq.status === "approved") {
         const consumedList: number[] = JSON.parse(
@@ -902,25 +902,7 @@ export function TestingSystem() {
             </select>
           </div>
 
-          {!checkingAccess && !rankLockMessage && !isAttemptsExceeded && !hasApproval && !pendingRequest && (
-            <div>
-              <label className="text-[10px] font-mono text-muted-foreground uppercase block mb-1">Выберите инструктора (необязательно)</label>
-              <select
-                value={selectedInstructorId}
-                onChange={(e) => setSelectedInstructorId(e.target.value)}
-                className="w-full bg-tactical-panel border border-tactical-border text-foreground font-mono text-xs p-2.5 focus:outline-none focus:border-primary"
-              >
-                <option value="">Любой инструктор</option>
-                {instructors
-                  .filter((inst) => ["instructor", "chief_instructor", "senior_instructor", "junior_instructor"].includes(inst.role))
-                  .map((inst) => (
-                    <option key={inst.id} value={String(inst.id)}>
-                      {inst.rank ? `${inst.rank} ` : ""}{inst.name}
-                    </option>
-                  ))}
-              </select>
-            </div>
-          )}
+
 
           {checkingAccess ? (
             <div className="flex items-center justify-center py-4 gap-2 text-xs font-mono text-muted-foreground">
@@ -954,7 +936,7 @@ export function TestingSystem() {
               ) : pendingRequest ? (
                 <div className="bg-gold/10 border border-gold/30 p-3 text-gold rounded-sm text-center leading-relaxed">
                   <Icon name="Clock" className="mx-auto mb-1 text-gold animate-pulse" size={18} />
-                  Допуск на рассмотрении у инструктора. Ожидайте одобрения.
+                  {pendingRequest.status === "created" ? "Допуск отправлен. Ожидайте принятия инструктором." : `Допуск на рассмотрении у инструктора ${pendingRequest.target_instructor_name || ""}. Ожидайте одобрения.`}
                 </div>
               ) : (
                 <div className="bg-tactical-panel/80 border border-tactical-border p-3 text-muted-foreground rounded-sm text-center leading-relaxed">
@@ -980,7 +962,7 @@ export function TestingSystem() {
                 disabled
                 className="w-full bg-tactical-panel border border-tactical-border/50 text-muted-foreground py-3 font-mono text-xs uppercase tracking-wider cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Допуск на рассмотрении <Icon name="Clock" size={12} />
+                {pendingRequest.status === "created" ? "Допуск отправлен" : "Допуск на рассмотрении"} <Icon name="Clock" size={12} />
               </button>
             ) : (
               <button

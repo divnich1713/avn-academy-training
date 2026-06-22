@@ -1,0 +1,1 @@
+ALTER TABLE t_p29017774_avn_academy_training.weekly_reports DROP CONSTRAINT IF EXISTS unique_user_week;

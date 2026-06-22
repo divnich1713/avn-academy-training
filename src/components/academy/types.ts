@@ -14,7 +14,8 @@ export type Section =
   | "testing"
   | "testing-history"
   | "simulator"
-  | "flashcards";
+  | "flashcards"
+  | "weekly-reports";
 
 export type UserRole = "head_avng" | "deputy_head" | "chief_instructor" | "senior_instructor" | "instructor" | "junior_instructor" | "cadet" | "dismissed" | "senior_ufsvng";
 
@@ -113,6 +114,12 @@ export const NAV_ITEMS: {
     id: "instructor",
     label: "Панель инструктора",
     icon: "Shield",
+    roles: ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"],
+  },
+  {
+    id: "weekly-reports",
+    label: "Еженедельные отчеты",
+    icon: "CalendarCheck",
     roles: ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"],
   },
 ];

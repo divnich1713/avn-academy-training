@@ -4,9 +4,10 @@ import { fetchDiscordProfile } from "@/lib/api";
 
 export function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string }> = {
+    created: { label: "Создана", cls: "text-blue-400 bg-blue-900/30 border-blue-800" },
     approved: { label: "Одобрено", cls: "text-green-400 bg-green-900/30 border-green-800" },
     pending: { label: "На рассмотрении", cls: "text-yellow-400 bg-yellow-900/30 border-yellow-800" },
-    rejected: { label: "Отклонено", cls: "text-red-400 bg-red-900/30 border-red-800" },
+    rejected: { label: "Отказано", cls: "text-red-400 bg-red-900/30 border-red-800" },
   };
   const s = map[status] ?? { label: status, cls: "text-gray-400 bg-gray-900/30 border-gray-700" };
   return (
@@ -152,7 +153,7 @@ export function InstructorAvatar({
 
   // If cadet and no custom/Discord avatar, assign a random FSVNG themed avatar based on ID
   const isCadet = role === "cadet";
-  const defaultCadetAvatar = isCadet && id ? `/avatars/cadet${(id % 4) + 1}.png` : null;
+  const defaultCadetAvatar = isCadet && id ? `/avatars/cadet${(id % 4) + 1}.webp` : null;
 
   const targetUrl = avatarUrl || discordAvatar || defaultCadetAvatar;
 

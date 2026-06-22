@@ -1813,7 +1813,7 @@ export function OathMemo({ isOpen, onClose }: MemoProps) {
                 Военная присяга АВНГ
               </h4>
               <div className="bg-tactical-panel/40 border border-tactical-border/60 p-4 rounded text-foreground font-sans italic relative overflow-hidden">
-                <div className="absolute right-2 bottom-2 w-16 h-16 opacity-5 pointer-events-none bg-contain bg-center bg-no-repeat" style={{ backgroundImage: 'url("/rosgvardia_emblem.png")' }} />
+                <div className="absolute right-2 bottom-2 w-16 h-16 opacity-5 pointer-events-none bg-contain bg-center bg-no-repeat" style={{ backgroundImage: 'url("/rosgvardia_emblem_color.webp")' }} />
                 <p className="indent-4 leading-relaxed font-semibold text-yellow-500 font-mono not-italic mb-2">
                   Текст ПРИСЯГИ для Курсанта Академии Войск Национальной Гвардии
                 </p>

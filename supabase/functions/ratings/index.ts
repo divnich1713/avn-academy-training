@@ -89,7 +89,7 @@ export default async function handler(req: Request): Promise<Response> {
             COALESCE((SELECT COUNT(g.id)::int FROM ${SCHEMA}.grades g WHERE g.instructor_id = u.id AND g.type = 'exam' AND g.graded_at > NOW() - ${intervalSql}), 0) as exams_count,
             COALESCE((SELECT COUNT(pr.id)::int FROM ${SCHEMA}.promotion_reports pr WHERE pr.reviewed_by = u.id AND pr.status != 'pending' AND pr.reviewed_at > NOW() - ${intervalSql}), 0) as reviews_count
          FROM ${SCHEMA}.users u
-         WHERE u.role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head', 'senior_ufsvng')`
+         WHERE u.role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head')`
       );
 
       const instructors = res.rows.map(inst => {

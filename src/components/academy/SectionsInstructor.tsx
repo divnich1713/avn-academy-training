@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, Fragment } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Icon from "@/components/ui/icon";
 import { SectionHeader, StatCard, StatusBadge, GradeCircle, OnlineStatus, InstructorAvatar } from "./UIComponents";
-import { User, reviewRequest, TrainingRequest } from "@/lib/api";
+import { User, reviewRequest, startReviewRequest, TrainingRequest } from "@/lib/api";
 import { useRequests, useGrades, useAdminUsers, usePromotionReports, queryKeys, useDeleteUser } from "@/lib/useQueries";
 import { TYPE_LABEL, fmt, Spinner, Empty, fmtStaticId, renderTextWithLinks } from "./SectionsShared";
 import { InstructorRatingView } from "./SectionsRatings";
@@ -172,6 +172,18 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
     setReviewLoading((prev) => ({ ...prev, [id]: false }));
   };
 
+  const handleStartReview = async (id: number) => {
+    setReviewLoading((prev) => ({ ...prev, [id]: true }));
+    try {
+      await startReviewRequest(id);
+      await refetchRequests();
+    } catch (err: any) {
+      alert("Ошибка при принятии заявки на рассмотрение: " + err.message);
+    } finally {
+      setReviewLoading((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
 
 
 
@@ -336,7 +348,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [allRequestsPlusDismissals, filterType, filterStatus, selectedReqDate, filterInstructor, authUser.id]);
 
-  const pendingCount = allRequestsPlusDismissals.filter((r) => r.status === "pending").length;
+  const pendingCount = allRequestsPlusDismissals.filter((r) => r.status === "created" || r.status === "pending").length;
 
   const pendingCountByType = useMemo(() => {
     const counts = {
@@ -347,7 +359,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       dismissal: 0
     };
     allRequestsPlusDismissals.forEach((r) => {
-      if (r.status === "pending") {
+      if (r.status === "created" || r.status === "pending") {
         counts.all++;
         if (r.type === "lecture") counts.lecture++;
         if (r.type === "practice") counts.practice++;
@@ -621,6 +633,19 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
           </div>
           <StatusBadge status={r.status} />
         </div>
+        {r.status === "created" && (
+          <div className="border-t border-tactical-border pt-3 flex items-center gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              disabled={reviewLoading[r.id]}
+              onClick={() => handleStartReview(r.id)}
+              className="rank-badge text-yellow-400 border border-yellow-800 px-3 py-1 hover:bg-yellow-900/30 transition-colors disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+            >
+              <Icon name="Eye" size={12} /> Рассмотреть
+            </button>
+            {reviewLoading[r.id] && <Icon name="Loader2" size={14} className="text-primary animate-spin" />}
+          </div>
+        )}
         {r.status === "pending" && (() => {
           const isAssignedToOther = r.instructor_id && r.instructor_id !== authUser.id;
           if (isAssignedToOther) {
@@ -809,9 +834,10 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
               >
+                <option value="created">Созданы</option>
                 <option value="pending">На рассмотрении</option>
                 <option value="approved">Одобренные</option>
-                <option value="rejected">Отклонённые</option>
+                <option value="rejected">Отказано</option>
                 <option value="all">Все статусы</option>
               </select>
               <select

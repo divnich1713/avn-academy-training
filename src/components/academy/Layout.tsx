@@ -49,7 +49,7 @@ export function AppHeader({
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Double-headed eagle emblem */}
             <img
-              src="/rosgvardia_emblem.png"
+              src="/rosgvardia_emblem_color.webp"
               alt="Эмблема АВНГ"
               className="w-9 h-9 sm:w-12 sm:h-12 object-contain filter drop-shadow-[0_0_8px_rgba(200,168,74,0.3)]"
             />
