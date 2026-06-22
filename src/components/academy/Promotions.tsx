@@ -1602,8 +1602,14 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                                 >
                                   <option value={item.num}>— Нет (Оригинал) —</option>
                                   {pointsConfig.map(c => {
-                                    const isMandatory = activeFlowConfig.mandatory.some(m => m.num === c.num);
-                                    if (isMandatory && c.num !== item.num) return null;
+                                    if (item.allowedAlternatives && item.allowedAlternatives.length > 0) {
+                                      if (c.num !== item.num && !item.allowedAlternatives.includes(c.num)) {
+                                        return null;
+                                      }
+                                    } else {
+                                      const isMandatory = activeFlowConfig.mandatory.some(m => m.num === c.num);
+                                      if (isMandatory && c.num !== item.num) return null;
+                                    }
                                     return (
                                       <option key={c.num} value={c.num}>
                                         Пункт {c.num}. {c.name}
@@ -2174,44 +2180,78 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                         ) : (
                           <div className="space-y-2">
                             {flow.mandatory.map((m: any, mIdx: number) => (
-                              <div key={mIdx} className="flex items-center gap-2 bg-tactical-panel p-1.5 border border-tactical-border/40">
-                                <select
-                                  value={m.num}
-                                  onChange={(e) => {
-                                    const updated = [...editRanks];
-                                    updated[flowIdx].mandatory[mIdx].num = Number(e.target.value);
-                                    setEditRanks(updated);
-                                  }}
-                                  className="bg-tactical-card border border-tactical-border px-2 py-1 text-xs text-foreground font-ibm flex-1 focus:outline-none focus:border-primary"
-                                >
-                                  {editPoints.map(p => (
-                                    <option key={p.num} value={p.num}>
-                                      Пункт {p.num}. {p.name}
-                                    </option>
-                                  ))}
-                                </select>
-
-                                <div className="flex items-center gap-1 w-20">
-                                  <label className="text-[8px] uppercase font-mono text-muted-foreground">Кол-во</label>
-                                  <input
-                                    type="number"
-                                    value={m.count}
+                              <div key={mIdx} className="bg-tactical-panel/40 p-3 border border-tactical-border/40 space-y-2 rounded-sm">
+                                <div className="flex items-center gap-2">
+                                  <select
+                                    value={m.num}
                                     onChange={(e) => {
                                       const updated = [...editRanks];
-                                      updated[flowIdx].mandatory[mIdx].count = Math.max(1, Number(e.target.value));
+                                      updated[flowIdx].mandatory[mIdx].num = Number(e.target.value);
+                                      const currentAlts = updated[flowIdx].mandatory[mIdx].allowedAlternatives || [];
+                                      updated[flowIdx].mandatory[mIdx].allowedAlternatives = currentAlts.filter((n: number) => n !== Number(e.target.value));
                                       setEditRanks(updated);
                                     }}
-                                    className="w-full bg-tactical-card border border-tactical-border px-1.5 py-0.5 text-xs text-foreground font-mono focus:outline-none focus:border-primary"
-                                  />
+                                    className="bg-tactical-card border border-tactical-border px-2 py-1 text-xs text-foreground font-ibm flex-1 focus:outline-none focus:border-primary"
+                                  >
+                                    {editPoints.map(p => (
+                                      <option key={p.num} value={p.num}>
+                                        Пункт {p.num}. {p.name}
+                                      </option>
+                                    ))}
+                                  </select>
+
+                                  <div className="flex items-center gap-1 w-20">
+                                    <label className="text-[8px] uppercase font-mono text-muted-foreground">Кол-во</label>
+                                    <input
+                                      type="number"
+                                      value={m.count}
+                                      onChange={(e) => {
+                                        const updated = [...editRanks];
+                                        updated[flowIdx].mandatory[mIdx].count = Math.max(1, Number(e.target.value));
+                                        setEditRanks(updated);
+                                      }}
+                                      className="w-full bg-tactical-card border border-tactical-border px-1.5 py-0.5 text-xs text-foreground font-mono focus:outline-none focus:border-primary"
+                                    />
+                                  </div>
+
+                                  <button
+                                    onClick={() => deleteMandatory(flowIdx, mIdx)}
+                                    title="Удалить обязательное условие"
+                                    className="text-muted-foreground hover:text-red-500 transition-colors p-1"
+                                  >
+                                    <Icon name="Trash2" size={12} />
+                                  </button>
                                 </div>
 
-                                <button
-                                  onClick={() => deleteMandatory(flowIdx, mIdx)}
-                                  title="Удалить обязательное условие"
-                                  className="text-muted-foreground hover:text-red-500 transition-colors p-1"
-                                >
-                                  <Icon name="Trash2" size={12} />
-                                </button>
+                                <div className="pl-4 border-l border-tactical-border/40 space-y-1">
+                                  <span className="text-[9px] uppercase font-mono text-muted-foreground block">Разрешенные альтернативы:</span>
+                                  <div className="flex flex-wrap gap-x-3 gap-y-1.5 max-h-[80px] overflow-y-auto bg-tactical-panel/40 p-2 border border-tactical-border/30 rounded-sm">
+                                    {editPoints.map(p => {
+                                      if (p.num === m.num) return null;
+                                      const isAltChecked = m.allowedAlternatives?.includes(p.num);
+                                      return (
+                                        <label key={p.num} className="flex items-center gap-1.5 text-[10px] text-foreground select-none cursor-pointer">
+                                          <input
+                                            type="checkbox"
+                                            checked={!!isAltChecked}
+                                            onChange={(e) => {
+                                              const updated = [...editRanks];
+                                              const currentAlts = updated[flowIdx].mandatory[mIdx].allowedAlternatives || [];
+                                              if (e.target.checked) {
+                                                updated[flowIdx].mandatory[mIdx].allowedAlternatives = [...currentAlts, p.num];
+                                              } else {
+                                                updated[flowIdx].mandatory[mIdx].allowedAlternatives = currentAlts.filter((num: number) => num !== p.num);
+                                              }
+                                              setEditRanks(updated);
+                                            }}
+                                            className="rounded border-tactical-border bg-tactical-card text-primary focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer"
+                                          />
+                                          <span>Пункт {p.num}. {p.name}</span>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
                               </div>
                             ))}
                           </div>
