@@ -411,6 +411,19 @@ export async function createGrade(payload: {
   const user = getUser();
   const cadet = USERS.find((u) => u.id === payload.cadet_id);
   if (!cadet) throw new Error("Курсант не найден");
+
+  if (payload.request_id) {
+    const req = REQUESTS.find((r) => r.id === payload.request_id);
+    if (req) {
+      if (req.instructor_id && req.instructor_id !== user?.id) {
+        throw new Error("Этот запрос адресован конкретному инструктору");
+      }
+      req.status = "approved";
+      req.reviewer_name = user ? `${user.rank} ${user.name}` : "Инструктор";
+      req.updated_at = new Date().toISOString();
+    }
+  }
+
   const grade: Grade = {
     id: nextGradeId++,
     subject: payload.subject,

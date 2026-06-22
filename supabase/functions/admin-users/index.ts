@@ -253,12 +253,6 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     if (method === "DELETE") {
-      if (requester.role !== "head_avng" && requester.role !== "deputy_head" && requester.role !== "senior_ufsvng") {
-        return new Response(JSON.stringify({ error: "Доступ запрещён" }), {
-          status: 403,
-          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
-        });
-      }
       const userId = url.searchParams.get("id");
       if (!userId || !/^\d+$/.test(userId)) {
         return new Response(JSON.stringify({ error: "Не указан ID пользователя" }), {
@@ -267,8 +261,50 @@ export default async function handler(req: Request): Promise<Response> {
         });
       }
 
-      await client.queryArray(`UPDATE ${SCHEMA}.sessions SET expires_at = NOW() WHERE user_id = $1`, [Number(userId)]);
-      await client.queryArray(`UPDATE ${SCHEMA}.users SET is_whitelisted = FALSE, updated_at = NOW() WHERE id = $1`, [Number(userId)]);
+      if (requester.role !== "head_avng") {
+        return new Response(JSON.stringify({ error: "Доступ запрещён. Удалять пользователей может только Начальник АВНГ." }), {
+          status: 403,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      const targetRes = await client.queryObject<{ role: string }>(
+        `SELECT role FROM ${SCHEMA}.users WHERE id = $1`,
+        [Number(userId)]
+      );
+      if (targetRes.rows.length === 0) {
+        return new Response(JSON.stringify({ error: "Пользователь не найден" }), {
+          status: 404,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+      
+      const targetUser = targetRes.rows[0];
+      if (targetUser.role !== "cadet") {
+        return new Response(JSON.stringify({ error: "Разрешено удалять только курсантов" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      // Start transaction for cascade deletion
+      await client.queryArray("BEGIN");
+      try {
+        await client.queryArray(`DELETE FROM ${SCHEMA}.sessions WHERE user_id = $1`, [Number(userId)]);
+        await client.queryArray(`DELETE FROM ${SCHEMA}.grades WHERE user_id = $1 OR instructor_id = $1`, [Number(userId)]);
+        await client.queryArray(`DELETE FROM ${SCHEMA}.requests WHERE user_id = $1 OR reviewed_by = $1 OR instructor_id = $1`, [Number(userId)]);
+        await client.queryArray(`DELETE FROM ${SCHEMA}.notifications WHERE user_id = $1`, [Number(userId)]);
+        await client.queryArray(`DELETE FROM ${SCHEMA}.student_elo WHERE user_id = $1`, [Number(userId)]);
+        await client.queryArray(`DELETE FROM ${SCHEMA}.test_attempts WHERE user_id = $1`, [Number(userId)]);
+        await client.queryArray(`DELETE FROM ${SCHEMA}.instructor_ratings WHERE cadet_id = $1 OR instructor_id = $1`, [Number(userId)]);
+        await client.queryArray(`DELETE FROM ${SCHEMA}.instructor_promotion_reports WHERE user_id = $1 OR reviewed_by = $1`, [Number(userId)]);
+        await client.queryArray(`DELETE FROM ${SCHEMA}.promotion_reports WHERE user_id = $1 OR reviewed_by = $1`, [Number(userId)]);
+        await client.queryArray(`DELETE FROM ${SCHEMA}.users WHERE id = $1`, [Number(userId)]);
+        await client.queryArray("COMMIT");
+      } catch (dbErr) {
+        await client.queryArray("ROLLBACK");
+        throw dbErr;
+      }
 
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,

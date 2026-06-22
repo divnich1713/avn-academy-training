@@ -266,7 +266,7 @@ function getSubSubjects(subject: string): string[] {
 }
 
 // Serve Edge Function
-Deno.serve(async (req) => {
+export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response("", { headers: CORS_HEADERS, status: 200 });
   }
@@ -1111,7 +1111,7 @@ Deno.serve(async (req) => {
       const checkAdminAccess = (usr: any, method: string) => {
         const isMutation = ["POST", "PUT", "DELETE"].includes(method);
         const allowed = isMutation
-          ? ["head_avng", "chief_instructor", "deputy_head", "senior_ufsvng"]
+          ? ["head_avng", "deputy_head", "senior_ufsvng"]
           : ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"];
         if (!allowed.includes(usr.role)) {
           throw new Error("Недостаточно прав для изменения вопросов тестов");
@@ -1212,7 +1212,7 @@ Deno.serve(async (req) => {
       const checkAdminAccess = (usr: any, method: string) => {
         const isMutation = ["POST", "PUT", "DELETE"].includes(method);
         const allowed = isMutation
-          ? ["head_avng", "chief_instructor", "deputy_head", "senior_ufsvng"]
+          ? ["head_avng", "deputy_head", "senior_ufsvng"]
           : ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"];
         if (!allowed.includes(usr.role)) {
           throw new Error("Недостаточно прав для изменения настроек тестов");
@@ -1291,4 +1291,9 @@ Deno.serve(async (req) => {
       client.release();
     }
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handler);
+}
+

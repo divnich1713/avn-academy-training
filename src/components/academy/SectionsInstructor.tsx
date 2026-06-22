@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import Icon from "@/components/ui/icon";
 import { SectionHeader, StatCard, StatusBadge, GradeCircle, OnlineStatus, InstructorAvatar } from "./UIComponents";
 import { User, reviewRequest, TrainingRequest } from "@/lib/api";
-import { useRequests, useGrades, useAdminUsers, usePromotionReports, queryKeys } from "@/lib/useQueries";
+import { useRequests, useGrades, useAdminUsers, usePromotionReports, queryKeys, useDeleteUser } from "@/lib/useQueries";
 import { TYPE_LABEL, fmt, Spinner, Empty, fmtStaticId, renderTextWithLinks } from "./SectionsShared";
 import { InstructorRatingView } from "./SectionsRatings";
 import { PromotionInstructorTab } from "./Promotions";
@@ -83,6 +83,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
 
   // --- Whitelist tab ---
   const { data: wlUsers = [], isLoading: wlLoading } = useAdminUsers();
+  const deleteUserMutation = useDeleteUser();
   const [showAddForm, setShowAddForm] = useState(false);
   const [form, setForm] = useState({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "АВНГ", role: "cadet" as "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed" | "senior_ufsvng", discord_id: "", avatar_url: "" });
   const [formError, setFormError] = useState("");
@@ -246,6 +247,19 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       setFormError(err instanceof Error ? err.message : "Ошибка");
     }
     setFormLoading(false);
+  };
+
+  const handleDeleteClick = (u: import("@/lib/api").AdminUser) => {
+    if (window.confirm(`Вы уверены, что хотите НАВСЕГДА удалить курсанта ${u.rank} ${u.name} (Static ID: ${fmtStaticId(u.static_id)})?\n\nЭто действие необратимо и каскадно удалит ВСЕ связанные с ним данные: сессии, запросы, оценки, уведомления, результаты тестов и прочее.`)) {
+      deleteUserMutation.mutate(u.id, {
+        onSuccess: () => {
+          alert(`Курсант ${u.name} был успешно и полностью удален из базы данных.`);
+        },
+        onError: (err: any) => {
+          alert(`Ошибка при удалении курсанта: ${err.message || err}`);
+        }
+      });
+    }
   };
 
   // Generate virtual dismissal requests for cadets exceeding 7 days
@@ -1447,9 +1461,25 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                               </button>
                             </td>
                             <td className="px-4 py-3 text-center">
-                              <button onClick={() => openEdit(u)} className="rank-badge text-primary border border-primary/30 px-2 py-0.5 hover:bg-primary/10 transition-colors">
-                                <Icon name="Pencil" size={11} />
-                              </button>
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button onClick={() => openEdit(u)} className="rank-badge text-primary border border-primary/30 px-2 py-0.5 hover:bg-primary/10 transition-colors" title="Редактировать">
+                                  <Icon name="Pencil" size={11} />
+                                </button>
+                                {authUser.role === "head_avng" && u.role === "cadet" && (
+                                  <button 
+                                    onClick={() => handleDeleteClick(u)} 
+                                    className="rank-badge text-red-400 border border-red-800/80 px-2 py-0.5 hover:bg-red-900/30 transition-colors"
+                                    title="Удалить навсегда"
+                                    disabled={deleteUserMutation.isPending}
+                                  >
+                                    {deleteUserMutation.isPending && deleteUserMutation.variables === u.id ? (
+                                      <Icon name="Loader2" size={11} className="animate-spin" />
+                                    ) : (
+                                      <Icon name="Trash2" size={11} />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))}

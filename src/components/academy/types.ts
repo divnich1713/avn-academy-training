@@ -34,7 +34,7 @@ export const NAV_ITEMS: {
     id: "materials",
     label: "Обучающие материалы",
     icon: "BookOpen",
-    roles: ["cadet", "instructor", "head_avng", "senior_ufsvng"],
+    roles: ["cadet", "instructor", "head_avng", "senior_ufsvng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"],
   },
   {
     id: "lectures",

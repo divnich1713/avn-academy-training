@@ -451,6 +451,26 @@ export async function reviewPromotionReport(id: number, status: "approved" | "re
   });
 }
 
+export async function fetchInstructorPromotionConfig(): Promise<{ points_config: any[] | null; ranks_flow: any[] | null }> {
+  if (USE_MOCK) {
+    return { points_config: null, ranks_flow: null };
+  }
+  return safeFetch(`${PROMOTIONS_URL}?action=instructor_config`, {
+    headers: authHeaders(),
+  });
+}
+
+export async function saveInstructorPromotionConfig(payload: { points_config: any[]; ranks_flow: any[] }) {
+  if (USE_MOCK) {
+    return { success: true };
+  }
+  return safeFetch(`${PROMOTIONS_URL}?action=save_instructor_config`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export interface InstructorPromotionReport {
   id: number;
   user_id: number;

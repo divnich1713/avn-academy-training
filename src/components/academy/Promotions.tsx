@@ -23,6 +23,7 @@ import {
   sendInstructorPromotionReportDiscord,
   sendInstructorPromotionReviewedDiscord,
 } from "@/lib/discord";
+import { useInstructorPromotionConfig, useSaveInstructorPromotionConfig } from "@/lib/useQueries";
 
 const PROMOTION_LABELS: Record<PromotionType, string> = {
   junior_sergeant: "Младший Сержант",
@@ -572,7 +573,7 @@ const INSTRUCTOR_RANKS = [
   "Капитан"
 ];
 
-const INSTRUCTOR_POINTS_CONFIG = [
+const DEFAULT_INSTRUCTOR_POINTS_CONFIG = [
   { num: 1, name: "Участие в ГМП", points: 40, desc: "3 и более фракций, включая ФСВНГ в т.ч отбитие нападения на ИК, похищения, теракты и т.д." },
   { num: 2, name: "Участие в поставке", points: 35 },
   { num: 3, name: "Участие в отбитии налёта/ограбления", points: 20, hasSubPoints: true, bonusPoints: 15, bonusLabel: "Успешное отбитие (+15 баллов)" },
@@ -589,7 +590,7 @@ const INSTRUCTOR_POINTS_CONFIG = [
   { num: 17, name: "Принятие присяги", points: 10 },
 ];
 
-const INSTRUCTOR_RANKS_FLOW = [
+const DEFAULT_INSTRUCTOR_RANKS_FLOW = [
   {
     from: "Сержант",
     to: "Старший Сержант",
@@ -696,6 +697,8 @@ export function InstructorMilitaryReport({
   gratitude,
   gratitudeLink,
   date,
+  pointsConfig = DEFAULT_INSTRUCTOR_POINTS_CONFIG,
+  ranksFlow = DEFAULT_INSTRUCTOR_RANKS_FLOW,
 }: {
   name: string;
   staticId: string;
@@ -706,8 +709,10 @@ export function InstructorMilitaryReport({
   gratitude: boolean;
   gratitudeLink: string;
   date: string;
+  pointsConfig?: any[];
+  ranksFlow?: any[];
 }) {
-  const flow = INSTRUCTOR_RANKS_FLOW.find(f => f.from === currentRank && f.to === targetRank);
+  const flow = ranksFlow.find(f => f.from === currentRank && f.to === targetRank);
   const neededPoints = flow ? flow.points : 0;
 
   const formattedCurrentRank = `${currentRank.toLowerCase()} полиции`;
@@ -751,7 +756,7 @@ export function InstructorMilitaryReport({
         <p className="font-semibold">К рапорту прилагаю:</p>
         <ul className="space-y-4">
           {entries.map((e, idx) => {
-            const config = INSTRUCTOR_POINTS_CONFIG.find(c => c.num === e.num);
+            const config = pointsConfig.find(c => c.num === e.num);
             if (!config) return null;
             const successText = config.hasSubPoints && e.successCount > 0 ? `, успешных: ${e.successCount}` : "";
             return (
@@ -795,13 +800,113 @@ export function InstructorMilitaryReport({
 }
 
 export function InstructorPromotionSection({ authUser }: { authUser: User }) {
-  const [activeSubTab, setActiveSubTab] = useState<"submit" | "review">("submit");
+  const [activeSubTab, setActiveSubTab] = useState<"submit" | "review" | "settings">("submit");
   const [reports, setReports] = useState<InstructorPromotionReport[]>([]);
   const [reportsLoading, setReportsLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [reviewLoading, setReviewLoading] = useState<Record<number, boolean>>({});
   const [reviewComment, setReviewComment] = useState<Record<number, string>>({});
   const [filterStatus, setFilterStatus] = useState<string>("all");
+
+  const { data: configData } = useInstructorPromotionConfig();
+  const saveConfigMutation = useSaveInstructorPromotionConfig();
+
+  const pointsConfig = useMemo(() => {
+    return configData?.points_config || DEFAULT_INSTRUCTOR_POINTS_CONFIG;
+  }, [configData]);
+
+  const ranksFlow = useMemo(() => {
+    return configData?.ranks_flow || DEFAULT_INSTRUCTOR_RANKS_FLOW;
+  }, [configData]);
+
+  const [editPoints, setEditPoints] = useState<any[]>([]);
+  const [editRanks, setEditRanks] = useState<any[]>([]);
+  const [saveStatus, setSaveStatus] = useState<{ success?: boolean; error?: string } | null>(null);
+
+  useEffect(() => {
+    if (activeSubTab === "settings") {
+      setEditPoints(JSON.parse(JSON.stringify(pointsConfig)));
+      setEditRanks(JSON.parse(JSON.stringify(ranksFlow)));
+    }
+  }, [activeSubTab, pointsConfig, ranksFlow]);
+
+  const addPointConfig = () => {
+    const nextNum = editPoints.length > 0 ? Math.max(...editPoints.map(p => p.num)) + 1 : 1;
+    setEditPoints(prev => [
+      ...prev,
+      {
+        num: nextNum,
+        name: "Новая активность",
+        points: 10,
+        desc: "",
+        hasSubPoints: false,
+        bonusPoints: 0,
+        bonusLabel: ""
+      }
+    ]);
+  };
+
+  const addRankFlow = () => {
+    setEditRanks(prev => [
+      ...prev,
+      {
+        from: "Сержант",
+        to: "Старший Сержант",
+        points: 100,
+        mandatory: []
+      }
+    ]);
+  };
+
+  const addMandatory = (flowIdx: number) => {
+    const updated = [...editRanks];
+    const firstPointNum = editPoints.length > 0 ? editPoints[0].num : 1;
+    if (!updated[flowIdx].mandatory) {
+      updated[flowIdx].mandatory = [];
+    }
+    updated[flowIdx].mandatory.push({ num: firstPointNum, count: 1 });
+    setEditRanks(updated);
+  };
+
+  const deleteMandatory = (flowIdx: number, mIdx: number) => {
+    const updated = [...editRanks];
+    updated[flowIdx].mandatory.splice(mIdx, 1);
+    setEditRanks(updated);
+  };
+
+  const hasDuplicateNums = useMemo(() => {
+    const nums = editPoints.map(p => p.num);
+    return new Set(nums).size !== nums.length;
+  }, [editPoints]);
+
+  const handleSaveConfig = async () => {
+    if (hasDuplicateNums) {
+      setSaveStatus({ error: "Ошибка: Присутствуют дубликаты номеров пунктов активности!" });
+      return;
+    }
+    for (const p of editPoints) {
+      if (!p.name.trim()) {
+        setSaveStatus({ error: "Ошибка: Название активности не может быть пустым!" });
+        return;
+      }
+      if (p.points <= 0) {
+        setSaveStatus({ error: "Ошибка: Баллы за активность должны быть больше нуля!" });
+        return;
+      }
+    }
+    
+    try {
+      setSaveStatus(null);
+      await saveConfigMutation.mutateAsync({
+        points_config: editPoints,
+        ranks_flow: editRanks,
+      });
+      setSaveStatus({ success: true });
+      setTimeout(() => setSaveStatus(null), 5000);
+    } catch (err: any) {
+      setSaveStatus({ error: err.message || "Не удалось сохранить конфигурацию" });
+    }
+  };
   
   const [currentRank, setCurrentRank] = useState<string>(() => {
     const matched = INSTRUCTOR_RANKS.find(r => r.toLowerCase() === authUser.rank.toLowerCase());
@@ -827,6 +932,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
   const [success, setSuccess] = useState("");
   const [submittedReportLink, setSubmittedReportLink] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [replacements, setReplacements] = useState<Record<number, number>>({});
 
   const isLeadership = ["head_avng", "chief_instructor", "deputy_head"].includes(authUser.role);
 
@@ -836,6 +942,10 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       setTargetRank(INSTRUCTOR_RANKS[idx + 1]);
     }
   }, [currentRank]);
+
+  useEffect(() => {
+    setReplacements({});
+  }, [currentRank, targetRank]);
 
   const loadData = useCallback(async () => {
     setReportsLoading(true);
@@ -982,7 +1092,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
   const totalPoints = useMemo(() => {
     let pts = 0;
     entries.forEach(e => {
-      const config = INSTRUCTOR_POINTS_CONFIG.find(c => c.num === e.num);
+      const config = pointsConfig.find(c => c.num === e.num);
       if (!config) return;
       pts += e.count * config.points;
       if (config.hasSubPoints) {
@@ -993,26 +1103,37 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       pts += 50;
     }
     return pts;
-  }, [entries, gratitude]);
+  }, [entries, gratitude, pointsConfig]);
 
   const activeFlowConfig = useMemo(() => {
-    return INSTRUCTOR_RANKS_FLOW.find(f => f.from === currentRank && f.to === targetRank);
-  }, [currentRank, targetRank]);
+    return ranksFlow.find(f => f.from === currentRank && f.to === targetRank);
+  }, [currentRank, targetRank, ranksFlow]);
 
   const checklistStatus = useMemo(() => {
     if (!activeFlowConfig) return { allCompleted: true, pointsCompleted: true, items: [] };
     
     let allCompleted = true;
     const items = activeFlowConfig.mandatory.map(m => {
-      const matchingEntries = entries.filter(e => e.num === m.num);
+      const resolvedNum = replacements[m.num] || m.num;
+      const matchingEntries = entries.filter(e => e.num === resolvedNum);
       const totalEnteredCount = matchingEntries.reduce((sum, e) => sum + e.count, 0);
       const linksCount = matchingEntries.reduce((sum, e) => sum + e.links.filter(link => link.trim().length > 0).length, 0);
       const completed = totalEnteredCount >= m.count && linksCount >= m.count;
       
       if (!completed) allCompleted = false;
       
+      const activity = pointsConfig.find(p => p.num === resolvedNum);
+      const resolvedName = activity ? activity.name : (m.name || `Пункт ${resolvedNum}`);
+      
+      const originalActivity = pointsConfig.find(p => p.num === m.num);
+      const originalName = originalActivity ? originalActivity.name : `Пункт ${m.num}`;
+      
       return {
         ...m,
+        resolvedNum,
+        name: resolvedName,
+        originalName,
+        isReplaced: resolvedNum !== m.num,
         enteredCount: totalEnteredCount,
         linksCount,
         completed
@@ -1027,7 +1148,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       pointsCompleted,
       items
     };
-  }, [activeFlowConfig, entries, totalPoints]);
+  }, [activeFlowConfig, entries, totalPoints, pointsConfig, replacements]);
 
   const handleSubmit = async () => {
     if (!checklistStatus.allCompleted) return;
@@ -1038,7 +1159,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
     
     let itemsText = "";
     entries.forEach((e) => {
-      const config = INSTRUCTOR_POINTS_CONFIG.find(c => c.num === e.num);
+      const config = pointsConfig.find(c => c.num === e.num);
       if (!config) return;
       const successText = config.hasSubPoints && e.successCount > 0 ? `, успешных: ${e.successCount}` : "";
       itemsText += `• ${config.name} (${e.count} шт${successText}) — ${e.count * config.points + e.successCount * (config.bonusPoints || 0)} б.;\n`;
@@ -1050,17 +1171,52 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       itemsText += `• Благодарность от старшего состава — 50 б.;\n  - Ссылка: ${gratitudeLink || "(ссылка отсутствует)"}\n`;
     }
 
+    const replacementEntries = Object.entries(replacements);
+    if (replacementEntries.length > 0) {
+      itemsText += `\n**Замены обязательных пунктов:**\n`;
+      replacementEntries.forEach(([originalStr, replacedStr]) => {
+        const origNum = Number(originalStr);
+        const replNum = Number(replacedStr);
+        const origConf = pointsConfig.find(p => p.num === origNum);
+        const replConf = pointsConfig.find(p => p.num === replNum);
+        const origName = origConf ? origConf.name : `Пункт ${origNum}`;
+        const replName = replConf ? replConf.name : `Пункт ${replNum}`;
+        itemsText += `• ${origName} ➔ Заменен на: ${replName}\n`;
+      });
+    }
+
+    const itemsCompletedPayload = entries.map(e => ({
+      num: e.num,
+      count: e.count,
+      successCount: e.successCount,
+      links: e.links
+    }));
+    
+    if (gratitude) {
+      itemsCompletedPayload.push({
+        num: 99,
+        count: 1,
+        successCount: 0,
+        links: [gratitudeLink]
+      });
+    }
+    
+    if (replacementEntries.length > 0) {
+      itemsCompletedPayload.push({
+        num: 100,
+        count: 0,
+        successCount: 0,
+        links: [],
+        metadata: { replacements }
+      } as any);
+    }
+
     try {
       const res = await submitInstructorPromotionReport({
         current_rank: currentRank,
         target_rank: targetRank,
         total_points: totalPoints,
-        items_completed: entries.map(e => ({
-          num: e.num,
-          count: e.count,
-          successCount: e.successCount,
-          links: e.links
-        })).concat(gratitude ? [{ num: 99, count: 1, successCount: 0, links: [gratitudeLink] }] : [])
+        items_completed: itemsCompletedPayload
       });
 
       sendInstructorPromotionReportDiscord({
@@ -1078,6 +1234,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       setSubmittedReportLink(link);
       setSuccess("Рапорт на повышение успешно подан!");
       setEntries([]);
+      setReplacements({});
       setGratitude(false);
       setGratitudeLink("");
       await loadData();
@@ -1154,6 +1311,18 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
               <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
             )}
           </button>
+          {authUser.role === "head_avng" && (
+            <button
+              onClick={() => setActiveSubTab("settings")}
+              className={`px-4 py-2 text-xs tracking-wider uppercase font-oswald border-b-2 transition-colors ${
+                activeSubTab === "settings"
+                  ? "border-primary text-foreground font-semibold"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Настройка системы
+            </button>
+          )}
         </div>
       )}
 
@@ -1213,7 +1382,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                 ) : (
                   <div className="space-y-4">
                     {entries.map((entry) => {
-                      const selectedConfig = INSTRUCTOR_POINTS_CONFIG.find(c => c.num === entry.num);
+                      const selectedConfig = pointsConfig.find(c => c.num === entry.num);
                       return (
                         <div key={entry.id} className={`bg-tactical-panel border p-4 relative space-y-3 ${entry.isAuto ? "border-green-500/40" : "border-tactical-border/80"}`}>
                           {!entry.isAuto ? (
@@ -1242,7 +1411,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                                   entry.isAuto ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
                                 }`}
                               >
-                                {INSTRUCTOR_POINTS_CONFIG.map(c => (
+                                {pointsConfig.map(c => (
                                   <option key={c.num} value={c.num}>
                                     Пункт {c.num}. {c.name} ({c.points} б.)
                                   </option>
@@ -1383,24 +1552,67 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                   {/* Mandatory items checklist */}
                   <div className="space-y-2 pt-2 border-t border-tactical-border/40">
                     <span className="text-[10px] uppercase font-mono text-muted-foreground block">Обязательное выполнение пунктов:</span>
-                    <div className="space-y-1.5">
-                      {checklistStatus.items.map((item, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <Icon
-                              name={item.completed ? "CheckSquare" : "Square"}
-                              size={12}
-                              className={item.completed ? "text-green-400" : "text-muted-foreground/30"}
-                            />
-                            <span className={item.completed ? "text-green-300" : ""}>
-                              Пункт {item.num}. {item.name}
-                            </span>
+                    <div className="space-y-2">
+                      {checklistStatus.items.map((item, idx) => {
+                        const isReplaced = item.isReplaced;
+                        return (
+                          <div key={idx} className="bg-tactical-panel/30 border border-tactical-border/30 p-2.5 rounded-sm space-y-2 text-left">
+                            <div className="flex items-start justify-between text-xs gap-2">
+                              <div className="flex items-start gap-2 text-muted-foreground flex-1 min-w-0">
+                                <Icon
+                                  name={item.completed ? "CheckSquare" : "Square"}
+                                  size={12}
+                                  className={`mt-0.5 flex-shrink-0 ${item.completed ? "text-green-400" : "text-muted-foreground/30"}`}
+                                />
+                                <div className="min-w-0">
+                                  <span className={item.completed ? "text-green-300" : "text-foreground"}>
+                                    Пункт {item.resolvedNum}. {item.name}
+                                  </span>
+                                  {isReplaced && (
+                                    <span className="block text-[10px] text-yellow-500 font-mono mt-0.5">
+                                      (Заменено с: {item.originalName})
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <span className={`font-mono font-bold flex-shrink-0 ml-2 ${item.completed ? "text-green-400" : "text-red-400"}`}>
+                                {item.enteredCount} / {item.count}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2 pl-5 pt-1 border-t border-tactical-border/20">
+                              <span className="text-[10px] text-muted-foreground font-mono">Альтернатива:</span>
+                              <div className="flex items-center gap-1.5 flex-1 max-w-[180px]">
+                                <select
+                                  value={replacements[item.num] || item.num}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    if (val === item.num) {
+                                      const updated = { ...replacements };
+                                      delete updated[item.num];
+                                      setReplacements(updated);
+                                    } else {
+                                      setReplacements(prev => ({ ...prev, [item.num]: val }));
+                                    }
+                                  }}
+                                  className="w-full bg-tactical-panel border border-tactical-border/60 text-[10px] font-ibm py-0.5 px-1.5 focus:outline-none focus:border-primary text-foreground cursor-pointer"
+                                >
+                                  <option value={item.num}>— Нет (Оригинал) —</option>
+                                  {pointsConfig.map(c => {
+                                    const isMandatory = activeFlowConfig.mandatory.some(m => m.num === c.num);
+                                    if (isMandatory && c.num !== item.num) return null;
+                                    return (
+                                      <option key={c.num} value={c.num}>
+                                        Пункт {c.num}. {c.name}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                              </div>
+                            </div>
                           </div>
-                          <span className={`font-mono font-bold ${item.completed ? "text-green-400" : "text-red-400"}`}>
-                            {item.enteredCount} / {item.count}
-                          </span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -1421,6 +1633,8 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                   gratitude={gratitude}
                   gratitudeLink={gratitudeLink}
                   date={new Date().toLocaleDateString("ru-RU")}
+                  pointsConfig={pointsConfig}
+                  ranksFlow={ranksFlow}
                 />
               </div>
 
@@ -1478,7 +1692,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
             </div>
           </div>
         )
-      ) : (
+      ) : activeSubTab === "review" ? (
         /* Review instructor promotion reports list */
         <div className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
@@ -1568,6 +1782,36 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                             </button>
                           </div>
                           
+                          {/* Replacement warning alert */}
+                          {(() => {
+                            const metadataEntry = r.items_completed.find(e => e.num === 100);
+                            const reportReplacements = metadataEntry?.metadata?.replacements || {};
+                            const hasReplacements = Object.keys(reportReplacements).length > 0;
+                            if (!hasReplacements) return null;
+                            return (
+                              <div className="mb-4 p-3 bg-yellow-950/20 border border-yellow-800/60 rounded text-xs space-y-1 text-left">
+                                <p className="font-semibold text-yellow-400 flex items-center gap-1.5">
+                                  <Icon name="AlertTriangle" size={13} className="text-yellow-400" />
+                                  Внимание: В рапорте произведены замены обязательных пунктов!
+                                </p>
+                                <ul className="list-disc pl-4 space-y-0.5 text-yellow-200/80 font-mono text-[11px]">
+                                  {Object.entries(reportReplacements).map(([origStr, replStr]) => {
+                                    const origNum = Number(origStr);
+                                    const replNum = Number(replacedStr => replacedStr || replStr); // wait, replStr is the actual value
+                                    const replNumVal = Number(replStr);
+                                    const origConf = pointsConfig.find(p => p.num === origNum);
+                                    const replConf = pointsConfig.find(p => p.num === replNumVal);
+                                    return (
+                                      <li key={origNum}>
+                                        {origConf ? origConf.name : `Пункт ${origNum}`} ➔ Заменен на: {replConf ? replConf.name : `Пункт ${replNumVal}`}
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                            );
+                          })()}
+
                           {/* Formal document component */}
                           <InstructorMilitaryReport
                             name={r.instructor_name || "Инструктор"}
@@ -1575,10 +1819,12 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                             currentRank={r.current_rank}
                             targetRank={r.target_rank}
                             totalPoints={r.total_points}
-                            entries={r.items_completed.filter(e => e.num !== 99)}
+                            entries={r.items_completed.filter(e => e.num !== 99 && e.num !== 100)}
                             gratitude={r.items_completed.some(e => e.num === 99)}
                             gratitudeLink={r.items_completed.find(e => e.num === 99)?.links[0] || ""}
                             date={new Date(r.created_at).toLocaleDateString("ru-RU")}
+                            pointsConfig={pointsConfig}
+                            ranksFlow={ranksFlow}
                           />
                         </div>
 
@@ -1629,6 +1875,362 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
               })}
             </div>
           )}
+        </div>
+      ) : (
+        /* Settings panel */
+        <div className="space-y-6 animate-fade-in">
+          <div className="bg-tactical-card border border-tactical-border/60 p-6 corner-mark space-y-4">
+            <div className="flex items-center justify-between border-b border-tactical-border pb-3">
+              <div>
+                <h3 className="font-oswald text-sm tracking-widest uppercase text-foreground flex items-center gap-2">
+                  <Icon name="Settings" size={16} className="text-primary" />
+                  Управление системой повышения инструкторов
+                </h3>
+                <p className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                  Настройка баллов за активности и пороговых требований по званиям
+                </p>
+              </div>
+              <button
+                onClick={handleSaveConfig}
+                disabled={saveConfigMutation.isPending || hasDuplicateNums}
+                className="bg-primary text-primary-foreground font-oswald text-xs tracking-wider uppercase px-4 py-2 hover:bg-primary/90 transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed corner-mark"
+              >
+                <Icon name="Save" size={14} />
+                {saveConfigMutation.isPending ? "Сохранение..." : "Сохранить всё"}
+              </button>
+            </div>
+
+            {saveStatus?.error && (
+              <div className="bg-red-950/20 border border-red-800 px-4 py-3 flex items-center gap-2 text-red-400 text-xs font-ibm">
+                <Icon name="AlertTriangle" size={14} />
+                <span>{saveStatus.error}</span>
+              </div>
+            )}
+
+            {saveStatus?.success && (
+              <div className="bg-green-950/20 border border-green-800 px-4 py-3 flex items-center gap-2 text-green-400 text-xs font-ibm">
+                <Icon name="CheckCircle" size={14} />
+                <span>Конфигурация успешно сохранена и применена!</span>
+              </div>
+            )}
+
+            {hasDuplicateNums && (
+              <div className="bg-yellow-950/20 border border-yellow-800 px-4 py-3 flex items-center gap-2 text-yellow-400 text-xs font-ibm">
+                <Icon name="AlertTriangle" size={14} />
+                <span>Внимание: Обнаружены дублирующиеся ID пунктов! Убедитесь, что ID каждого пункта уникален перед сохранением.</span>
+              </div>
+            )}
+
+            <div className="grid lg:grid-cols-12 gap-6 items-start">
+              {/* Left Column: Points Configuration */}
+              <div className="lg:col-span-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-tactical-border/40 pb-2">
+                  <h4 className="font-oswald text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+                    <Icon name="Medal" size={13} />
+                    1. Активности и баллы
+                  </h4>
+                  <button
+                    onClick={addPointConfig}
+                    className="border border-tactical-border hover:border-primary text-foreground hover:text-primary transition-colors font-oswald text-[10px] tracking-wider uppercase px-2 py-1 flex items-center gap-1 bg-tactical-panel"
+                  >
+                    <Icon name="Plus" size={10} /> Добавить
+                  </button>
+                </div>
+
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                  {editPoints.map((p, idx) => {
+                    const isDuplicate = editPoints.filter(ep => ep.num === p.num).length > 1;
+                    return (
+                      <div key={idx} className={`bg-tactical-panel border p-4 space-y-3 relative ${isDuplicate ? 'border-red-500/50 bg-red-950/5' : 'border-tactical-border/60'}`}>
+                        <button
+                          onClick={() => {
+                            setEditPoints(prev => prev.filter((_, i) => i !== idx));
+                          }}
+                          title="Удалить активность"
+                          className="absolute top-3 right-3 text-muted-foreground hover:text-red-500 transition-colors"
+                        >
+                          <Icon name="Trash2" size={14} />
+                        </button>
+
+                        <div className="grid grid-cols-12 gap-3 pr-6">
+                          <div className="col-span-3 space-y-1">
+                            <label className="text-[9px] uppercase font-mono text-muted-foreground">ID/Пункт</label>
+                            <input
+                              type="number"
+                              value={p.num}
+                              onChange={(e) => {
+                                const updated = [...editPoints];
+                                updated[idx].num = Number(e.target.value);
+                                setEditPoints(updated);
+                              }}
+                              className="w-full bg-tactical-card border border-tactical-border px-2 py-1 text-xs text-foreground font-mono focus:outline-none focus:border-primary"
+                            />
+                          </div>
+
+                          <div className="col-span-6 space-y-1">
+                            <label className="text-[9px] uppercase font-mono text-muted-foreground">Название</label>
+                            <input
+                              type="text"
+                              value={p.name}
+                              onChange={(e) => {
+                                const updated = [...editPoints];
+                                updated[idx].name = e.target.value;
+                                setEditPoints(updated);
+                              }}
+                              placeholder="Напр. Проведение лекции"
+                              className="w-full bg-tactical-card border border-tactical-border px-2 py-1 text-xs text-foreground font-ibm focus:outline-none focus:border-primary"
+                            />
+                          </div>
+
+                          <div className="col-span-3 space-y-1">
+                            <label className="text-[9px] uppercase font-mono text-muted-foreground">Баллы</label>
+                            <input
+                              type="number"
+                              value={p.points}
+                              onChange={(e) => {
+                                const updated = [...editPoints];
+                                updated[idx].points = Number(e.target.value);
+                                setEditPoints(updated);
+                              }}
+                              className="w-full bg-tactical-card border border-tactical-border px-2 py-1 text-xs text-foreground font-mono focus:outline-none focus:border-primary"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[9px] uppercase font-mono text-muted-foreground">Описание (необязательно)</label>
+                          <input
+                            type="text"
+                            value={p.desc || ""}
+                            onChange={(e) => {
+                              const updated = [...editPoints];
+                              updated[idx].desc = e.target.value;
+                              setEditPoints(updated);
+                            }}
+                            placeholder="Описание требований к доказательствам"
+                            className="w-full bg-tactical-card border border-tactical-border px-2 py-1 text-xs text-foreground font-ibm focus:outline-none focus:border-primary"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-4 pt-1">
+                          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={!!p.hasSubPoints}
+                              onChange={(e) => {
+                                const updated = [...editPoints];
+                                updated[idx].hasSubPoints = e.target.checked;
+                                if (!e.target.checked) {
+                                  updated[idx].bonusPoints = 0;
+                                  updated[idx].bonusLabel = "";
+                                } else {
+                                  updated[idx].bonusPoints = updated[idx].bonusPoints || 10;
+                                  updated[idx].bonusLabel = updated[idx].bonusLabel || "Бонусные баллы";
+                                }
+                                setEditPoints(updated);
+                              }}
+                              className="rounded border-tactical-border bg-tactical-card text-primary focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5"
+                            />
+                            <span className="text-[10px] font-ibm text-muted-foreground">Доп. баллы за успех</span>
+                          </label>
+                        </div>
+
+                        {p.hasSubPoints && (
+                          <div className="grid grid-cols-2 gap-3 pl-4 border-l border-tactical-border/60">
+                            <div className="space-y-1">
+                              <label className="text-[9px] uppercase font-mono text-muted-foreground">Название бонуса</label>
+                              <input
+                                type="text"
+                                value={p.bonusLabel || ""}
+                                onChange={(e) => {
+                                  const updated = [...editPoints];
+                                  updated[idx].bonusLabel = e.target.value;
+                                  setEditPoints(updated);
+                                }}
+                                placeholder="Успешное выполнение"
+                                className="w-full bg-tactical-card border border-tactical-border px-2 py-1 text-xs text-foreground font-ibm focus:outline-none focus:border-primary"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[9px] uppercase font-mono text-muted-foreground">Бонусные баллы</label>
+                              <input
+                                type="number"
+                                value={p.bonusPoints || 0}
+                                onChange={(e) => {
+                                  const updated = [...editPoints];
+                                  updated[idx].bonusPoints = Number(e.target.value);
+                                  setEditPoints(updated);
+                                }}
+                                className="w-full bg-tactical-card border border-tactical-border px-2 py-1 text-xs text-foreground font-mono focus:outline-none focus:border-primary"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Right Column: Ranks Flow Configuration */}
+              <div className="lg:col-span-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-tactical-border/40 pb-2">
+                  <h4 className="font-oswald text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+                    <Icon name="Award" size={13} />
+                    2. Требования по званиям
+                  </h4>
+                  <button
+                    onClick={addRankFlow}
+                    className="border border-tactical-border hover:border-primary text-foreground hover:text-primary transition-colors font-oswald text-[10px] tracking-wider uppercase px-2 py-1 flex items-center gap-1 bg-tactical-panel"
+                  >
+                    <Icon name="Plus" size={10} /> Добавить переход
+                  </button>
+                </div>
+
+                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
+                  {editRanks.map((flow, flowIdx) => (
+                    <div key={flowIdx} className="bg-tactical-panel border border-tactical-border/60 p-4 space-y-4 relative">
+                      <button
+                        onClick={() => {
+                          setEditRanks(prev => prev.filter((_, i) => i !== flowIdx));
+                        }}
+                        title="Удалить переход"
+                        className="absolute top-3 right-3 text-muted-foreground hover:text-red-500 transition-colors"
+                      >
+                        <Icon name="Trash2" size={14} />
+                      </button>
+
+                      <div className="flex items-center gap-2 flex-wrap text-xs font-oswald uppercase tracking-wider text-primary border-b border-tactical-border/30 pb-1.5 pr-6">
+                        <span>Переход {flowIdx + 1}</span>
+                      </div>
+
+                      <div className="grid grid-cols-12 gap-3">
+                        <div className="col-span-4 space-y-1">
+                          <label className="text-[9px] uppercase font-mono text-muted-foreground">С какого звания</label>
+                          <select
+                            value={flow.from}
+                            onChange={(e) => {
+                              const updated = [...editRanks];
+                              updated[flowIdx].from = e.target.value;
+                              setEditRanks(updated);
+                            }}
+                            className="w-full bg-tactical-card border border-tactical-border px-2 py-1 text-xs text-foreground font-ibm focus:outline-none focus:border-primary"
+                          >
+                            {INSTRUCTOR_RANKS.map(r => (
+                              <option key={r} value={r}>{r}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="col-span-4 space-y-1">
+                          <label className="text-[9px] uppercase font-mono text-muted-foreground">До какого звания</label>
+                          <select
+                            value={flow.to}
+                            onChange={(e) => {
+                              const updated = [...editRanks];
+                              updated[flowIdx].to = e.target.value;
+                              setEditRanks(updated);
+                            }}
+                            className="w-full bg-tactical-card border border-tactical-border px-2 py-1 text-xs text-foreground font-ibm focus:outline-none focus:border-primary"
+                          >
+                            {INSTRUCTOR_RANKS.map(r => (
+                              <option key={r} value={r}>{r}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="col-span-4 space-y-1">
+                          <label className="text-[9px] uppercase font-mono text-muted-foreground">Порог баллов</label>
+                          <input
+                            type="number"
+                            value={flow.points}
+                            onChange={(e) => {
+                              const updated = [...editRanks];
+                              updated[flowIdx].points = Number(e.target.value);
+                              setEditRanks(updated);
+                            }}
+                            className="w-full bg-tactical-card border border-tactical-border px-2 py-1 text-xs text-foreground font-mono focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Mandatory Conditions List */}
+                      <div className="space-y-2.5 bg-tactical-card p-3 border border-tactical-border/40">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase font-mono text-muted-foreground">Обязательные активности:</span>
+                          <button
+                            onClick={() => addMandatory(flowIdx)}
+                            className="text-[9px] uppercase font-mono text-primary hover:underline flex items-center gap-0.5"
+                          >
+                            <Icon name="Plus" size={9} /> Добавить условие
+                          </button>
+                        </div>
+
+                        {(!flow.mandatory || flow.mandatory.length === 0) ? (
+                          <p className="text-[10px] text-muted-foreground font-ibm italic">Нет обязательных активностей для этого перехода</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {flow.mandatory.map((m: any, mIdx: number) => (
+                              <div key={mIdx} className="flex items-center gap-2 bg-tactical-panel p-1.5 border border-tactical-border/40">
+                                <select
+                                  value={m.num}
+                                  onChange={(e) => {
+                                    const updated = [...editRanks];
+                                    updated[flowIdx].mandatory[mIdx].num = Number(e.target.value);
+                                    setEditRanks(updated);
+                                  }}
+                                  className="bg-tactical-card border border-tactical-border px-2 py-1 text-xs text-foreground font-ibm flex-1 focus:outline-none focus:border-primary"
+                                >
+                                  {editPoints.map(p => (
+                                    <option key={p.num} value={p.num}>
+                                      Пункт {p.num}. {p.name}
+                                    </option>
+                                  ))}
+                                </select>
+
+                                <div className="flex items-center gap-1 w-20">
+                                  <label className="text-[8px] uppercase font-mono text-muted-foreground">Кол-во</label>
+                                  <input
+                                    type="number"
+                                    value={m.count}
+                                    onChange={(e) => {
+                                      const updated = [...editRanks];
+                                      updated[flowIdx].mandatory[mIdx].count = Math.max(1, Number(e.target.value));
+                                      setEditRanks(updated);
+                                    }}
+                                    className="w-full bg-tactical-card border border-tactical-border px-1.5 py-0.5 text-xs text-foreground font-mono focus:outline-none focus:border-primary"
+                                  />
+                                </div>
+
+                                <button
+                                  onClick={() => deleteMandatory(flowIdx, mIdx)}
+                                  title="Удалить обязательное условие"
+                                  className="text-muted-foreground hover:text-red-500 transition-colors p-1"
+                                >
+                                  <Icon name="Trash2" size={12} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-tactical-border/40">
+              <button
+                onClick={handleSaveConfig}
+                disabled={saveConfigMutation.isPending || hasDuplicateNums}
+                className="bg-primary text-primary-foreground font-oswald text-xs tracking-widest uppercase py-2.5 px-6 hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed corner-mark"
+              >
+                <Icon name="Save" size={14} />
+                {saveConfigMutation.isPending ? "Сохранение конфигурации..." : "Сохранить конфигурацию"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

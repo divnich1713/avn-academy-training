@@ -404,6 +404,22 @@ export default async function handler(req: Request): Promise<Response> {
         });
       }
 
+      if (requestId) {
+        const checkRes = await client.queryObject<{ instructor_id: number | null }>(
+          `SELECT instructor_id FROM ${SCHEMA}.requests WHERE id = $1`,
+          [requestId]
+        );
+        if (checkRes.rows.length > 0) {
+          const targetInstId = checkRes.rows[0].instructor_id;
+          if (targetInstId && targetInstId !== user.id) {
+            return new Response(JSON.stringify({ error: "Этот запрос адресован конкретному инструктору" }), {
+              status: 403,
+              headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+            });
+          }
+        }
+      }
+
       const insertRes = await client.queryObject<{ id: number }>(
         `INSERT INTO ${SCHEMA}.grades (user_id, instructor_id, request_id, subject, type, grade, comment)
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,

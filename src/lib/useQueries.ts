@@ -11,6 +11,7 @@ import {
   fetchNotifications,
   fetchPromotionReports,
   adminListUsers,
+  adminRemoveUser,
   createRequest,
   reviewRequest,
   createGrade,
@@ -18,6 +19,8 @@ import {
   markNotificationRead,
   reviewPromotionReport,
   createPromotionReport,
+  fetchInstructorPromotionConfig,
+  saveInstructorPromotionConfig,
   TrainingRequest,
   Grade,
   User,
@@ -33,6 +36,7 @@ export const queryKeys = {
   notifications: ["notifications"] as const,
   promotionReports: ["promotionReports"] as const,
   adminUsers: ["adminUsers"] as const,
+  instructorPromotionConfig: ["instructorPromotionConfig"] as const,
 };
 
 // ─── Query Hooks ─────────────────────────────────────────────────────────────
@@ -178,6 +182,34 @@ export function useCreatePromotionReport() {
     mutationFn: createPromotionReport,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.promotionReports });
+    },
+  });
+}
+
+export function useDeleteUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: adminRemoveUser,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminUsers });
+    },
+  });
+}
+
+export function useInstructorPromotionConfig() {
+  return useQuery({
+    queryKey: queryKeys.instructorPromotionConfig,
+    queryFn: fetchInstructorPromotionConfig,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useSaveInstructorPromotionConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: saveInstructorPromotionConfig,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.instructorPromotionConfig });
     },
   });
 }

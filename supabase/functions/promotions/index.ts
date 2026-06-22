@@ -187,6 +187,35 @@ export default async function handler(req: Request): Promise<Response> {
       });
     }
 
+    // ===== GET /promotions?action=instructor_config — получить настройки повышения инструкторов =====
+    if (method === "GET" && action === "instructor_config") {
+      const res = await client.queryObject<{
+        points_config: string;
+        ranks_flow: string;
+      }>(
+        `SELECT points_config, ranks_flow FROM ${SCHEMA}.instructor_promotion_settings LIMIT 1`
+      );
+      if (res.rows.length > 0) {
+        const row = res.rows[0];
+        let points_config = row.points_config;
+        let ranks_flow = row.ranks_flow;
+        if (typeof points_config === "string") {
+          try { points_config = JSON.parse(points_config); } catch (_) {}
+        }
+        if (typeof ranks_flow === "string") {
+          try { ranks_flow = JSON.parse(ranks_flow); } catch (_) {}
+        }
+        return new Response(JSON.stringify({ points_config, ranks_flow }), {
+          status: 200,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+      return new Response(JSON.stringify({ points_config: null, ranks_flow: null }), {
+        status: 200,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    }
+
     // ===== GET /promotions?action=check&type=... — проверка прогресса =====
     if (method === "GET" && action === "check") {
       const promotionType = url.searchParams.get("type") || "";
@@ -399,6 +428,52 @@ export default async function handler(req: Request): Promise<Response> {
       );
 
       return new Response(JSON.stringify({ success: true, id: newId }), {
+        status: 200,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    }
+
+    // ===== POST /promotions?action=save_instructor_config — сохранить настройки повышения инструкторов =====
+    if (method === "POST" && action === "save_instructor_config") {
+      if (user.role !== "head_avng") {
+        return new Response(JSON.stringify({ error: "Доступ запрещён. Настраивать систему повышения может только Начальник АВНГ." }), {
+          status: 403,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      const body = await req.json().catch(() => ({}));
+      const points_config = body.points_config;
+      const ranks_flow = body.ranks_flow;
+
+      if (!points_config || !ranks_flow) {
+        return new Response(JSON.stringify({ error: "Неверные параметры конфигурации" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      // Check if row exists
+      const existRes = await client.queryObject<{ id: number }>(
+        `SELECT id FROM ${SCHEMA}.instructor_promotion_settings LIMIT 1`
+      );
+
+      if (existRes.rows.length > 0) {
+        await client.queryArray(
+          `UPDATE ${SCHEMA}.instructor_promotion_settings
+           SET points_config = $1, ranks_flow = $2, updated_at = NOW()
+           WHERE id = $3`,
+          [JSON.stringify(points_config), JSON.stringify(ranks_flow), existRes.rows[0].id]
+        );
+      } else {
+        await client.queryArray(
+          `INSERT INTO ${SCHEMA}.instructor_promotion_settings (points_config, ranks_flow)
+           VALUES ($1, $2)`,
+          [JSON.stringify(points_config), JSON.stringify(ranks_flow)]
+        );
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
         status: 200,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
       });
