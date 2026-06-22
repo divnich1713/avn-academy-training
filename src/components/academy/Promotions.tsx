@@ -912,13 +912,49 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
   };
   
   const [currentRank, setCurrentRank] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(`instructor_promo_draft_${authUser.id}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.currentRank) return parsed.currentRank;
+      }
+    } catch (_) {}
     const matched = INSTRUCTOR_RANKS.find(r => r.toLowerCase() === authUser.rank.toLowerCase());
     return matched || "Сержант";
   });
   
-  const [targetRank, setTargetRank] = useState<string>("Старший Сержант");
-  const [gratitude, setGratitude] = useState(false);
-  const [gratitudeLink, setGratitudeLink] = useState("");
+  const [targetRank, setTargetRank] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(`instructor_promo_draft_${authUser.id}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.targetRank) return parsed.targetRank;
+      }
+    } catch (_) {}
+    return "Старший Сержант";
+  });
+
+  const [gratitude, setGratitude] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`instructor_promo_draft_${authUser.id}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.gratitude !== undefined) return parsed.gratitude;
+      }
+    } catch (_) {}
+    return false;
+  });
+
+  const [gratitudeLink, setGratitudeLink] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`instructor_promo_draft_${authUser.id}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.gratitudeLink !== undefined) return parsed.gratitudeLink;
+      }
+    } catch (_) {}
+    return "";
+  });
   
   const [entries, setEntries] = useState<Array<{
     id: string;
@@ -927,7 +963,18 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
     successCount: number;
     links: string[];
     isAuto?: boolean;
-  }>>([]);
+  }>>(() => {
+    try {
+      const saved = localStorage.getItem(`instructor_promo_draft_${authUser.id}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.entries) {
+          return parsed.entries.filter((e: any) => !e.isAuto);
+        }
+      }
+    } catch (_) {}
+    return [];
+  });
 
   const [autoLoading, setAutoLoading] = useState(true);
 
@@ -935,7 +982,33 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
   const [success, setSuccess] = useState("");
   const [submittedReportLink, setSubmittedReportLink] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [replacements, setReplacements] = useState<Record<number, number>>({});
+  
+  const [replacements, setReplacements] = useState<Record<number, number>>(() => {
+    try {
+      const saved = localStorage.getItem(`instructor_promo_draft_${authUser.id}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.replacements) return parsed.replacements;
+      }
+    } catch (_) {}
+    return {};
+  });
+
+  useEffect(() => {
+    try {
+      const draft = {
+        currentRank,
+        targetRank,
+        gratitude,
+        gratitudeLink,
+        entries: entries.filter(e => !e.isAuto),
+        replacements
+      };
+      localStorage.setItem(`instructor_promo_draft_${authUser.id}`, JSON.stringify(draft));
+    } catch (e) {
+      console.warn("Failed to save promotion draft", e);
+    }
+  }, [currentRank, targetRank, gratitude, gratitudeLink, entries, replacements, authUser.id]);
 
   const isLeadership = ["head_avng", "chief_instructor", "deputy_head"].includes(authUser.role);
 
@@ -1250,6 +1323,9 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       setReplacements({});
       setGratitude(false);
       setGratitudeLink("");
+      try {
+        localStorage.removeItem(`instructor_promo_draft_${authUser.id}`);
+      } catch (_) {}
       await loadData();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Ошибка подачи рапорта");
