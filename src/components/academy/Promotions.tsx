@@ -2174,13 +2174,14 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                                 >
                                   <option value={item.num}>— Нет (Оригинал) —</option>
                                   {pointsConfig.map(c => {
+                                    if (c.num === item.num) return null;
                                     if (item.allowedAlternatives && item.allowedAlternatives.length > 0) {
-                                      if (c.num !== item.num && !item.allowedAlternatives.includes(c.num)) {
+                                      if (!item.allowedAlternatives.includes(c.num)) {
                                         return null;
                                       }
                                     } else {
                                       const isMandatory = activeFlowConfig.mandatory.some((m: any) => m.num === c.num);
-                                      if (isMandatory && c.num !== item.num) return null;
+                                      if (isMandatory) return null;
                                     }
                                     return (
                                       <option key={c.num} value={c.num}>
