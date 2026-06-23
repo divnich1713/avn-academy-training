@@ -5,7 +5,6 @@ import { SectionHeader, StatCard, StatusBadge, GradeCircle, OnlineStatus, Instru
 import { User, reviewRequest, startReviewRequest, TrainingRequest } from "@/lib/api";
 import { useRequests, useGrades, useAdminUsers, usePromotionReports, queryKeys, useDeleteUser } from "@/lib/useQueries";
 import { TYPE_LABEL, fmt, Spinner, Empty, fmtStaticId, renderTextWithLinks } from "./SectionsShared";
-import { InstructorRatingView } from "./SectionsRatings";
 import { PromotionInstructorTab } from "./Promotions";
 import { TestingAdmin } from "./TestingAdmin";
 
@@ -52,7 +51,7 @@ const ACADEMY_UNITS = [
 // INSTRUCTOR PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
 export function InstructorPanel({ authUser, highlightRequestId, highlightReportId, onViewProfile }: { authUser: User; highlightRequestId?: number; highlightReportId?: number; onViewProfile?: (c: User) => void }) {
-  const [activeTab, setActiveTab] = useState<"requests" | "grades" | "cadets" | "whitelist" | "rating" | "promotions" | "expired" | "testing">(() => {
+  const [activeTab, setActiveTab] = useState<"requests" | "grades" | "cadets" | "whitelist" | "promotions" | "expired" | "testing">(() => {
     if (highlightReportId) return "promotions";
     return "requests";
   });
@@ -766,7 +765,6 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
           { id: "cadets", label: "Курсанты" },
           { id: "expired", label: "Просроченные" },
           { id: "whitelist", label: "Вайтлист" },
-          { id: "rating", label: "Мой рейтинг" },
           { id: "testing", label: "Результаты тестов" },
         ] as const)
           .filter((tab) => tab.id !== "whitelist" || authUser.role === "head_avng" || authUser.role === "deputy_head" || authUser.role === "senior_ufsvng")
@@ -1544,10 +1542,6 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
         <PromotionInstructorTab authUser={authUser} highlightReportId={highlightReportId} onReviewSuccess={() => { queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers }); queryClient.invalidateQueries({ queryKey: queryKeys.requests }); queryClient.invalidateQueries({ queryKey: queryKeys.promotionReports }); }} />
       )}
 
-      {/* ── RATING TAB ── */}
-      {activeTab === "rating" && (
-        <InstructorRatingView instructorId={authUser.id} />
-      )}
 
       {/* ── TESTING TAB ── */}
       {activeTab === "testing" && (
