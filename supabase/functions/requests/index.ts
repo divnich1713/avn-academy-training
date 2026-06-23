@@ -403,7 +403,7 @@ export default async function handler(req: Request): Promise<Response> {
         query = `
           SELECT g.id, g.subject, g.type, g.grade, g.comment, g.graded_at,
                  u.name as cadet_name, u.rank as cadet_rank, u.id as cadet_id,
-                 i.name as instructor_name
+                 i.name as instructor_name, g.instructor_promo_used
           FROM ${SCHEMA}.grades g
           JOIN ${SCHEMA}.users u ON g.user_id = u.id
           JOIN ${SCHEMA}.users i ON g.instructor_id = i.id

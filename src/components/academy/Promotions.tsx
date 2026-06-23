@@ -8,13 +8,19 @@ import {
   PromotionReport,
   checkPromotionRequirements,
   fetchPromotionReports,
-  fetchGrades,
   createPromotionReport,
   reviewPromotionReport,
   InstructorPromotionReport,
   fetchInstructorPromotionReports,
   submitInstructorPromotionReport,
   reviewInstructorPromotionReport,
+  uploadEvidenceFile,
+  fetchAvailableActivities,
+  fetchUserWarnings,
+  issueWarning,
+  dismissWarning,
+  InstructorWarning,
+  fetchInstructors,
 } from "@/lib/api";
 import { fmt, Spinner, Empty, fmtStaticId } from "./SectionsShared";
 import {
@@ -45,7 +51,6 @@ export function MilitaryReport({
 }) {
   const isSergeant = promotionType === "sergeant";
   const currentRank = isSergeant ? "Младший Сержант" : "Рядовой";
-  const targetRank = isSergeant ? "Сержант" : "Младший Сержант";
 
   const formattedCurrentRank = isSergeant ? "младший сержант полиции" : "рядовой полиции";
   const formattedTargetRank = isSergeant ? "Сержант полиции" : "Младший сержант полиции";
@@ -705,6 +710,7 @@ export function InstructorMilitaryReport({
   ranksFlow = DEFAULT_INSTRUCTOR_RANKS_FLOW,
   replacements,
   replacementLinks,
+  onImageClick,
 }: {
   name: string;
   staticId: string;
@@ -719,6 +725,7 @@ export function InstructorMilitaryReport({
   ranksFlow?: any[];
   replacements?: Record<number, number>;
   replacementLinks?: Record<number, string>;
+  onImageClick?: (images: string[], index: number) => void;
 }) {
   const flow = ranksFlow.find(f => f.from === currentRank && f.to === targetRank);
   const neededPoints = flow ? flow.points : 0;
@@ -771,9 +778,38 @@ export function InstructorMilitaryReport({
               <li key={idx} className="space-y-1">
                 <p>• {config.name} ({e.count} шт{successText}) — {e.count * config.points + e.successCount * (config.bonusPoints || 0)} б.;</p>
                 <div className="pl-4 text-black space-y-0.5 font-mono">
-                  {e.links.map((link: string, lIdx: number) => (
-                    <p key={lIdx} className="break-all">- Доказательство {lIdx + 1}: {link || "(ссылка отсутствует)"}</p>
-                  ))}
+                  {e.links.map((link: string, lIdx: number) => {
+                    const allImages = [
+                      ...entries.flatMap(entry => entry.links),
+                      gratitude ? gratitudeLink : "",
+                      ...Object.values(replacementLinks || {})
+                    ].filter(Boolean);
+
+                    return (
+                      <p key={lIdx} className="break-all">
+                        - Доказательство {lIdx + 1}:{" "}
+                        {link ? (
+                          onImageClick ? (
+                            <span
+                              onClick={() => {
+                                const idxInAll = allImages.indexOf(link);
+                                onImageClick(allImages, idxInAll !== -1 ? idxInAll : 0);
+                              }}
+                              className="underline text-blue-600 hover:text-blue-800 cursor-pointer font-bold select-none"
+                            >
+                              {link}
+                            </span>
+                          ) : (
+                            <a href={link} target="_blank" rel="noopener noreferrer" className="underline text-blue-600 hover:text-blue-800 break-all font-bold">
+                              {link}
+                            </a>
+                          )
+                        ) : (
+                          "(ссылка отсутствует)"
+                        )}
+                      </p>
+                    );
+                  })}
                 </div>
               </li>
             );
@@ -781,7 +817,33 @@ export function InstructorMilitaryReport({
           {gratitude && (
             <li className="space-y-1">
               <p>• Благодарность от старшего состава — 50 б.;</p>
-              <p className="pl-4 text-black break-all font-mono">- Ссылка: {gratitudeLink || "(ссылка отсутствует)"}</p>
+              <p className="pl-4 text-black break-all font-mono">
+                - Ссылка:{" "}
+                {gratitudeLink ? (
+                  onImageClick ? (
+                    <span
+                      onClick={() => {
+                        const allImages = [
+                          ...entries.flatMap(entry => entry.links),
+                          gratitudeLink,
+                          ...Object.values(replacementLinks || {})
+                        ].filter(Boolean);
+                        const idxInAll = allImages.indexOf(gratitudeLink);
+                        onImageClick(allImages, idxInAll !== -1 ? idxInAll : 0);
+                      }}
+                      className="underline text-blue-600 hover:text-blue-800 cursor-pointer font-bold select-none"
+                    >
+                      {gratitudeLink}
+                    </span>
+                  ) : (
+                    <a href={gratitudeLink} target="_blank" rel="noopener noreferrer" className="underline text-blue-600 hover:text-blue-800 break-all font-bold">
+                      {gratitudeLink}
+                    </a>
+                  )
+                ) : (
+                  "(ссылка отсутствует)"
+                )}
+              </p>
             </li>
           )}
           {replacements && Object.keys(replacements).length > 0 && (
@@ -800,7 +862,31 @@ export function InstructorMilitaryReport({
                     <div key={origNum}>
                       <p>{origName} ➔ Заменен на: {replName}</p>
                       <p className="pl-2 text-gray-600 break-all">
-                        - Доказательство замены: {link || "(ссылка отсутствует)"}
+                        - Доказательство замены:{" "}
+                        {link ? (
+                          onImageClick ? (
+                            <span
+                              onClick={() => {
+                                const allImages = [
+                                  ...entries.flatMap(entry => entry.links),
+                                  gratitude ? gratitudeLink : "",
+                                  ...Object.values(replacementLinks || {})
+                                ].filter(Boolean);
+                                const idxInAll = allImages.indexOf(link);
+                                onImageClick(allImages, idxInAll !== -1 ? idxInAll : 0);
+                              }}
+                              className="underline text-blue-600 hover:text-blue-800 cursor-pointer font-bold select-none"
+                            >
+                              {link}
+                            </span>
+                          ) : (
+                            <a href={link} target="_blank" rel="noopener noreferrer" className="underline text-blue-600 hover:text-blue-800 break-all font-bold">
+                              {link}
+                            </a>
+                          )
+                        ) : (
+                          "(ссылка отсутствует)"
+                        )}
                       </p>
                     </div>
                   );
@@ -940,7 +1026,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
     }
   };
   
-  const [currentRank, setCurrentRank] = useState<string>(() => {
+  const [currentRank, _setCurrentRank] = useState<string>(() => {
     try {
       const saved = localStorage.getItem(`instructor_promo_draft_${authUser.id}`);
       if (saved) {
@@ -1005,7 +1091,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
     return [];
   });
 
-  const [autoLoading, setAutoLoading] = useState(true);
+  const [_autoLoading, setAutoLoading] = useState(true);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -1033,6 +1119,71 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
     } catch (_) {}
     return {};
   });
+
+  const [activeWarnings, setActiveWarnings] = useState<InstructorWarning[]>([]);
+  const [availableGrades, setAvailableGrades] = useState<any[]>([]);
+  const [availableReports, setAvailableReports] = useState<any[]>([]);
+  const [selectedGradeIds, setSelectedGradeIds] = useState<Record<number, boolean>>({});
+  const [selectedReportIds, setSelectedReportIds] = useState<Record<number, boolean>>({});
+  
+  // Warnings issue form state (for leadership)
+  const [warningTargetUserId, setWarningTargetUserId] = useState<number | "">("");
+  const [warningReason, setWarningReason] = useState("");
+  const [warningIssueLoading, setWarningIssueLoading] = useState(false);
+  const [warningDismissLoading, setWarningDismissLoading] = useState<Record<number, boolean>>({});
+  
+  const [instructors, setInstructors] = useState<User[]>([]);
+  const [warningsList, setWarningsList] = useState<InstructorWarning[]>([]);
+  const [warningsLoading, setWarningsLoading] = useState(false);
+  
+  // Gallery Lightbox Modal State
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [galleryIndex, setGalleryIndex] = useState<number>(0);
+
+  // Keyboard navigation for Lightbox
+  useEffect(() => {
+    if (galleryImages.length === 0) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setGalleryImages([]);
+      } else if (e.key === "ArrowRight") {
+        setGalleryIndex(prev => (prev + 1) % galleryImages.length);
+      } else if (e.key === "ArrowLeft") {
+        setGalleryIndex(prev => (prev - 1 + galleryImages.length) % galleryImages.length);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [galleryImages]);
+
+  const loadTargetWarnings = useCallback(async (userId: number) => {
+    setWarningsLoading(true);
+    try {
+      const wrns = await fetchUserWarnings(userId);
+      setWarningsList(wrns || []);
+    } catch (err) {
+      console.error("Failed to load warnings:", err);
+    } finally {
+      setWarningsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (warningTargetUserId) {
+      loadTargetWarnings(Number(warningTargetUserId));
+    } else {
+      setWarningsList([]);
+    }
+  }, [warningTargetUserId, loadTargetWarnings]);
+
+  // Uploading progress states
+  const [uploadingLink, setUploadingLink] = useState<string | null>(null);
+  const [uploadingGratitude, setUploadingGratitude] = useState(false);
+  const [uploadingReplacements, setUploadingReplacements] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     try {
@@ -1069,113 +1220,37 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
     setReportsLoading(true);
     setAutoLoading(true);
     try {
-      const [allGrades, allCadetReports, allInstReports] = await Promise.all([
-        fetchGrades().catch(() => []),
-        fetchPromotionReports().catch(() => []),
-        fetchInstructorPromotionReports().catch(() => [])
+      const [allInstReports, acts, wrns, insts] = await Promise.all([
+        fetchInstructorPromotionReports().catch(() => []),
+        fetchAvailableActivities().catch(() => ({ grades: [], reports: [] })),
+        fetchUserWarnings().catch(() => []),
+        fetchInstructors().catch(() => [])
       ]);
       setReports(allInstReports);
+      setAvailableGrades(acts.grades || []);
+      setAvailableReports(acts.reports || []);
+      setActiveWarnings(wrns || []);
+      setInstructors(insts || []);
 
-      // Find last approved report for this instructor to use as cutoff date
-      const approvedInstReports = allInstReports.filter(
-        (r) => r.user_id === authUser.id && r.status === "approved"
-      );
-      let cutoffDate = new Date(authUser.created_at || 0);
-      if (approvedInstReports.length > 0) {
-        approvedInstReports.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        cutoffDate = new Date(approvedInstReports[0].created_at);
-      }
-
-      // Count grades given by this instructor after cutoff date
-      const myGrades = allGrades.filter(
-        (g) => g.instructor_name === authUser.name && new Date(g.graded_at) > cutoffDate
-      );
-
-      const lecturesCount = myGrades.filter((g) => g.type === "lecture").length;
-      const examsCount = myGrades.filter((g) => g.type === "exam").length;
-      const oathsCount = myGrades.filter(
-        (g) => g.type === "practice" && g.subject.toLowerCase().includes("присяга")
-      ).length;
-      const practicesCount = myGrades.filter(
-        (g) => g.type === "practice" && !g.subject.toLowerCase().includes("присяга")
-      ).length;
-
-      // Count cadet reports reviewed by this instructor after cutoff date
-      const myReviewsCount = allCadetReports.filter(
-        (r) =>
-          r.reviewer_name === authUser.name &&
-          r.status !== "pending" &&
-          new Date(r.reviewed_at || r.created_at) > cutoffDate
-      ).length;
-
-      const lectureConfig = pointsConfig.find(c => c.name.toLowerCase().includes("лекц"));
-      const examConfig = pointsConfig.find(c => c.name.toLowerCase().includes("экзамен") || c.name.toLowerCase().includes("аттестац"));
-      const reviewConfig = pointsConfig.find(c => c.name.toLowerCase().includes("рапорт"));
-      const oathConfig = pointsConfig.find(c => c.name.toLowerCase().includes("присяг"));
-      const practiceConfig = pointsConfig.find(c => c.name.toLowerCase().includes("практик"));
-
-      const lectureNum = lectureConfig ? lectureConfig.num : 10;
-      const examNum = examConfig ? examConfig.num : 14;
-      const reviewNum = reviewConfig ? reviewConfig.num : 15;
-      const oathNum = oathConfig ? oathConfig.num : 17;
-      const practiceNum = practiceConfig ? practiceConfig.num : 18;
-
-      const autoEntries: typeof entries = [];
-
-      if (lecturesCount > 0 && lectureConfig) {
-        autoEntries.push({
-          id: "auto_lecture",
-          num: lectureNum,
-          count: lecturesCount,
-          successCount: 0,
-          links: Array(lecturesCount).fill("[Автоподтверждение из БД]"),
-          isAuto: true,
+      // Auto check new grades/reports by default on first fetch
+      setSelectedGradeIds(prev => {
+        const next = { ...prev };
+        (acts.grades || []).forEach((g: any) => {
+          if (next[g.id] === undefined) {
+            next[g.id] = true;
+          }
         });
-      }
-      if (examsCount > 0 && examConfig) {
-        autoEntries.push({
-          id: "auto_exam",
-          num: examNum,
-          count: examsCount,
-          successCount: 0,
-          links: Array(examsCount).fill("[Автоподтверждение из БД]"),
-          isAuto: true,
-        });
-      }
-      if (myReviewsCount > 0 && reviewConfig) {
-        autoEntries.push({
-          id: "auto_review",
-          num: reviewNum,
-          count: myReviewsCount,
-          successCount: 0,
-          links: Array(myReviewsCount).fill("[Автоподтверждение из БД]"),
-          isAuto: true,
-        });
-      }
-      if (oathsCount > 0 && oathConfig) {
-        autoEntries.push({
-          id: "auto_oath",
-          num: oathNum,
-          count: oathsCount,
-          successCount: 0,
-          links: Array(oathsCount).fill("[Автоподтверждение из БД]"),
-          isAuto: true,
-        });
-      }
-      if (practicesCount > 0 && practiceConfig) {
-        autoEntries.push({
-          id: "auto_practice",
-          num: practiceNum,
-          count: practicesCount,
-          successCount: 0,
-          links: Array(practicesCount).fill("[Автоподтверждение из БД]"),
-          isAuto: true,
-        });
-      }
+        return next;
+      });
 
-      setEntries((prev) => {
-        const manualEntries = prev.filter((e) => !e.isAuto);
-        return [...autoEntries, ...manualEntries];
+      setSelectedReportIds(prev => {
+        const next = { ...prev };
+        (acts.reports || []).forEach((r: any) => {
+          if (next[r.id] === undefined) {
+            next[r.id] = true;
+          }
+        });
+        return next;
       });
     } catch (err) {
       console.error("Failed to load promotion data:", err);
@@ -1183,7 +1258,92 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       setReportsLoading(false);
       setAutoLoading(false);
     }
-  }, [authUser, pointsConfig]);
+  }, [authUser]);
+
+  useEffect(() => {
+    const selectedGrades = availableGrades.filter(g => selectedGradeIds[g.id]);
+    const selectedReports = availableReports.filter(r => selectedReportIds[r.id]);
+
+    const lecturesCount = selectedGrades.filter((g) => g.type === "lecture").length;
+    const examsCount = selectedGrades.filter((g) => g.type === "exam").length;
+    const oathsCount = selectedGrades.filter(
+      (g) => g.type === "practice" && g.subject.toLowerCase().includes("присяга")
+    ).length;
+    const practicesCount = selectedGrades.filter(
+      (g) => g.type === "practice" && !g.subject.toLowerCase().includes("присяга")
+    ).length;
+    const myReviewsCount = selectedReports.length;
+
+    const lectureConfig = pointsConfig.find(c => c.name.toLowerCase().includes("лекц"));
+    const examConfig = pointsConfig.find(c => c.name.toLowerCase().includes("экзамен") || c.name.toLowerCase().includes("аттестац"));
+    const reviewConfig = pointsConfig.find(c => c.name.toLowerCase().includes("рапорт"));
+    const oathConfig = pointsConfig.find(c => c.name.toLowerCase().includes("присяг"));
+    const practiceConfig = pointsConfig.find(c => c.name.toLowerCase().includes("практик"));
+
+    const lectureNum = lectureConfig ? lectureConfig.num : 10;
+    const examNum = examConfig ? examConfig.num : 14;
+    const reviewNum = reviewConfig ? reviewConfig.num : 15;
+    const oathNum = oathConfig ? oathConfig.num : 17;
+    const practiceNum = practiceConfig ? practiceConfig.num : 18;
+
+    const autoEntries: typeof entries = [];
+
+    if (lecturesCount > 0 && lectureConfig) {
+      autoEntries.push({
+        id: "auto_lecture",
+        num: lectureNum,
+        count: lecturesCount,
+        successCount: 0,
+        links: Array(lecturesCount).fill("[Автоподтверждение из БД]"),
+        isAuto: true,
+      });
+    }
+    if (examsCount > 0 && examConfig) {
+      autoEntries.push({
+        id: "auto_exam",
+        num: examNum,
+        count: examsCount,
+        successCount: 0,
+        links: Array(examsCount).fill("[Автоподтверждение из БД]"),
+        isAuto: true,
+      });
+    }
+    if (myReviewsCount > 0 && reviewConfig) {
+      autoEntries.push({
+        id: "auto_review",
+        num: reviewNum,
+        count: myReviewsCount,
+        successCount: 0,
+        links: Array(myReviewsCount).fill("[Автоподтверждение из БД]"),
+        isAuto: true,
+      });
+    }
+    if (oathsCount > 0 && oathConfig) {
+      autoEntries.push({
+        id: "auto_oath",
+        num: oathNum,
+        count: oathsCount,
+        successCount: 0,
+        links: Array(oathsCount).fill("[Автоподтверждение из БД]"),
+        isAuto: true,
+      });
+    }
+    if (practicesCount > 0 && practiceConfig) {
+      autoEntries.push({
+        id: "auto_practice",
+        num: practiceNum,
+        count: practicesCount,
+        successCount: 0,
+        links: Array(practicesCount).fill("[Автоподтверждение из БД]"),
+        isAuto: true,
+      });
+    }
+
+    setEntries((prev) => {
+      const manualEntries = prev.filter((e) => !e.isAuto);
+      return [...autoEntries, ...manualEntries];
+    });
+  }, [availableGrades, availableReports, selectedGradeIds, selectedReportIds, pointsConfig]);
 
   useEffect(() => {
     loadData();
@@ -1232,6 +1392,38 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
     setEntries(prev => prev.filter(entry => entry.id !== id || entry.isAuto));
   };
 
+  const handleIssueWarning = async () => {
+    if (!warningTargetUserId || !warningReason.trim()) return;
+    setWarningIssueLoading(true);
+    try {
+      await issueWarning(Number(warningTargetUserId), warningReason.trim());
+      setWarningReason("");
+      await loadTargetWarnings(Number(warningTargetUserId));
+      await loadData();
+      alert("Выговор успешно выдан!");
+    } catch (err: any) {
+      alert("Ошибка при выдаче выговора: " + err.message);
+    } finally {
+      setWarningIssueLoading(false);
+    }
+  };
+
+  const handleDismissWarning = async (warningId: number) => {
+    setWarningDismissLoading(prev => ({ ...prev, [warningId]: true }));
+    try {
+      await dismissWarning(warningId);
+      if (warningTargetUserId) {
+        await loadTargetWarnings(Number(warningTargetUserId));
+      }
+      await loadData();
+      alert("Выговор успешно снят!");
+    } catch (err: any) {
+      alert("Ошибка при снятии выговора: " + err.message);
+    } finally {
+      setWarningDismissLoading(prev => ({ ...prev, [warningId]: false }));
+    }
+  };
+
   const totalPoints = useMemo(() => {
     let pts = 0;
     entries.forEach(e => {
@@ -1256,7 +1448,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
     if (!activeFlowConfig) return { allCompleted: true, pointsCompleted: true, items: [] };
     
     let allCompleted = true;
-    const items = activeFlowConfig.mandatory.map(m => {
+    const items = activeFlowConfig.mandatory.map((m: any) => {
       const resolvedNum = replacements[m.num] || m.num;
       const matchingEntries = entries.filter(e => e.num === resolvedNum);
       const totalEnteredCount = matchingEntries.reduce((sum, e) => sum + e.count, 0);
@@ -1298,6 +1490,10 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
   }, [activeFlowConfig, entries, totalPoints, pointsConfig, replacements, replacementLinks]);
 
   const handleSubmit = async () => {
+    if (activeWarnings.some(w => w.is_active)) {
+      setError("Подача рапорта заблокирована: у вас есть активные дисциплинарные выговоры.");
+      return;
+    }
     if (!checklistStatus.allCompleted) return;
     setSubmitLoading(true);
     setError("");
@@ -1359,6 +1555,20 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       } as any);
     }
 
+    // Собираем ID выбранных для зачета оценок и рапортов
+    const selectedGrades = availableGrades.filter(g => selectedGradeIds[g.id]);
+    const selectedReports = availableReports.filter(r => selectedReportIds[r.id]);
+    const gradeIds = selectedGrades.map(g => g.id);
+    const reportIds = selectedReports.map(r => r.id);
+
+    itemsCompletedPayload.push({
+      num: 101,
+      count: 0,
+      successCount: 0,
+      links: [],
+      metadata: { grade_ids: gradeIds, report_ids: reportIds }
+    } as any);
+
     try {
       const res = await submitInstructorPromotionReport({
         current_rank: currentRank,
@@ -1386,6 +1596,8 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       setReplacementLinks({});
       setGratitude(false);
       setGratitudeLink("");
+      setSelectedGradeIds({});
+      setSelectedReportIds({});
       try {
         localStorage.removeItem(`instructor_promo_draft_${authUser.id}`);
       } catch (_) {}
@@ -1463,7 +1675,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
               <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
             )}
           </button>
-          {authUser.role === "head_avng" && (
+          {(authUser.role === "head_avng" || authUser.role === "deputy_head") && (
             <button
               onClick={() => setActiveSubTab("settings")}
               className={`px-4 py-2 text-xs tracking-wider uppercase font-oswald border-b-2 transition-colors ${
@@ -1486,32 +1698,158 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
             <p className="text-xs font-mono mt-1 text-muted-foreground">Вы уже достигли максимального воинского звания Капитан!</p>
           </div>
         ) : (
-          <div className="grid lg:grid-cols-12 gap-6 items-start">
-            {/* Left side - input form */}
-            <div className="lg:col-span-7 space-y-6">
-              <div className="bg-tactical-card border border-tactical-border/60 p-6 corner-mark space-y-4">
-                <h3 className="font-oswald text-sm tracking-widest uppercase text-muted-foreground border-b border-tactical-border pb-2">
-                  1. Звание для повышения
-                </h3>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase font-mono text-muted-foreground">Текущее звание</label>
-                    <input
-                      readOnly
-                      value={currentRank}
-                      className="w-full bg-tactical-panel/50 border border-tactical-border px-3 py-2 text-xs text-muted-foreground font-ibm focus:outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase font-mono text-muted-foreground">Целевое звание</label>
-                    <input
-                      readOnly
-                      value={targetRank}
-                      className="w-full bg-tactical-panel/50 border border-tactical-border px-3 py-2 text-xs text-muted-foreground font-ibm focus:outline-none"
-                    />
+          <div className="space-y-6">
+            {/* Warning block */}
+            {activeWarnings.some(w => w.is_active) && (
+              <div className="bg-red-950/45 border-2 border-red-500/80 p-5 text-left corner-mark space-y-3 shadow-[0_0_15px_rgba(239,68,68,0.25)] animate-pulse">
+                <div className="flex items-center gap-2">
+                  <Icon name="AlertTriangle" size={20} className="text-red-500" />
+                  <h4 className="font-oswald text-sm font-bold uppercase tracking-wider text-red-400">
+                    Подача рапорта заблокирована
+                  </h4>
+                </div>
+                <p className="text-xs text-red-200/90 font-ibm leading-relaxed">
+                  У вас есть активные дисциплинарные выговоры. Подача рапортов полностью заблокирована руководством до снятия выговоров.
+                </p>
+                <div className="border-t border-red-500/25 pt-2.5 space-y-2">
+                  <span className="text-[10px] uppercase font-mono text-red-400 font-bold block">Список активных выговоров:</span>
+                  <div className="space-y-1.5 font-mono text-[11px] text-red-300">
+                    {activeWarnings.filter(w => w.is_active).map((w, idx) => (
+                      <div key={idx} className="bg-black/30 border border-red-500/30 p-2.5 rounded-sm">
+                        <p className="font-semibold">• Выговор #{w.id}</p>
+                        <p className="pl-3 text-red-200">Причина: {w.reason}</p>
+                        <p className="pl-3 text-muted-foreground/80 text-[10px]">Выдал: {w.issued_by_name} · {fmt(w.created_at)}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
+            )}
+
+            <div className="grid lg:grid-cols-12 gap-6 items-start">
+              {/* Left side - input form */}
+              <div className="lg:col-span-7 space-y-6">
+                <div className="bg-tactical-card border border-tactical-border/60 p-6 corner-mark space-y-4">
+                  <h3 className="font-oswald text-sm tracking-widest uppercase text-muted-foreground border-b border-tactical-border pb-2">
+                    1. Звание для повышения
+                  </h3>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-mono text-muted-foreground">Текущее звание</label>
+                      <input
+                        readOnly
+                        value={currentRank}
+                        className="w-full bg-tactical-panel/50 border border-tactical-border px-3 py-2 text-xs text-muted-foreground font-ibm focus:outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-mono text-muted-foreground">Целевое звание</label>
+                      <input
+                        readOnly
+                        value={targetRank}
+                        className="w-full bg-tactical-panel/50 border border-tactical-border px-3 py-2 text-xs text-muted-foreground font-ibm focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Available Activities (Rollover Checkboxes) */}
+                <div className="bg-tactical-card border border-tactical-border/60 p-6 corner-mark space-y-4">
+                  <div className="flex items-center justify-between border-b border-tactical-border pb-2">
+                    <h3 className="font-oswald text-sm tracking-widest uppercase text-muted-foreground">
+                      1.5. Автоматические активности для зачета (Rollover)
+                    </h3>
+                    {(availableGrades.length > 0 || availableReports.length > 0) && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            const nextGrades = { ...selectedGradeIds };
+                            availableGrades.forEach(g => { nextGrades[g.id] = true; });
+                            setSelectedGradeIds(nextGrades);
+
+                            const nextReports = { ...selectedReportIds };
+                            availableReports.forEach(r => { nextReports[r.id] = true; });
+                            setSelectedReportIds(nextReports);
+                          }}
+                          className="text-[9px] uppercase font-mono text-primary hover:underline"
+                        >
+                          Выбрать все
+                        </button>
+                        <span className="text-muted-foreground/30 text-[9px] font-mono">|</span>
+                        <button
+                          onClick={() => {
+                            const nextGrades = { ...selectedGradeIds };
+                            availableGrades.forEach(g => { nextGrades[g.id] = false; });
+                            setSelectedGradeIds(nextGrades);
+
+                            const nextReports = { ...selectedReportIds };
+                            availableReports.forEach(r => { nextReports[r.id] = false; });
+                            setSelectedReportIds(nextReports);
+                          }}
+                          className="text-[9px] uppercase font-mono text-primary hover:underline"
+                        >
+                          Снять все
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {availableGrades.length === 0 && availableReports.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic font-ibm text-center py-4">
+                      Нет неиспользованных автоматических активностей в базе данных (лекций, экзаменов, практик, принятых рапортов).
+                    </p>
+                  ) : (
+                    <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
+                      {availableGrades.map((g) => (
+                        <label
+                          key={`grade_${g.id}`}
+                          className="flex items-start gap-2.5 p-2 border border-tactical-border/40 bg-tactical-panel/20 hover:bg-tactical-panel/40 cursor-pointer select-none rounded-sm transition-all text-left"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!!selectedGradeIds[g.id]}
+                            onChange={(e) => {
+                              setSelectedGradeIds(prev => ({ ...prev, [g.id]: e.target.checked }));
+                            }}
+                            className="rounded border-tactical-border text-primary focus:ring-0 focus:ring-offset-0 bg-tactical-panel mt-0.5"
+                          />
+                          <div className="text-left text-xs font-mono">
+                            <span className="text-primary font-bold">
+                              [{g.type === "lecture" ? "Лекция" : g.type === "exam" ? "Экзамен" : g.subject.toLowerCase().includes("присяга") ? "Присяга" : "Практика"}]
+                            </span>{" "}
+                            <span className="text-foreground">{g.subject}</span>
+                            <div className="text-[10px] text-muted-foreground mt-0.5 font-ibm">
+                              Курсант: {g.cadet_name} (Оценка: {g.grade}) · {fmt(g.graded_at)}
+                            </div>
+                          </div>
+                        </label>
+                      ))}
+
+                      {availableReports.map((r) => (
+                        <label
+                          key={`report_${r.id}`}
+                          className="flex items-start gap-2.5 p-2 border border-tactical-border/40 bg-tactical-panel/20 hover:bg-tactical-panel/40 cursor-pointer select-none rounded-sm transition-all text-left"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!!selectedReportIds[r.id]}
+                            onChange={(e) => {
+                              setSelectedReportIds(prev => ({ ...prev, [r.id]: e.target.checked }));
+                            }}
+                            className="rounded border-tactical-border text-primary focus:ring-0 focus:ring-offset-0 bg-tactical-panel mt-0.5"
+                          />
+                          <div className="text-left text-xs font-mono">
+                            <span className="text-green-400 font-bold">[Проверка рапорта]</span>{" "}
+                            <span className="text-foreground">Рапорт на {PROMOTION_LABELS[r.promotion_type as PromotionType] || r.promotion_type}</span>
+                            <div className="text-[10px] text-muted-foreground mt-0.5 font-ibm">
+                              Курсант: {r.cadet_name} · {fmt(r.reviewed_at)}
+                            </div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
               {/* Point Calculator items */}
               <div className="bg-tactical-card border border-tactical-border/60 p-6 corner-mark space-y-6">
@@ -1622,24 +1960,65 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
 
                           {/* Links block */}
                           <div className="space-y-1.5 border-t border-tactical-border/40 pt-2">
-                            <span className="text-[9px] uppercase font-mono text-muted-foreground block">Ссылки на скриншоты (доказательства)</span>
-                            {entry.links.map((link, linkIdx) => (
-                              <input
-                                key={linkIdx}
-                                type={entry.isAuto ? "text" : "url"}
-                                placeholder={`Ссылка на скриншот №${linkIdx + 1}...`}
-                                disabled={entry.isAuto}
-                                value={link}
-                                onChange={(e) => {
-                                  const newLinks = [...entry.links];
-                                  newLinks[linkIdx] = e.target.value;
-                                  updateEntryField(entry.id, "links", newLinks);
-                                }}
-                                className={`w-full bg-tactical-panel border border-tactical-border px-2 py-1 text-xs text-foreground font-mono focus:outline-none focus:border-primary ${
-                                  entry.isAuto ? "opacity-60 cursor-not-allowed" : ""
-                                }`}
-                              />
-                            ))}
+                            <span className="text-[9px] uppercase font-mono text-muted-foreground block font-bold">Ссылки на скриншоты (доказательства)</span>
+                            {entry.links.map((link, linkIdx) => {
+                              const isUploading = uploadingLink === `${entry.id}_${linkIdx}`;
+                              return (
+                                <div key={linkIdx} className="flex items-center gap-2">
+                                  <input
+                                    type={entry.isAuto ? "text" : "url"}
+                                    placeholder={`Ссылка на скриншот №${linkIdx + 1}...`}
+                                    disabled={entry.isAuto || isUploading}
+                                    value={link}
+                                    onChange={(e) => {
+                                      const newLinks = [...entry.links];
+                                      newLinks[linkIdx] = e.target.value;
+                                      updateEntryField(entry.id, "links", newLinks);
+                                    }}
+                                    className={`w-full bg-tactical-panel border border-tactical-border px-2 py-1 text-xs text-foreground font-mono focus:outline-none focus:border-primary ${
+                                      entry.isAuto ? "opacity-60 cursor-not-allowed" : ""
+                                    }`}
+                                  />
+                                  {!entry.isAuto && (
+                                    <label className="bg-tactical-panel border border-tactical-border hover:border-primary px-3 py-1.5 text-xs font-mono text-muted-foreground hover:text-foreground cursor-pointer transition-all flex items-center gap-1 flex-shrink-0">
+                                      {isUploading ? (
+                                        <>
+                                          <Icon name="Loader2" size={12} className="animate-spin text-primary" />
+                                          <span>...</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Icon name="Upload" size={12} />
+                                          <span>Загрузить</span>
+                                        </>
+                                      )}
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        disabled={isUploading}
+                                        onChange={async (e) => {
+                                          const file = e.target.files?.[0];
+                                          if (!file) return;
+                                          const linkKey = `${entry.id}_${linkIdx}`;
+                                          setUploadingLink(linkKey);
+                                          try {
+                                            const url = await uploadEvidenceFile(file);
+                                            const newLinks = [...entry.links];
+                                            newLinks[linkIdx] = url;
+                                            updateEntryField(entry.id, "links", newLinks);
+                                          } catch (uploadErr: any) {
+                                            alert("Ошибка загрузки: " + uploadErr.message);
+                                          }                                          finally {
+                                            setUploadingLink(null);
+                                          }
+                                        }}
+                                      />
+                                    </label>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       );
@@ -1662,13 +2041,48 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                     </label>
                   </div>
                   {gratitude && (
-                    <input
-                      type="url"
-                      placeholder="Ссылка на скриншот благодарности..."
-                      value={gratitudeLink}
-                      onChange={(e) => setGratitudeLink(e.target.value)}
-                      className="w-full bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-mono focus:outline-none focus:border-primary"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="url"
+                        placeholder="Ссылка на скриншот благодарности..."
+                        disabled={uploadingGratitude}
+                        value={gratitudeLink}
+                        onChange={(e) => setGratitudeLink(e.target.value)}
+                        className="bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-mono flex-1 focus:outline-none focus:border-primary"
+                      />
+                      <label className="bg-tactical-panel border border-tactical-border hover:border-primary px-3 py-2 text-xs font-mono text-muted-foreground hover:text-foreground cursor-pointer transition-all flex items-center gap-1 flex-shrink-0">
+                        {uploadingGratitude ? (
+                          <>
+                            <Icon name="Loader2" size={12} className="animate-spin text-primary" />
+                            <span>...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Icon name="Upload" size={12} />
+                            <span>Загрузить</span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={uploadingGratitude}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setUploadingGratitude(true);
+                            try {
+                              const url = await uploadEvidenceFile(file);
+                              setGratitudeLink(url);
+                            } catch (err: any) {
+                              alert("Ошибка загрузки: " + err.message);
+                            } finally {
+                              setUploadingGratitude(false);
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1705,7 +2119,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                   <div className="space-y-2 pt-2 border-t border-tactical-border/40">
                     <span className="text-[10px] uppercase font-mono text-muted-foreground block">Обязательное выполнение пунктов:</span>
                     <div className="space-y-2">
-                      {checklistStatus.items.map((item, idx) => {
+                      {checklistStatus.items.map((item: any, idx: number) => {
                         const isReplaced = item.isReplaced;
                         return (
                           <div key={idx} className="bg-tactical-panel/30 border border-tactical-border/30 p-2.5 rounded-sm space-y-2 text-left">
@@ -1765,7 +2179,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                                         return null;
                                       }
                                     } else {
-                                      const isMandatory = activeFlowConfig.mandatory.some(m => m.num === c.num);
+                                      const isMandatory = activeFlowConfig.mandatory.some((m: any) => m.num === c.num);
                                       if (isMandatory && c.num !== item.num) return null;
                                     }
                                     return (
@@ -1780,18 +2194,53 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
 
                             {replacements[item.num] && replacements[item.num] !== item.num && (
                               <div className="pl-5 pt-1.5 space-y-1">
-                                <label className="text-[9px] uppercase font-mono text-muted-foreground block">
+                                <label className="text-[9px] uppercase font-mono text-muted-foreground block font-bold">
                                   Ссылка на скриншот (подтверждение замены)
                                 </label>
-                                <input
-                                  type="url"
-                                  placeholder="Ссылка на скриншот..."
-                                  value={replacementLinks[item.num] || ""}
-                                  onChange={(e) => {
-                                    setReplacementLinks(prev => ({ ...prev, [item.num]: e.target.value }));
-                                  }}
-                                  className="w-full bg-tactical-panel border border-tactical-border px-2 py-1 text-xs text-foreground font-mono focus:outline-none focus:border-primary"
-                                />
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="url"
+                                    placeholder="Ссылка на скриншот..."
+                                    disabled={!!uploadingReplacements[item.num]}
+                                    value={replacementLinks[item.num] || ""}
+                                    onChange={(e) => {
+                                      setReplacementLinks(prev => ({ ...prev, [item.num]: e.target.value }));
+                                    }}
+                                    className="bg-tactical-panel border border-tactical-border px-2 py-1 text-xs text-foreground font-mono flex-1 focus:outline-none focus:border-primary"
+                                  />
+                                  <label className="bg-tactical-panel border border-tactical-border hover:border-primary px-3 py-1 text-xs font-mono text-muted-foreground hover:text-foreground cursor-pointer transition-all flex items-center gap-1 flex-shrink-0">
+                                    {!!uploadingReplacements[item.num] ? (
+                                      <>
+                                        <Icon name="Loader2" size={12} className="animate-spin text-primary" />
+                                        <span>...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Icon name="Upload" size={12} />
+                                        <span>Загрузить</span>
+                                      </>
+                                    )}
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      disabled={!!uploadingReplacements[item.num]}
+                                      onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+                                        setUploadingReplacements(prev => ({ ...prev, [item.num]: true }));
+                                        try {
+                                          const url = await uploadEvidenceFile(file);
+                                          setReplacementLinks(prev => ({ ...prev, [item.num]: url }));
+                                        } catch (err: any) {
+                                          alert("Ошибка загрузки: " + err.message);
+                                        } finally {
+                                          setUploadingReplacements(prev => ({ ...prev, [item.num]: false }));
+                                        }
+                                      }}
+                                    />
+                                  </label>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -1821,6 +2270,10 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                   ranksFlow={ranksFlow}
                   replacements={replacements}
                   replacementLinks={replacementLinks}
+                  onImageClick={(images, index) => {
+                    setGalleryImages(images);
+                    setGalleryIndex(index);
+                  }}
                 />
               </div>
 
@@ -1869,15 +2322,26 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
               {/* Action Submit Button */}
               <button
                 onClick={handleSubmit}
-                disabled={!checklistStatus.allCompleted || submitLoading || hasPendingReport}
-                className="w-full bg-primary text-primary-foreground font-oswald text-xs tracking-widest uppercase py-3.5 px-8 hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 corner-mark"
+                disabled={!checklistStatus.allCompleted || submitLoading || hasPendingReport || activeWarnings.some(w => w.is_active)}
+                className={`w-full font-oswald text-xs tracking-widest uppercase py-3.5 px-8 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 corner-mark ${
+                  activeWarnings.some(w => w.is_active)
+                    ? "bg-red-950/80 border border-red-700 text-red-400"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+                }`}
               >
-                <Icon name="Send" size={12} />
-                {submitLoading ? "Отправка..." : hasPendingReport ? "Рапорт на рассмотрении" : "Подать рапорт"}
+                <Icon name={activeWarnings.some(w => w.is_active) ? "AlertTriangle" : "Send"} size={12} />
+                {activeWarnings.some(w => w.is_active)
+                  ? "Блокировка: активный выговор"
+                  : submitLoading
+                    ? "Отправка..."
+                    : hasPendingReport
+                      ? "Рапорт на рассмотрении"
+                      : "Подать рапорт"}
               </button>
             </div>
           </div>
-        )
+        </div>
+      )
       ) : activeSubTab === "review" ? (
         /* Review instructor promotion reports list */
         <div className="space-y-4">
@@ -1970,7 +2434,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                           
                           {/* Replacement warning alert & formal document */}
                           {(() => {
-                            const metadataEntry = r.items_completed.find(e => e.num === 100);
+                            const metadataEntry = r.items_completed.find(e => e.num === 100) as any;
                             const reportReplacements = metadataEntry?.metadata?.replacements || {};
                             const reportReplacementLinks = metadataEntry?.metadata?.replacementLinks || {};
                             const hasReplacements = Object.keys(reportReplacements).length > 0;
@@ -1994,7 +2458,22 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                                             {origConf ? origConf.name : `Пункт ${origNum}`} ➔ Заменен на: {replConf ? replConf.name : `Пункт ${replNumVal}`}
                                             {link && (
                                               <span className="block pl-3 text-[10px] text-yellow-400/70 font-mono break-all">
-                                                Скриншот: <a href={link} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">{link}</a>
+                                                Скриншот:{" "}
+                                                <span
+                                                  onClick={() => {
+                                                    const allImages = [
+                                                      ...r.items_completed.flatMap(e => e.links),
+                                                      r.items_completed.find(e => e.num === 99)?.links[0] || "",
+                                                      ...Object.values(reportReplacementLinks)
+                                                    ].filter(Boolean) as string[];
+                                                    const idxInAll = allImages.indexOf(link);
+                                                    setGalleryImages(allImages);
+                                                    setGalleryIndex(idxInAll !== -1 ? idxInAll : 0);
+                                                  }}
+                                                  className="underline hover:text-primary cursor-pointer font-bold select-none"
+                                                >
+                                                  {link}
+                                                </span>
                                               </span>
                                             )}
                                           </li>
@@ -2019,6 +2498,10 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                                   ranksFlow={ranksFlow}
                                   replacements={reportReplacements}
                                   replacementLinks={reportReplacementLinks}
+                                  onImageClick={(images, index) => {
+                                    setGalleryImages(images);
+                                    setGalleryIndex(index);
+                                  }}
                                 />
                               </>
                             );
@@ -2466,11 +2949,208 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
               </button>
             </div>
           </div>
+
+          {/* Warnings Management panel */}
+          <div className="bg-tactical-card border border-tactical-border/60 p-6 corner-mark space-y-4 mt-6">
+            <h3 className="font-oswald text-sm tracking-widest uppercase text-foreground border-b border-tactical-border pb-3 flex items-center gap-2">
+              <Icon name="AlertTriangle" size={16} className="text-red-500" />
+              Дисциплинарные выговоры инструкторов
+            </h3>
+            
+            <div className="grid lg:grid-cols-12 gap-6 items-start">
+              {/* Left Column: Issue Warning Form */}
+              <div className="lg:col-span-5 space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-mono text-muted-foreground block font-bold">Выбор инструктора</label>
+                  <select
+                    value={warningTargetUserId}
+                    onChange={(e) => setWarningTargetUserId(e.target.value ? Number(e.target.value) : "")}
+                    className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-ibm focus:outline-none focus:border-primary cursor-pointer rounded-sm"
+                  >
+                    <option value="">-- Выберите инструктора --</option>
+                    {instructors
+                      .filter(i => i.id !== authUser.id)
+                      .map(i => (
+                        <option key={i.id} value={i.id}>
+                          [{fmtStaticId(i.static_id)}] {i.name} ({i.rank})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-mono text-muted-foreground block font-bold">Причина выговора</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Укажите причину дисциплинарного взыскания..."
+                    value={warningReason}
+                    onChange={(e) => setWarningReason(e.target.value)}
+                    className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-ibm focus:outline-none focus:border-primary rounded-sm resize-none"
+                  />
+                </div>
+
+                <button
+                  onClick={handleIssueWarning}
+                  disabled={warningIssueLoading || !warningTargetUserId || !warningReason.trim()}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white font-oswald text-xs tracking-wider uppercase py-2.5 px-4 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed corner-mark"
+                >
+                  <Icon name="AlertOctagon" size={14} />
+                  {warningIssueLoading ? "Выдача выговора..." : "Выдать выговор"}
+                </button>
+              </div>
+
+              {/* Right Column: Instructor Warnings List */}
+              <div className="lg:col-span-7 space-y-3 text-left">
+                <span className="text-[10px] uppercase font-mono text-zinc-400 block font-bold">
+                  История выговоров выбранного инструктора:
+                </span>
+                
+                {!warningTargetUserId ? (
+                  <div className="text-center p-8 border border-dashed border-tactical-border/40 text-muted-foreground bg-tactical-panel/10 rounded-sm">
+                    <p className="text-xs font-ibm">Выберите инструктора в левой колонке для просмотра истории выговоров.</p>
+                  </div>
+                ) : warningsLoading ? (
+                  <div className="py-8 flex justify-center">
+                    <Icon name="Loader2" size={24} className="text-primary animate-spin" />
+                  </div>
+                ) : warningsList.length === 0 ? (
+                  <div className="text-center p-8 border border-dashed border-tactical-border/40 text-muted-foreground bg-tactical-panel/10 rounded-sm">
+                    <p className="text-xs font-ibm">У данного инструктора нет зарегистрированных выговоров.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                    {warningsList.map((w) => (
+                      <div
+                        key={w.id}
+                        className={`p-3 border rounded-sm font-mono text-xs flex justify-between items-start gap-4 transition-all ${
+                          w.is_active
+                            ? "bg-red-950/20 border-red-800/60 shadow-[0_0_8px_rgba(239,68,68,0.05)]"
+                            : "bg-tactical-panel/40 border-tactical-border/40 opacity-70"
+                        }`}
+                      >
+                        <div className="space-y-1 text-left">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-1.5 py-0.5 text-[9px] uppercase font-bold rounded-sm border ${
+                              w.is_active
+                                ? "bg-red-950/80 text-red-400 border-red-800/50"
+                                : "bg-zinc-900 text-zinc-400 border-zinc-700/50"
+                            }`}>
+                              {w.is_active ? "Активен" : "Снят"}
+                            </span>
+                            <span className="text-[10px] text-zinc-400 font-mono">{w.id} · {fmt(w.created_at)}</span>
+                          </div>
+                          <p className="text-foreground font-ibm font-medium pt-1 text-[12px]">
+                            {w.reason}
+                          </p>
+                          <p className="text-[10px] text-zinc-400 font-ibm">
+                            Выдал: <span className="text-zinc-300 font-semibold">{w.issued_by_name}</span>
+                          </p>
+                        </div>
+                        
+                        {w.is_active && (
+                          <button
+                            onClick={() => handleDismissWarning(w.id)}
+                            disabled={!!warningDismissLoading[w.id]}
+                            className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white text-[10px] font-oswald tracking-wide uppercase px-2.5 py-1.5 transition-colors disabled:opacity-40 flex items-center gap-1 rounded-sm flex-shrink-0"
+                          >
+                            <Icon name="Check" size={10} />
+                            {warningDismissLoading[w.id] ? "Снятие..." : "Снять выговор"}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Proof Gallery Modal */}
+      {galleryImages.length > 0 && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex flex-col justify-between p-6 animate-fade-in"
+          onClick={() => setGalleryImages([])}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between text-white">
+            <span className="font-mono text-zinc-400 text-xs">
+              Доказательства · {galleryIndex + 1} из {galleryImages.length}
+            </span>
+            <button
+              onClick={() => setGalleryImages([])}
+              className="text-zinc-400 hover:text-white transition-colors p-2 bg-zinc-900/60 border border-zinc-800 rounded hover:border-zinc-700"
+            >
+              <Icon name="X" size={18} />
+            </button>
+          </div>
+
+          {/* Main Content Area */}
+          <div className="flex-1 flex items-center justify-between gap-4 max-w-7xl mx-auto w-full relative">
+            {/* Left Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setGalleryIndex(prev => (prev - 1 + galleryImages.length) % galleryImages.length);
+              }}
+              className="w-10 h-10 bg-zinc-900/80 border border-zinc-800 hover:border-zinc-600 text-white rounded flex items-center justify-center transition-colors flex-shrink-0"
+            >
+              <Icon name="ChevronLeft" size={20} />
+            </button>
+
+            {/* Active Image */}
+            <div
+              className="flex-1 flex items-center justify-center p-4 max-h-[70vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={galleryImages[galleryIndex]}
+                alt={`Evidence screenshot ${galleryIndex + 1}`}
+                className="max-w-full max-h-[70vh] object-contain shadow-2xl border border-zinc-800 rounded-sm"
+              />
+            </div>
+
+            {/* Right Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setGalleryIndex(prev => (prev + 1) % galleryImages.length);
+              }}
+              className="w-10 h-10 bg-zinc-900/80 border border-zinc-800 hover:border-zinc-600 text-white rounded flex items-center justify-center transition-colors flex-shrink-0"
+            >
+              <Icon name="ChevronRight" size={20} />
+            </button>
+          </div>
+
+          {/* Thumbnails list below */}
+          <div
+            className="flex justify-center items-center gap-2 overflow-x-auto py-3 max-w-3xl mx-auto w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {galleryImages.map((img, idx) => (
+              <button
+                key={idx}
+                onClick={() => setGalleryIndex(idx)}
+                className={`w-14 h-10 border rounded-sm overflow-hidden flex-shrink-0 transition-all ${
+                  idx === galleryIndex
+                    ? "border-primary scale-110 ring-1 ring-primary"
+                    : "border-zinc-700 opacity-60 hover:opacity-100 hover:scale-105"
+                }`}
+              >
+                <img src={img} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>
   );
 }
+
+type PromotionCheckResultsMap = Record<number, PromotionCheckResult>;
+type NumberBooleanMap = Record<number, boolean>;
+type NumberStringMap = Record<number, string>;
 
 export function PromotionInstructorTab({
   highlightReportId,
@@ -2493,10 +3173,10 @@ export function PromotionInstructorTab({
       setExpandedId(highlightReportId);
     }
   }, [highlightReportId]);
-  const [checkResults, setCheckResults] = useState<Record<number, PromotionCheckResult>>({});
-  const [checkLoading, setCheckLoading] = useState<Record<number, boolean>>({});
-  const [reviewComment, setReviewComment] = useState<Record<number, string>>({});
-  const [reviewLoading, setReviewLoading] = useState<Record<number, boolean>>({});
+  const [checkResults, setCheckResults] = useState<PromotionCheckResultsMap>({});
+  const [checkLoading, setCheckLoading] = useState<NumberBooleanMap>({});
+  const [reviewComment, setReviewComment] = useState<NumberStringMap>({});
+  const [reviewLoading, setReviewLoading] = useState<NumberBooleanMap>({});
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [selectedPromoDate, setSelectedPromoDate] = useState<string>(() => new Date().toLocaleDateString("ru-RU"));
 

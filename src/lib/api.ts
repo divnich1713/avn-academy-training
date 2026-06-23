@@ -666,3 +666,65 @@ export async function saveWeeklyReportsSettings(activities: ActivityDef[]): Prom
     body: JSON.stringify({ activities }),
   });
 }
+
+export interface InstructorWarning {
+  id: number;
+  user_id: number;
+  reason: string;
+  is_active: boolean;
+  created_at: string;
+  issued_by_name: string;
+}
+
+export async function uploadEvidenceFile(file: File): Promise<string> {
+  if (USE_MOCK) {
+    return `/uploads/mock_evidence_${Date.now()}.${file.type.split("/")[1] || "png"}`;
+  }
+  const res = await safeFetch(`${PROMOTIONS_URL}?action=upload_evidence`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": file.type },
+    body: file,
+  });
+  return res.url;
+}
+
+export async function fetchAvailableActivities(): Promise<{ grades: Grade[]; reports: PromotionReport[] }> {
+  if (USE_MOCK) {
+    return { grades: [], reports: [] };
+  }
+  return safeFetch(`${PROMOTIONS_URL}?action=available_activities`, {
+    headers: authHeaders(),
+  });
+}
+
+export async function fetchUserWarnings(userId?: number): Promise<InstructorWarning[]> {
+  if (USE_MOCK) {
+    return [];
+  }
+  let url = `${PROMOTIONS_URL}?action=warnings`;
+  if (userId) url += `&user_id=${userId}`;
+  const res = await safeFetch(url, { headers: authHeaders() });
+  return res.warnings || [];
+}
+
+export async function issueWarning(userId: number, reason: string): Promise<{ success: boolean }> {
+  if (USE_MOCK) {
+    return { success: true };
+  }
+  return safeFetch(`${PROMOTIONS_URL}?action=issue_warning`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: userId, reason }),
+  });
+}
+
+export async function dismissWarning(warningId: number): Promise<{ success: boolean }> {
+  if (USE_MOCK) {
+    return { success: true };
+  }
+  return safeFetch(`${PROMOTIONS_URL}?action=dismiss_warning`, {
+    method: "PUT",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ warning_id: warningId }),
+  });
+}

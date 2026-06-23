@@ -3,6 +3,7 @@ import Icon from "@/components/ui/icon";
 import { SectionHeader, InstructorAvatar } from "./UIComponents";
 import { fetchRatings, InstructorRating, User } from "@/lib/api";
 import { Spinner, Empty } from "./SectionsShared";
+import { InstructorAchievements } from "./Achievements";
 
 type Timeframe = "daily" | "weekly" | "monthly" | "yearly";
 
@@ -84,6 +85,13 @@ export function InstructorRatingView({ instructorId }: { instructorId?: number }
               <p className="rank-badge text-muted-foreground mt-1">Место в рейтинге</p>
             </div>
           </div>
+        </div>
+      )}
+
+      {me && (
+        <div className="bg-tactical-card border border-tactical-border p-6 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-1 h-full bg-primary/70" />
+          <InstructorAchievements rating={me} rankIndex={myRankIndex} />
         </div>
       )}
 

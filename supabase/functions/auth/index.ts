@@ -28,7 +28,11 @@ function generateToken(): string {
 
 async function downloadAvatar(discordId: string, avatarUrl: string): Promise<string | null> {
   try {
-    const res = await fetch(avatarUrl);
+    const res = await fetch(avatarUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      }
+    });
     if (!res.ok) {
       console.error(`[Avatar Downloader] Failed to fetch avatar from Discord: HTTP ${res.status}`);
       return null;

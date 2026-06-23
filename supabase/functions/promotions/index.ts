@@ -69,6 +69,74 @@ async function getUserByToken(client: Client, token: string | null) {
   return null;
 }
 
+async function handleUploadEvidence(req: Request, userId: number): Promise<Response> {
+  try {
+    const contentType = req.headers.get("content-type") || "image/png";
+    const extension = contentType.split("/")[1] || "png";
+    const arrayBuffer = await req.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+
+    const filename = `inst_${userId}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${extension}`;
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    if (supabaseUrl && serviceRoleKey && supabaseUrl.includes("supabase.co")) {
+      console.log(`Uploading to Supabase Storage: ${filename}`);
+      const uploadRes = await fetch(
+        `${supabaseUrl}/storage/v1/object/instructor-evidence/${filename}`,
+        {
+          method: "PUT",
+          headers: {
+            "Authorization": `Bearer ${serviceRoleKey}`,
+            "Content-Type": contentType,
+          },
+          body: uint8Array,
+        }
+      );
+      if (uploadRes.ok) {
+        return new Response(JSON.stringify({ 
+          success: true, 
+          url: `/supabase-api/storage/v1/object/public/instructor-evidence/${filename}` 
+        }), {
+          status: 200,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      } else {
+        console.warn("Supabase Storage upload failed, trying local fallback", await uploadRes.text());
+      }
+    }
+
+    // Local fallback: write to filesystem
+    try {
+      const publicUploadsDir = "/app/public/uploads";
+      await Deno.mkdir(publicUploadsDir, { recursive: true });
+      const filepath = `${publicUploadsDir}/${filename}`;
+      await Deno.writeFile(filepath, uint8Array);
+      console.log(`Local file saved: ${filepath}`);
+      return new Response(JSON.stringify({ 
+        success: true, 
+        url: `/uploads/${filename}` 
+      }), {
+        status: 200,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    } catch (fsErr) {
+      console.error("Local file system upload failed:", fsErr);
+      return new Response(JSON.stringify({ error: "Не удалось сохранить файл" }), {
+        status: 500,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    }
+  } catch (err) {
+    console.error("Upload error:", err);
+    return new Response(JSON.stringify({ error: err.message || "Ошибка при загрузке файла" }), {
+      status: 500,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+    });
+  }
+}
+
 async function checkRequirements(
   client: Client,
   userId: number,
@@ -216,6 +284,85 @@ export default async function handler(req: Request): Promise<Response> {
       });
     }
 
+    // ===== GET /promotions?action=available_activities — получить неиспользованные активности =====
+    if (method === "GET" && action === "available_activities") {
+      const gradesRes = await client.queryObject<{
+        id: number;
+        subject: string;
+        type: string;
+        grade: number;
+        graded_at: Date;
+        cadet_name: string;
+      }>(
+        `SELECT g.id, g.subject, g.type, g.grade, g.graded_at, u.name as cadet_name
+         FROM ${SCHEMA}.grades g
+         JOIN ${SCHEMA}.users u ON g.user_id = u.id
+         WHERE g.instructor_id = $1 AND g.instructor_promo_used = FALSE`,
+        [user.id]
+      );
+
+      const reportsRes = await client.queryObject<{
+        id: number;
+        promotion_type: string;
+        status: string;
+        reviewed_at: Date;
+        cadet_name: string;
+      }>(
+        `SELECT pr.id, pr.promotion_type, pr.status, pr.reviewed_at, u.name as cadet_name
+         FROM ${SCHEMA}.promotion_reports pr
+         JOIN ${SCHEMA}.users u ON pr.user_id = u.id
+         WHERE pr.reviewed_by = $1 AND pr.status IN ('approved', 'rejected') AND pr.instructor_promo_used = FALSE`,
+        [user.id]
+      );
+
+      const grades = gradesRes.rows.map(row => {
+        const item = { ...row };
+        if (item.graded_at) item.graded_at = new Date(item.graded_at).toISOString();
+        return item;
+      });
+
+      const reports = reportsRes.rows.map(row => {
+        const item = { ...row };
+        if (item.reviewed_at) item.reviewed_at = new Date(item.reviewed_at).toISOString();
+        return item;
+      });
+
+      return new Response(JSON.stringify({ grades, reports }), {
+        status: 200,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    }
+
+    // ===== GET /promotions?action=warnings — получить выговоры пользователя =====
+    if (method === "GET" && action === "warnings") {
+      let targetUserId = user.id;
+      const userIdParam = url.searchParams.get("user_id");
+      if (userIdParam) {
+        targetUserId = Number(userIdParam);
+      }
+
+      const res = await client.queryObject<any>(
+        `SELECT w.id, w.user_id, w.reason, w.is_active, w.created_at,
+                u.name as issued_by_name
+         FROM ${SCHEMA}.instructor_warnings w
+         JOIN ${SCHEMA}.users u ON w.issued_by = u.id
+         WHERE w.user_id = $1
+         ORDER BY w.created_at DESC`,
+        [targetUserId]
+      );
+
+      const warnings = res.rows.map((row: any) => {
+        const item = { ...row };
+        if (item.created_at) item.created_at = new Date(item.created_at).toISOString();
+        return item;
+      });
+
+      return new Response(JSON.stringify({ warnings }), {
+        status: 200,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    }
+
     // ===== GET /promotions?action=check&type=... — проверка прогресса =====
     if (method === "GET" && action === "check") {
       const promotionType = url.searchParams.get("type") || "";
@@ -246,7 +393,15 @@ export default async function handler(req: Request): Promise<Response> {
       }
 
       const result = await checkRequirements(client, targetUserId, promotionType);
-      return new Response(JSON.stringify(result), {
+      
+      // Добавим информацию об активных выговорах
+      const warningsRes = await client.queryObject<{ count: number }>(
+        `SELECT COUNT(id)::int as count FROM ${SCHEMA}.instructor_warnings WHERE user_id = $1 AND is_active = TRUE`,
+        [targetUserId]
+      );
+      const activeWarningsCount = Number(warningsRes.rows[0]?.count || 0);
+
+      return new Response(JSON.stringify({ ...result, active_warnings_count: activeWarningsCount }), {
         status: 200,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
       });
@@ -316,7 +471,7 @@ export default async function handler(req: Request): Promise<Response> {
                  u.name as cadet_name, u.rank as cadet_rank, u.static_id as cadet_static_id,
                  u.id as cadet_id,
                  u.discord_id as cadet_discord_id,
-                 rv.name as reviewer_name
+                 rv.name as reviewer_name, pr.instructor_promo_used
           FROM ${SCHEMA}.promotion_reports pr
           JOIN ${SCHEMA}.users u ON pr.user_id = u.id
           LEFT JOIN ${SCHEMA}.users rv ON pr.reviewed_by = rv.id
@@ -329,7 +484,7 @@ export default async function handler(req: Request): Promise<Response> {
                  u.name as cadet_name, u.rank as cadet_rank, u.static_id as cadet_static_id,
                  u.id as cadet_id,
                  u.discord_id as cadet_discord_id,
-                 rv.name as reviewer_name
+                 rv.name as reviewer_name, pr.instructor_promo_used
           FROM ${SCHEMA}.promotion_reports pr
           JOIN ${SCHEMA}.users u ON pr.user_id = u.id
           LEFT JOIN ${SCHEMA}.users rv ON pr.reviewed_by = rv.id
@@ -479,6 +634,56 @@ export default async function handler(req: Request): Promise<Response> {
       });
     }
 
+    // ===== POST /promotions?action=upload_evidence — загрузить скриншот доказательства =====
+    if (method === "POST" && action === "upload_evidence") {
+      return await handleUploadEvidence(req, user.id);
+    }
+
+    // ===== POST /promotions?action=issue_warning — выдать выговор инструктору =====
+    if (method === "POST" && action === "issue_warning") {
+      const isLeadership = (r: string) => ["head_avng", "deputy_head"].includes(r);
+      if (!isLeadership(user.role)) {
+        return new Response(JSON.stringify({ error: "Только Начальник АВНГ и его Заместители могут выдавать выговоры" }), {
+          status: 403,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      const body = await req.json().catch(() => ({}));
+      const targetUserId = Number(body.user_id || 0);
+      const reason = String(body.reason || "").trim();
+
+      if (!targetUserId || !reason) {
+        return new Response(JSON.stringify({ error: "Укажите ID пользователя и причину выговора" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      await client.queryArray(
+        `INSERT INTO ${SCHEMA}.instructor_warnings (user_id, reason, issued_by)
+         VALUES ($1, $2, $3)`,
+        [targetUserId, reason, user.id]
+      );
+
+      // Уведомление пользователю
+      await client.queryArray(
+        `INSERT INTO ${SCHEMA}.notifications (user_id, type, title, message)
+         VALUES ($1, $2, $3, $4)`,
+        [
+          targetUserId,
+          "warning_issued",
+          `Выдан выговор`,
+          `Вам был выдан дисциплинарный выговор. Причина: ${reason}. Выдача рапортов заблокирована до снятия выговора.`
+        ]
+      );
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    }
+
     // ===== POST /promotions?action=submit_instructor_report =====
     if (method === "POST" && action === "submit_instructor_report") {
       const body = await req.json().catch(() => ({}));
@@ -489,6 +694,18 @@ export default async function handler(req: Request): Promise<Response> {
 
       if (!currentRank || !targetRank || totalPoints <= 0) {
         return new Response(JSON.stringify({ error: "Неверные параметры рапорта" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      // Проверка: нет активных выговоров
+      const warningsRes = await client.queryObject<{ count: number }>(
+        `SELECT COUNT(id)::int as count FROM ${SCHEMA}.instructor_warnings WHERE user_id = $1 AND is_active = TRUE`,
+        [user.id]
+      );
+      if (Number(warningsRes.rows[0]?.count || 0) > 0) {
+        return new Response(JSON.stringify({ error: "Подача рапорта заблокирована: у вас есть активный выговор" }), {
           status: 400,
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
         });
@@ -689,12 +906,47 @@ export default async function handler(req: Request): Promise<Response> {
         [status, comment || null, user.id, Number(reportId)]
       );
 
-      // Если одобрено — обновить звание инструктора
+      // Если одобрено — обновить звание инструктора и пометить выбранные активности как использованные
       if (status === "approved") {
         await client.queryArray(
           `UPDATE ${SCHEMA}.users SET rank = $1 WHERE id = $2`,
           [report.target_rank, report.user_id]
         );
+
+        // Помечаем активности как использованные
+        try {
+          const fullReportRes = await client.queryObject<{ items_completed: any }>(
+            `SELECT items_completed FROM ${SCHEMA}.instructor_promotion_reports WHERE id = $1`,
+            [Number(reportId)]
+          );
+          if (fullReportRes.rows.length > 0) {
+            const rawItems = fullReportRes.rows[0].items_completed;
+            const items = typeof rawItems === "string" ? JSON.parse(rawItems) : rawItems;
+            if (Array.isArray(items)) {
+              const metaEntry = items.find(e => e.num === 101);
+              if (metaEntry && metaEntry.metadata) {
+                const gradeIds = metaEntry.metadata.grade_ids || [];
+                const reportIds = metaEntry.metadata.report_ids || [];
+                
+                if (gradeIds.length > 0) {
+                  await client.queryArray(
+                    `UPDATE ${SCHEMA}.grades SET instructor_promo_used = TRUE WHERE id = ANY($1)`,
+                    [gradeIds]
+                  );
+                }
+                if (reportIds.length > 0) {
+                  await client.queryArray(
+                    `UPDATE ${SCHEMA}.promotion_reports SET instructor_promo_used = TRUE WHERE id = ANY($1)`,
+                    [reportIds]
+                  );
+                }
+                console.log(`Marked activities as used for report ${reportId}. Grades: ${gradeIds.length}, Reports: ${reportIds.length}`);
+              }
+            }
+          }
+        } catch (actErr) {
+          console.error("Failed to mark activities as used:", actErr);
+        }
       }
 
       // Уведомление инструктору
@@ -708,6 +960,65 @@ export default async function handler(req: Request): Promise<Response> {
         `INSERT INTO ${SCHEMA}.notifications (user_id, type, title, message)
          VALUES ($1, $2, $3, $4)`,
         [report.user_id, "promotion_reviewed", `Рапорт ${statusText}`, notifMessage]
+      );
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    }
+
+    // ===== PUT /promotions?action=dismiss_warning — снять выговор инструктору =====
+    if (method === "PUT" && action === "dismiss_warning") {
+      const isLeadership = (r: string) => ["head_avng", "deputy_head"].includes(r);
+      if (!isLeadership(user.role)) {
+        return new Response(JSON.stringify({ error: "Только Начальник АВНГ и его Заместители могут снимать выговоры" }), {
+          status: 403,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      const body = await req.json().catch(() => ({}));
+      const warningId = Number(body.warning_id || 0);
+
+      if (!warningId) {
+        return new Response(JSON.stringify({ error: "Укажите ID выговора" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      const warnRes = await client.queryObject<{ user_id: number }>(
+        `SELECT user_id FROM ${SCHEMA}.instructor_warnings WHERE id = $1`,
+        [warningId]
+      );
+
+      if (warnRes.rows.length === 0) {
+        return new Response(JSON.stringify({ error: "Выговор не найден" }), {
+          status: 404,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      const warn = warnRes.rows[0];
+
+      await client.queryArray(
+        `UPDATE ${SCHEMA}.instructor_warnings
+         SET is_active = FALSE
+         WHERE id = $1`,
+        [warningId]
+      );
+
+      // Уведомление пользователю
+      await client.queryArray(
+        `INSERT INTO ${SCHEMA}.notifications (user_id, type, title, message)
+         VALUES ($1, $2, $3, $4)`,
+        [
+          warn.user_id,
+          "warning_dismissed",
+          `Выговор снят`,
+          `Ваш дисциплинарный выговор был снят руководством АВНГ. Подача рапортов снова доступна.`
+        ]
       );
 
       return new Response(JSON.stringify({ success: true }), {

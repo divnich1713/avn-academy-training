@@ -7,10 +7,23 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useAuth } from "./lib/useAuth";
 import Icon from "@/components/ui/icon";
 
+// Helper to reload page when lazy load fails (e.g. after a redeployment when old chunks are deleted)
+const safeLazy = (importFn: () => Promise<any>) => {
+  return lazy(async () => {
+    try {
+      return await importFn();
+    } catch (error) {
+      console.error("Chunk loading failed, forcing page reload:", error);
+      window.location.reload();
+      return { default: () => null };
+    }
+  });
+};
+
 // Lazy-load pages
-const Index = lazy(() => import("./pages/Index"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const LoginPage = lazy(() => import("./components/academy/LoginPage"));
+const Index = safeLazy(() => import("./pages/Index"));
+const NotFound = safeLazy(() => import("./pages/NotFound"));
+const LoginPage = safeLazy(() => import("./components/academy/LoginPage"));
 
 // Configure default cache options for optimization
 const queryClient = new QueryClient({
