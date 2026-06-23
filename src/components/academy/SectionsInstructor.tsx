@@ -1521,7 +1521,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
 
       {/* ── PROMOTIONS TAB ── */}
       {activeTab === "promotions" && (
-        <PromotionInstructorTab highlightReportId={highlightReportId} onReviewSuccess={() => { queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers }); queryClient.invalidateQueries({ queryKey: queryKeys.requests }); queryClient.invalidateQueries({ queryKey: queryKeys.promotionReports }); }} />
+        <PromotionInstructorTab authUser={authUser} highlightReportId={highlightReportId} onReviewSuccess={() => { queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers }); queryClient.invalidateQueries({ queryKey: queryKeys.requests }); queryClient.invalidateQueries({ queryKey: queryKeys.promotionReports }); }} />
       )}
 
       {/* ── RATING TAB ── */}

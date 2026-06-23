@@ -804,6 +804,13 @@ export default async function handler(req: Request): Promise<Response> {
         });
       }
 
+      if (report.user_id === user.id) {
+        return new Response(JSON.stringify({ error: "Нельзя одобрять/отклонять собственный рапорт" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
       // Обновить рапорт
       await client.queryArray(
         `UPDATE ${SCHEMA}.promotion_reports
@@ -893,6 +900,13 @@ export default async function handler(req: Request): Promise<Response> {
       const report = reportRes.rows[0];
       if (report.status !== "pending") {
         return new Response(JSON.stringify({ error: "Рапорт уже рассмотрен" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      if (report.user_id === user.id) {
+        return new Response(JSON.stringify({ error: "Нельзя одобрять/отклонять собственный рапорт" }), {
           status: 400,
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
         });

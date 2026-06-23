@@ -2512,31 +2512,39 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                         {/* Review actions */}
                         {r.status === "pending" && (
                           <div className="p-4 bg-tactical-panel/50 space-y-2">
-                            <input
-                              className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-ibm focus:outline-none focus:border-primary transition-colors"
-                              placeholder="Комментарий руководства (необязательно)..."
-                              value={reviewComment[r.id] || ""}
-                              onChange={(e) => setReviewComment(prev => ({ ...prev, [r.id]: e.target.value }))}
-                            />
-                            <div className="flex items-center gap-2">
-                              <button
-                                disabled={reviewLoading[r.id]}
-                                onClick={() => handleReviewClick(r, "approved")}
-                                className="rank-badge text-green-400 border border-green-800 px-3 py-1.5 hover:bg-green-900/30 transition-colors disabled:opacity-50 flex items-center gap-1 text-xs"
-                              >
-                                <Icon name="Check" size={12} /> Одобрить и повысить
-                              </button>
-                              <button
-                                disabled={reviewLoading[r.id]}
-                                onClick={() => handleReviewClick(r, "rejected")}
-                                className="rank-badge text-red-400 border border-red-800 px-3 py-1.5 hover:bg-red-900/30 transition-colors disabled:opacity-50 flex items-center gap-1 text-xs"
-                              >
-                                <Icon name="X" size={12} /> Отклонить
-                              </button>
-                              {reviewLoading[r.id] && (
-                                <Icon name="Loader2" size={14} className="text-primary animate-spin" />
-                              )}
-                            </div>
+                            {r.user_id === authUser.id || r.instructor_id === authUser.id ? (
+                              <p className="text-xs text-yellow-500 font-ibm italic">
+                                Вы не можете рассмотреть собственный рапорт. Дождитесь проверки другим членом руководства.
+                              </p>
+                            ) : (
+                              <>
+                                <input
+                                  className="w-full bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-ibm focus:outline-none focus:border-primary transition-colors"
+                                  placeholder="Комментарий руководства (необязательно)..."
+                                  value={reviewComment[r.id] || ""}
+                                  onChange={(e) => setReviewComment(prev => ({ ...prev, [r.id]: e.target.value }))}
+                                />
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    disabled={reviewLoading[r.id]}
+                                    onClick={() => handleReviewClick(r, "approved")}
+                                    className="rank-badge text-green-400 border border-green-800 px-3 py-1.5 hover:bg-green-900/30 transition-colors disabled:opacity-50 flex items-center gap-1 text-xs"
+                                  >
+                                    <Icon name="Check" size={12} /> Одобрить и повысить
+                                  </button>
+                                  <button
+                                    disabled={reviewLoading[r.id]}
+                                    onClick={() => handleReviewClick(r, "rejected")}
+                                    className="rank-badge text-red-400 border border-red-800 px-3 py-1.5 hover:bg-red-900/30 transition-colors disabled:opacity-50 flex items-center gap-1 text-xs"
+                                  >
+                                    <Icon name="X" size={12} /> Отклонить
+                                  </button>
+                                  {reviewLoading[r.id] && (
+                                    <Icon name="Loader2" size={14} className="text-primary animate-spin" />
+                                  )}
+                                </div>
+                              </>
+                            )}
                           </div>
                         )}
 
@@ -3156,9 +3164,11 @@ type NumberStringMap = Record<number, string>;
 export function PromotionInstructorTab({
   highlightReportId,
   onReviewSuccess,
+  authUser,
 }: {
   highlightReportId?: number;
   onReviewSuccess?: () => void;
+  authUser?: User;
 }) {
   const [reports, setReports] = useState<PromotionReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -3460,34 +3470,42 @@ export function PromotionInstructorTab({
                     {/* Review actions */}
                     {r.status === "pending" && (
                       <div className="p-4 border-t border-tactical-border space-y-2">
-                        <input
-                          className="w-full bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary transition-colors"
-                          placeholder="Комментарий инструктора (необязательно)..."
-                          value={reviewComment[r.id] || ""}
-                          onChange={(e) =>
-                            setReviewComment((prev) => ({ ...prev, [r.id]: e.target.value }))
-                          }
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            disabled={reviewLoading[r.id]}
-                            onClick={() => handleReview(r, "approved")}
-                            className="rank-badge text-green-400 border border-green-800 px-3 py-1 hover:bg-green-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
-                          >
-                            <Icon name="Check" size={12} />Одобрить и повысить
-                          </button>
-                          <button
-                            disabled={reviewLoading[r.id]}
-                            onClick={() => handleReview(r, "rejected")}
-                            className="rank-badge text-red-400 border border-red-800 px-3 py-1 hover:bg-red-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
-                          >
-                            <Icon name="X" size={12} />Отклонить
-                          </button>
-                          {reviewLoading[r.id] && (
-                            <Icon name="Loader2" size={14} className="text-primary animate-spin" />
-                          )}
-                        </div>
+                        {authUser && r.cadet_id === authUser.id ? (
+                          <p className="text-xs text-yellow-500 font-ibm italic">
+                            Вы не можете рассмотреть собственный рапорт. Дождитесь проверки другим членом руководства.
+                          </p>
+                        ) : (
+                          <>
+                            <input
+                              className="w-full bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary transition-colors"
+                              placeholder="Комментарий инструктора (необязательно)..."
+                              value={reviewComment[r.id] || ""}
+                              onChange={(e) =>
+                                setReviewComment((prev) => ({ ...prev, [r.id]: e.target.value }))
+                              }
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                disabled={reviewLoading[r.id]}
+                                onClick={() => handleReview(r, "approved")}
+                                className="rank-badge text-green-400 border border-green-800 px-3 py-1 hover:bg-green-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
+                              >
+                                <Icon name="Check" size={12} />Одобрить и повысить
+                              </button>
+                              <button
+                                disabled={reviewLoading[r.id]}
+                                onClick={() => handleReview(r, "rejected")}
+                                className="rank-badge text-red-400 border border-red-800 px-3 py-1 hover:bg-red-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
+                              >
+                                <Icon name="X" size={12} />Отклонить
+                              </button>
+                              {reviewLoading[r.id] && (
+                                <Icon name="Loader2" size={14} className="text-primary animate-spin" />
+                              )}
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
 
