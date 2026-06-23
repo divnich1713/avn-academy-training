@@ -1208,7 +1208,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
     }
   }, [currentRank, targetRank, gratitude, gratitudeLink, entries, replacements, replacementLinks, authUser.id]);
 
-  const isLeadership = ["head_avng", "chief_instructor", "deputy_head"].includes(authUser.role);
+  const isLeadership = ["head_avng", "chief_instructor", "deputy_head", "senior_ufsvng"].includes(authUser.role);
 
   useEffect(() => {
     const matched = INSTRUCTOR_RANKS.find(r => r.toLowerCase() === authUser.rank.toLowerCase());

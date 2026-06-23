@@ -852,7 +852,7 @@ export default async function handler(req: Request): Promise<Response> {
 
     // ===== PUT /promotions?action=review_instructor_report =====
     if (method === "PUT" && action === "review_instructor_report") {
-      const isLeadership = (r: string) => ["head_avng", "chief_instructor", "deputy_head"].includes(r);
+      const isLeadership = (r: string) => ["head_avng", "chief_instructor", "deputy_head", "senior_ufsvng"].includes(r);
       if (!isLeadership(user.role)) {
         return new Response(JSON.stringify({ error: "Только для руководства АВНГ" }), {
           status: 403,
