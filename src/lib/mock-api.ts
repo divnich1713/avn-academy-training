@@ -893,10 +893,7 @@ export async function fetchWeeklyReports(): Promise<WeeklyReport[]> {
   const user = USERS.find(u => u.id === currentUserId);
   if (!user) return [];
 
-  if (user.role === "head_avng") {
-    return WEEKLY_REPORTS;
-  }
-  return WEEKLY_REPORTS.filter(r => r.user_id === currentUserId);
+  return WEEKLY_REPORTS;
 }
 
 export async function submitWeeklyReport(weekStart: string, items: Record<string, WeeklyReportItem>): Promise<{ success: boolean; id: number }> {

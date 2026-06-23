@@ -82,7 +82,7 @@ function isAutomatedActivity(act: ActivityDef): boolean {
 }
 
 export function WeeklyReports({ authUser }: { authUser: User }) {
-  const [activeTab, setActiveTab] = useState<"submit" | "history" | "review" | "settings">("submit");
+  const [activeTab, setActiveTab] = useState<"submit" | "history" | "all" | "review" | "settings">("submit");
   const [reports, setReports] = useState<WeeklyReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -532,6 +532,21 @@ export function WeeklyReports({ authUser }: { authUser: User }) {
             </span>
           )}
         </button>
+        <button
+          onClick={() => setActiveTab("all")}
+          className={`font-oswald text-sm tracking-widest uppercase px-5 py-3 transition-colors border-b-2 relative ${
+            activeTab === "all"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Все отчёты
+          {reports.length > 0 && (
+            <span className="ml-2 bg-primary/20 text-primary border border-primary/30 rounded-full px-1.5 py-0.5 text-[10px] font-mono">
+              {reports.length}
+            </span>
+          )}
+        </button>
         {canReviewReports && (
           <button
             onClick={() => setActiveTab("review")}
@@ -771,6 +786,23 @@ export function WeeklyReports({ authUser }: { authUser: User }) {
             <div className="space-y-4">
               {myReports.map(report => (
                 <ReportCard key={report.id} report={report} activities={activities} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* All reports */}
+      {activeTab === "all" && (
+        <div className="space-y-4">
+          {loading ? (
+            <Spinner />
+          ) : reports.length === 0 ? (
+            <Empty text="Ни один инструктор еще не подавал еженедельные отчёты" />
+          ) : (
+            <div className="space-y-4">
+              {reports.map(report => (
+                <ReportCard key={report.id} report={report} activities={activities} showInstructorInfo={true} />
               ))}
             </div>
           )}
@@ -1115,7 +1147,7 @@ export function WeeklyReports({ authUser }: { authUser: User }) {
 }
 
 // Collapsible card to show a single report
-function ReportCard({ report, activities }: { report: WeeklyReport; activities: ActivityDef[] }) {
+function ReportCard({ report, activities, showInstructorInfo = false }: { report: WeeklyReport; activities: ActivityDef[]; showInstructorInfo?: boolean }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -1129,8 +1161,17 @@ function ReportCard({ report, activities }: { report: WeeklyReport; activities: 
             <Icon name="CalendarCheck" size={16} className="text-primary" />
           </div>
           <div>
-            <p className="font-oswald text-base text-foreground tracking-wide">Неделя: {report.week_start}</p>
-            <p className="text-xs text-muted-foreground font-mono mt-0.5">Подан: {new Date(report.created_at).toLocaleDateString("ru-RU")}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-oswald text-base text-foreground tracking-wide">Неделя: {report.week_start}</p>
+              {showInstructorInfo && (
+                <span className="bg-tactical-panel border border-tactical-border px-2 py-0.5 text-[10px] font-mono text-yellow-500 uppercase tracking-wider">
+                  {report.instructor_name} ({report.instructor_rank})
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground font-mono mt-0.5">
+              {showInstructorInfo ? `Static ID: ${report.instructor_static_id} · ` : ""}Подан: {new Date(report.created_at).toLocaleDateString("ru-RU")}
+            </p>
           </div>
         </div>
 

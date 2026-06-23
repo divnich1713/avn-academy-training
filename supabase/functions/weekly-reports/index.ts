@@ -262,39 +262,19 @@ export default async function handler(req: Request): Promise<Response> {
 
     // ===== GET /weekly-reports =====
     if (method === "GET" && !action) {
-      let query = "";
-      const params: any[] = [];
+      // Все инструкторы видят все еженедельные отчёты
+      const query = `
+        SELECT wr.id, wr.user_id, wr.week_start, wr.items, wr.total_points, wr.status,
+               wr.reviewer_comment, wr.reviewed_at, wr.created_at,
+               u.name as instructor_name, u.rank as instructor_rank, u.static_id as instructor_static_id,
+               rv.name as reviewer_name
+        FROM ${SCHEMA}.weekly_reports wr
+        JOIN ${SCHEMA}.users u ON wr.user_id = u.id
+        LEFT JOIN ${SCHEMA}.users rv ON wr.reviewed_by = rv.id
+        ORDER BY wr.week_start DESC, wr.created_at DESC
+      `;
 
-      const canReview = user.role === "head_avng" || user.role === "senior_ufsvng";
-      if (canReview) {
-        // Нач.АВНГ и Руководство УФСВНГ видят все отчеты для проверки
-        query = `
-          SELECT wr.id, wr.user_id, wr.week_start, wr.items, wr.total_points, wr.status,
-                 wr.reviewer_comment, wr.reviewed_at, wr.created_at,
-                 u.name as instructor_name, u.rank as instructor_rank, u.static_id as instructor_static_id,
-                 rv.name as reviewer_name
-          FROM ${SCHEMA}.weekly_reports wr
-          JOIN ${SCHEMA}.users u ON wr.user_id = u.id
-          LEFT JOIN ${SCHEMA}.users rv ON wr.reviewed_by = rv.id
-          ORDER BY wr.week_start DESC, wr.created_at DESC
-        `;
-      } else {
-        // Обычные инструкторы видят только свои отчеты
-        query = `
-          SELECT wr.id, wr.user_id, wr.week_start, wr.items, wr.total_points, wr.status,
-                 wr.reviewer_comment, wr.reviewed_at, wr.created_at,
-                 u.name as instructor_name, u.rank as instructor_rank, u.static_id as instructor_static_id,
-                 rv.name as reviewer_name
-          FROM ${SCHEMA}.weekly_reports wr
-          JOIN ${SCHEMA}.users u ON wr.user_id = u.id
-          LEFT JOIN ${SCHEMA}.users rv ON wr.reviewed_by = rv.id
-          WHERE wr.user_id = $1
-          ORDER BY wr.week_start DESC, wr.created_at DESC
-        `;
-        params.push(user.id);
-      }
-
-      const res = await client.queryObject<any>(query, params);
+      const res = await client.queryObject<any>(query);
       const reports = res.rows.map(row => {
         const item = { ...row };
         if (item.created_at) item.created_at = new Date(item.created_at).toISOString();
