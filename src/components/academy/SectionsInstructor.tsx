@@ -103,6 +103,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   const [selectedReqDate, setSelectedReqDate] = useState<string>(() => new Date().toLocaleDateString("ru-RU"));
   const [selectedGradeDate, setSelectedGradeDate] = useState<string>(() => new Date().toLocaleDateString("ru-RU"));
   const [wlSearchQuery, setWlSearchQuery] = useState("");
+  const [gradesSearchQuery, setGradesSearchQuery] = useState("");
 
 
 
@@ -433,10 +434,26 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
           const dateStr = new Date(g.graded_at).toLocaleDateString("ru-RU");
           if (dateStr !== selectedGradeDate) return false;
         }
+        if (gradesSearchQuery.trim()) {
+          const q = gradesSearchQuery.toLowerCase().trim();
+          const cleanQ = q.replace(/\D/g, ""); // digits only
+
+          const nameMatch = (g.cadet_name || "").toLowerCase().includes(q);
+
+          let staticId = g.cadet_static_id;
+          if (!staticId) {
+            const u = wlUsers.find((x) => x.id === g.cadet_id);
+            staticId = u?.static_id;
+          }
+          const cleanStaticId = staticId ? staticId.replace(/\D/g, "") : "";
+          const staticIdMatch = cleanQ && cleanStaticId && cleanStaticId.includes(cleanQ);
+
+          if (!nameMatch && !staticIdMatch) return false;
+        }
         return true;
       })
       .sort((a, b) => new Date(b.graded_at).getTime() - new Date(a.graded_at).getTime());
-  }, [allGrades, selectedGradeDate]);
+  }, [allGrades, selectedGradeDate, gradesSearchQuery, wlUsers]);
   
   // Custom sorting helper for ranks
   const getRankPriority = (rank: string) => {
@@ -932,7 +949,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       {/* ── GRADES TAB ── */}
       {activeTab === "grades" && (
         <div className="space-y-4 animate-fade-in">
-          <div className="flex justify-between items-center flex-wrap gap-3">
+          <div className="flex justify-between items-center flex-wrap gap-3 w-full">
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono text-muted-foreground">Дата оценки:</span>
               <select
@@ -948,11 +965,36 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                 ))}
               </select>
             </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono text-muted-foreground">Поиск:</span>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Static ID или фамилия..."
+                  value={gradesSearchQuery}
+                  onChange={(e) => setGradesSearchQuery(e.target.value)}
+                  className="bg-tactical-panel border border-tactical-border px-3 py-1.5 pl-8 text-xs text-foreground font-ibm focus:outline-none focus:border-primary transition-colors w-60"
+                />
+                <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  <Icon name="Search" size={12} />
+                </div>
+                {gradesSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setGradesSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Icon name="X" size={12} />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           {gradesLoading ? <Spinner /> : allGrades.length === 0 ? <Empty text="Оценок пока нет" /> : (
             filteredGrades.length === 0 ? (
-              <Empty text={`Нет оценок, выставленных ${selectedGradeDate === new Date().toLocaleDateString("ru-RU") ? "сегодня" : `в день ${selectedGradeDate}`}`} />
+              <Empty text={gradesSearchQuery ? "Оценки не найдены по вашему запросу." : `Нет оценок, выставленных ${selectedGradeDate === new Date().toLocaleDateString("ru-RU") ? "сегодня" : `в день ${selectedGradeDate}`}`} />
             ) : (
               <div className="bg-tactical-card border border-tactical-border overflow-x-auto">
                 <table className="w-full min-w-[500px]">

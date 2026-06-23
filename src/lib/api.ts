@@ -243,6 +243,7 @@ export interface Grade {
   cadet_name: string;
   cadet_rank: string;
   cadet_id: number;
+  cadet_static_id?: string | null;
   instructor_name: string;
 }
 

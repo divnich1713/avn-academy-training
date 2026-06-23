@@ -468,7 +468,13 @@ export async function startReviewRequest(id: number) {
 
 export async function fetchGrades(): Promise<Grade[]> {
   await delay();
-  return [...GRADES].reverse();
+  return GRADES.map((g) => {
+    const cadet = USERS.find((u) => u.id === g.cadet_id);
+    return {
+      ...g,
+      cadet_static_id: cadet?.static_id || null,
+    };
+  }).reverse();
 }
 
 export async function createGrade(payload: {

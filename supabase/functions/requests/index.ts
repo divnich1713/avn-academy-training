@@ -402,7 +402,7 @@ export default async function handler(req: Request): Promise<Response> {
       if (isInstructor(user.role)) {
         query = `
           SELECT g.id, g.subject, g.type, g.grade, g.comment, g.graded_at,
-                 u.name as cadet_name, u.rank as cadet_rank, u.id as cadet_id,
+                 u.name as cadet_name, u.rank as cadet_rank, u.id as cadet_id, u.static_id as cadet_static_id,
                  i.name as instructor_name, g.instructor_promo_used
           FROM ${SCHEMA}.grades g
           JOIN ${SCHEMA}.users u ON g.user_id = u.id
@@ -412,7 +412,7 @@ export default async function handler(req: Request): Promise<Response> {
       } else {
         query = `
           SELECT g.id, g.subject, g.type, g.grade, g.comment, g.graded_at,
-                 u.name as cadet_name, u.rank as cadet_rank, u.id as cadet_id,
+                 u.name as cadet_name, u.rank as cadet_rank, u.id as cadet_id, u.static_id as cadet_static_id,
                  i.name as instructor_name
           FROM ${SCHEMA}.grades g
           JOIN ${SCHEMA}.users u ON g.user_id = u.id
