@@ -301,6 +301,17 @@ export async function startReviewRequest(id: number) {
   });
 }
 
+export async function cancelReviewRequest(id: number) {
+  if (USE_MOCK) {
+    const mock = await getMockApi();
+    return mock.cancelReviewRequest(id);
+  }
+  return safeFetch(`${REQUESTS_URL}?action=cancel_review&id=${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+  });
+}
+
 export async function fetchGrades(): Promise<Grade[]> {
   if (USE_MOCK) {
     const mock = await getMockApi();

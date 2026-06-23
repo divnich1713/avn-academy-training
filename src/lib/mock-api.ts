@@ -464,6 +464,29 @@ export async function startReviewRequest(id: number) {
   return { ok: true };
 }
 
+export async function cancelReviewRequest(id: number) {
+  await delay();
+  const req = REQUESTS.find((r) => r.id === id);
+  if (!req) throw new Error("Запрос не найден");
+  
+  req.status = "created";
+  req.instructor_id = null;
+  req.reviewer_name = null;
+  req.updated_at = new Date().toISOString();
+  
+  // Add notification to cadet
+  NOTIFICATIONS.push({
+    id: NOTIFICATIONS.length + 1,
+    type: "request_reviewed",
+    title: "Запрос возвращен в очередь",
+    message: `Инструктор отменил рассмотрение вашего запроса на тему "${req.subject}". Запрос возвращен в очередь.`,
+    is_read: false,
+    created_at: new Date().toISOString(),
+  });
+  
+  return { ok: true };
+}
+
 // ─── Grades API ─────────────────────────────────────────────────────────────
 
 export async function fetchGrades(): Promise<Grade[]> {

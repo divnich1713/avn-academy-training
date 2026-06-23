@@ -246,6 +246,73 @@ export default async function handler(req: Request): Promise<Response> {
       });
     }
 
+    // ===== PUT /requests?action=cancel_review — инструктор отказывается от рассмотрения =====
+    if (method === "PUT" && action === "cancel_review") {
+      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"].includes(r);
+      if (!isInstructor(user.role)) {
+        return new Response(JSON.stringify({ error: "Только для инструкторов" }), {
+          status: 403,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      const requestId = url.searchParams.get("id");
+      if (!requestId || !/^\d+$/.test(requestId)) {
+        return new Response(JSON.stringify({ error: "Неверный ID запроса" }), {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      // Check current request status and instructor
+      const checkRes = await client.queryObject<{ status: string, user_id: number, instructor_id: number, subject: string }>(
+        `SELECT status, user_id, instructor_id, subject FROM ${SCHEMA}.requests WHERE id = $1`,
+        [Number(requestId)]
+      );
+      if (checkRes.rows.length === 0) {
+        return new Response(JSON.stringify({ error: "Запрос не найден" }), {
+          status: 404,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      const reqInfo = checkRes.rows[0];
+
+      // Only the assigned instructor or head/deputy/chief can cancel the review
+      const canCancel = reqInfo.instructor_id === user.id || ["head_avng", "deputy_head", "chief_instructor", "senior_ufsvng"].includes(user.role);
+      if (!canCancel) {
+        return new Response(JSON.stringify({ error: "Вы не можете отменить чужое рассмотрение" }), {
+          status: 403,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
+      // Update request: reset status back to created and clear instructor/reviewer fields
+      await client.queryArray(
+        `UPDATE ${SCHEMA}.requests
+         SET status = 'created', instructor_id = NULL, reviewed_by = NULL, updated_at = NOW()
+         WHERE id = $1`,
+        [Number(requestId)]
+      );
+
+      // Create notification for cadet that the review was cancelled/returned to queue
+      const cadetId = reqInfo.user_id;
+      const subject = reqInfo.subject;
+      const notifTitle = "Запрос возвращен в очередь";
+      const notifMessage = `Инструктор ${user.name} отменил рассмотрение вашего запроса на тему "${subject}". Запрос возвращен в очередь и будет принят другим инструктором.`;
+
+      await client.queryArray(
+        `INSERT INTO ${SCHEMA}.notifications (user_id, type, title, message)
+         VALUES ($1, $2, $3, $4)`,
+        [cadetId, "request_reviewed", notifTitle, notifMessage]
+      );
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+      });
+    }
+
     // ===== PUT /requests?action=review — инструктор одобряет/отклоняет =====
     if (method === "PUT" && action === "review") {
       const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"].includes(r);

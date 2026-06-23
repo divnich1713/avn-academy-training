@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, Fragment } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Icon from "@/components/ui/icon";
 import { SectionHeader, StatCard, StatusBadge, GradeCircle, OnlineStatus, InstructorAvatar } from "./UIComponents";
-import { User, reviewRequest, startReviewRequest, TrainingRequest } from "@/lib/api";
+import { User, reviewRequest, startReviewRequest, cancelReviewRequest, TrainingRequest } from "@/lib/api";
 import { useRequests, useGrades, useAdminUsers, usePromotionReports, queryKeys, useDeleteUser } from "@/lib/useQueries";
 import { TYPE_LABEL, fmt, Spinner, Empty, fmtStaticId, renderTextWithLinks } from "./SectionsShared";
 import { PromotionInstructorTab } from "./Promotions";
@@ -187,6 +187,18 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       await refetchRequests();
     } catch (err: any) {
       alert("Ошибка при принятии заявки на рассмотрение: " + err.message);
+    } finally {
+      setReviewLoading((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const handleCancelReview = async (id: number) => {
+    setReviewLoading((prev) => ({ ...prev, [id]: true }));
+    try {
+      await cancelReviewRequest(id);
+      await refetchRequests();
+    } catch (err: any) {
+      alert("Ошибка при отказе от заявки: " + err.message);
     } finally {
       setReviewLoading((prev) => ({ ...prev, [id]: false }));
     }
@@ -742,6 +754,14 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                   className="rank-badge text-red-400 border border-red-800 px-3 py-1 hover:bg-red-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
                 >
                   <Icon name="X" size={12} />Отклонить
+                </button>
+                <button
+                  type="button"
+                  disabled={reviewLoading[r.id]}
+                  onClick={() => handleCancelReview(r.id)}
+                  className="rank-badge text-yellow-500 border border-yellow-800 px-3 py-1 hover:bg-yellow-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
+                >
+                  <Icon name="Undo" size={12} />Отказаться
                 </button>
                  {reviewLoading[r.id] && <Icon name="Loader2" size={14} className="text-primary animate-spin" />}
               </div>
