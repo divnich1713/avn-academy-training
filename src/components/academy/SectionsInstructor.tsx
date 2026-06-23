@@ -63,6 +63,14 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
     }
   }, [highlightReportId]);
 
+  useEffect(() => {
+    if (highlightRequestId) {
+      setActiveTab("requests");
+      setFilterStatus("all");
+      setSelectedReqDate("all");
+    }
+  }, [highlightRequestId]);
+
   // --- Requests tab ---
   // --- Requests tab --- P1-6: React Query
   const queryClient = useQueryClient();
@@ -73,7 +81,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   const [reviewStartScreenshot, setReviewStartScreenshot] = useState<Record<number, string>>({});
   const [reviewEndScreenshot, setReviewEndScreenshot] = useState<Record<number, string>>({});
   const [filterType, setFilterType] = useState<string>("all");
-  const [filterStatus, setFilterStatus] = useState<string>("pending");
+  const [filterStatus, setFilterStatus] = useState<string>("created");
   const [filterInstructor, setFilterInstructor] = useState<string>("all");
 
 
@@ -345,7 +353,19 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
         }
         return true;
       })
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      .sort((a, b) => {
+        const getPriority = (status: string) => {
+          if (status === "created") return 1;
+          if (status === "pending") return 2;
+          if (status === "approved") return 3;
+          if (status === "rejected") return 4;
+          return 5;
+        };
+        const pA = getPriority(a.status);
+        const pB = getPriority(b.status);
+        if (pA !== pB) return pA - pB;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
   }, [allRequestsPlusDismissals, filterType, filterStatus, selectedReqDate, filterInstructor, authUser.id]);
 
   const pendingCount = allRequestsPlusDismissals.filter((r) => r.status === "created" || r.status === "pending").length;
