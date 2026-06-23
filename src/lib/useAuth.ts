@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { apiMe, apiLogout, User, getToken } from "./api";
 
 export function useAuth() {
@@ -43,17 +43,17 @@ export function useAuth() {
     };
   }, []);
 
-  const login = (u: User) => setUser(u);
+  const login = useCallback((u: User) => setUser(u), []);
 
-  const reloadUser = async () => {
+  const reloadUser = useCallback(async () => {
     const u = await apiMe();
     setUser(u);
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     await apiLogout();
     setUser(null);
-  };
+  }, []);
 
   return { user, loading, login, reloadUser, logout };
 }

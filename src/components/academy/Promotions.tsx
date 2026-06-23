@@ -145,7 +145,8 @@ export function PromotionSection({ authUser, onReloadUser }: { authUser: User; o
     if (onReloadUser) {
       onReloadUser();
     }
-  }, [onReloadUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (authUser.role !== "cadet") {
     return <InstructorPromotionSection authUser={authUser} />;
@@ -1368,6 +1369,11 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
     if (instReportIdParam && reports.length > 0) {
       setExpandedId(Number(instReportIdParam));
       setActiveSubTab("review");
+      
+      params.delete("instructorReportId");
+      const newSearch = params.toString();
+      const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : "");
+      window.history.replaceState({}, document.title, newUrl);
     }
   }, [reports]);
 
