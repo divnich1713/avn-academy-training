@@ -140,7 +140,13 @@ export function MilitaryReport({
 // ═══════════════════════════════════════════════════════════════════════════════
 // PROMOTION SECTION (CADET VIEW)
 // ═══════════════════════════════════════════════════════════════════════════════
-export function PromotionSection({ authUser }: { authUser: User }) {
+export function PromotionSection({ authUser, onReloadUser }: { authUser: User; onReloadUser?: () => void }) {
+  useEffect(() => {
+    if (onReloadUser) {
+      onReloadUser();
+    }
+  }, [onReloadUser]);
+
   if (authUser.role !== "cadet") {
     return <InstructorPromotionSection authUser={authUser} />;
   }
@@ -1203,6 +1209,13 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
   }, [currentRank, targetRank, gratitude, gratitudeLink, entries, replacements, replacementLinks, authUser.id]);
 
   const isLeadership = ["head_avng", "chief_instructor", "deputy_head"].includes(authUser.role);
+
+  useEffect(() => {
+    const matched = INSTRUCTOR_RANKS.find(r => r.toLowerCase() === authUser.rank.toLowerCase());
+    if (matched) {
+      _setCurrentRank(matched);
+    }
+  }, [authUser.rank]);
 
   useEffect(() => {
     const idx = INSTRUCTOR_RANKS.indexOf(currentRank);

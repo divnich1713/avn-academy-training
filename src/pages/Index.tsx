@@ -199,7 +199,7 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
       case "exams": return <Exams authUser={authUser} highlightRequestId={highlightRequestId} />;
       case "reports": return <Reports authUser={authUser} highlightRequestId={highlightRequestId} />;
       case "grades": return <Grades authUser={authUser} />;
-      case "promotions": return <PromotionSection authUser={authUser} />;
+      case "promotions": return <PromotionSection authUser={authUser} onReloadUser={onReloadUser} />;
       case "profile": return <Profile authUser={authUser} targetUser={selectedCadet || undefined} onNavigate={navigateTo} />;
       case "ratings": return <InstructorRatings authUser={authUser} />;
       case "instructors": return <Instructors onNavigate={navigateTo} />;
