@@ -265,8 +265,9 @@ export default async function handler(req: Request): Promise<Response> {
       let query = "";
       const params: any[] = [];
 
-      if (user.role === "head_avng") {
-        // Нач.АВНГ видит все отчеты для проверки
+      const canReview = user.role === "head_avng" || user.role === "senior_ufsvng";
+      if (canReview) {
+        // Нач.АВНГ и Руководство УФСВНГ видят все отчеты для проверки
         query = `
           SELECT wr.id, wr.user_id, wr.week_start, wr.items, wr.total_points, wr.status,
                  wr.reviewer_comment, wr.reviewed_at, wr.created_at,
@@ -353,12 +354,12 @@ export default async function handler(req: Request): Promise<Response> {
       );
       const newId = insertRes.rows[0].id;
 
-      // Уведомление руководству АВНГ о новом отчете
+      // Уведомление руководству АВНГ и УФСВНГ о новом отчете
       await client.queryArray(
         `INSERT INTO ${SCHEMA}.notifications (user_id, type, title, message)
          SELECT id, 'weekly_report_submitted', $1, $2
          FROM ${SCHEMA}.users
-         WHERE role IN ('head_avng', 'chief_instructor', 'deputy_head')`,
+         WHERE role IN ('head_avng', 'chief_instructor', 'deputy_head', 'senior_ufsvng')`,
         [
           `Новый еженедельный отчёт`,
           `Инструктор ${user.name} подал еженедельный отчёт за неделю с ${weekStartStr} (${calculatedPoints} баллов).`
@@ -373,8 +374,9 @@ export default async function handler(req: Request): Promise<Response> {
 
     // ===== PUT /weekly-reports?action=review&id=N — проверка отчёта =====
     if (method === "PUT" && action === "review") {
-      if (user.role !== "head_avng") {
-        return new Response(JSON.stringify({ error: "Доступ запрещен. Только Начальник АВНГ может проверять отчёты." }), {
+      const canReview = user.role === "head_avng" || user.role === "senior_ufsvng";
+      if (!canReview) {
+        return new Response(JSON.stringify({ error: "Доступ запрещен. Только Начальник АВНГ и Руководство УФСВНГ могут проверять отчёты." }), {
           status: 403,
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
         });

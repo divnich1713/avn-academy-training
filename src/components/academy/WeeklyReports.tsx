@@ -210,6 +210,7 @@ export function WeeklyReports({ authUser }: { authUser: User }) {
 
   const [savingSettings, setSavingSettings] = useState(false);
   const isHeadAvng = authUser.role === "head_avng";
+  const canReviewReports = authUser.role === "head_avng" || authUser.role === "senior_ufsvng";
 
   // Dynamic Settings Modifiers
   const handleActivityLabelChange = (index: number, label: string) => {
@@ -531,7 +532,7 @@ export function WeeklyReports({ authUser }: { authUser: User }) {
             </span>
           )}
         </button>
-        {isHeadAvng && (
+        {canReviewReports && (
           <button
             onClick={() => setActiveTab("review")}
             className={`font-oswald text-sm tracking-widest uppercase px-5 py-3 transition-colors border-b-2 relative ${
@@ -777,7 +778,7 @@ export function WeeklyReports({ authUser }: { authUser: User }) {
       )}
 
       {/* Review Tab */}
-      {activeTab === "review" && isHeadAvng && (
+      {activeTab === "review" && canReviewReports && (
         <div className="space-y-6">
           {loading ? (
             <Spinner />
