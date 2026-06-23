@@ -741,7 +741,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
       <div className="flex gap-1 border-b border-tactical-border overflow-x-auto">
         {([
           { id: "requests", label: "Запросы" },
-          { id: "promotions", label: "Повышения" },
+          { id: "promotions", label: "Повышения курсантов" },
           { id: "grades", label: "Оценки" },
           { id: "cadets", label: "Курсанты" },
           { id: "expired", label: "Просроченные" },
