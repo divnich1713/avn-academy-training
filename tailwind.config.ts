@@ -20,9 +20,9 @@ export default {
 		},
 		extend: {
 			fontFamily: {
-				oswald: ['Oswald', 'sans-serif'],
-				ibm: ['"IBM Plex Sans"', 'sans-serif'],
-				mono: ['"IBM Plex Mono"', 'monospace'],
+				oswald: ['var(--font-oswald)', 'Oswald', 'sans-serif'],
+				ibm: ['var(--font-ibm)', '"IBM Plex Sans"', 'sans-serif'],
+				mono: ['var(--font-mono)', '"IBM Plex Mono"', 'monospace'],
 			},
 			colors: {
 				border: 'hsl(var(--border))',

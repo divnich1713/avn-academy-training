@@ -216,11 +216,11 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
     <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
       {/* Russia Guard watermark right side background */}
       <div 
-        className="fixed top-12 right-0 w-[500px] h-[500px] bg-contain bg-right-top bg-no-repeat opacity-5 pointer-events-none z-0"
+        className="fixed top-12 right-0 w-[500px] h-[500px] bg-contain bg-right-top bg-no-repeat pointer-events-none z-0 tactical-watermark"
         style={{ backgroundImage: 'url("/rosgvardia_emblem_color.webp")' }}
       />
       <div 
-        className="fixed inset-0 bg-cover bg-center opacity-10 pointer-events-none z-0"
+        className="fixed inset-0 bg-cover bg-center pointer-events-none z-0 tactical-bg-camo"
         style={{ 
           backgroundImage: 'url("/academy_bg.webp")'
         }}

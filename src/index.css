@@ -42,6 +42,17 @@
     --sidebar-accent-foreground: 15 15% 82%;
     --sidebar-border: 0 14% 16%;
     --sidebar-ring: 355 65% 38%;
+
+    /* Custom theme and readability variables */
+    --font-ibm: "IBM Plex Sans", sans-serif;
+    --font-oswald: "Oswald", sans-serif;
+    --font-mono: "IBM Plex Mono", monospace;
+    
+    --bg-overlay-opacity: 0.85;
+    --scanline-opacity: 0.015;
+    --scanline-color-rgb: 140, 30, 40;
+    --line-height-body: 1.5;
+    --font-weight-body: 400;
   }
 }
 
@@ -52,15 +63,17 @@
 
   body {
     @apply bg-background text-foreground font-ibm;
+    line-height: var(--line-height-body, 1.5);
+    font-weight: var(--font-weight-body, 400);
     background-image: 
       repeating-linear-gradient(
         0deg,
         transparent,
         transparent 2px,
-        rgba(140, 30, 40, 0.015) 2px,
-        rgba(140, 30, 40, 0.015) 4px
+        rgba(var(--scanline-color-rgb, 140, 30, 40), var(--scanline-opacity, 0.015)) 2px,
+        rgba(var(--scanline-color-rgb, 140, 30, 40), var(--scanline-opacity, 0.015)) 4px
       ),
-      linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)),
+      linear-gradient(rgba(0,0,0,var(--bg-overlay-opacity, 0.85)), rgba(0,0,0,var(--bg-overlay-opacity, 0.85))),
       url("/academy_bg.webp");
     background-attachment: fixed;
     background-size: cover;
@@ -218,6 +231,16 @@
   }
   .rotate-y-180 {
     transform: rotateY(180deg);
+  }
+
+  .tactical-watermark {
+    opacity: var(--watermark-opacity, 0.05);
+    transition: opacity 0.3s ease;
+  }
+
+  .tactical-bg-camo {
+    opacity: calc((1 - var(--bg-overlay-opacity, 0.85)) * 0.6);
+    transition: opacity 0.3s ease;
   }
 }
 

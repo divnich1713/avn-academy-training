@@ -4,6 +4,7 @@ import { User } from "@/lib/api";
 import { NotificationBell } from "./NotificationBell";
 import { InstructorAvatar } from "./UIComponents";
 import { fmtStaticId } from "./SectionsShared";
+import { ThemeCustomizer } from "./ThemeCustomizer";
 
 interface AppHeaderProps {
   role: UserRole;
@@ -70,12 +71,13 @@ export function AppHeader({
         {/* Middle Header Icons */}
         <div className="hidden lg:flex items-center gap-4 px-4 py-1 border-x border-tactical-border/40">
           <NotificationBell onNavigate={onNavigate} />
+          <ThemeCustomizer />
           <button
             onClick={onLogout}
             title="Выйти"
-            className="text-muted-foreground hover:text-red-500 transition-colors"
+            className="text-muted-foreground hover:text-red-500 transition-colors flex items-center justify-center p-1.5 border border-tactical-border/40 hover:border-red-500/50 bg-tactical-panel/40 rounded-sm"
           >
-            <Icon name="LogOut" size={18} />
+            <Icon name="LogOut" size={17} />
           </button>
         </div>
 
@@ -84,12 +86,13 @@ export function AppHeader({
           {/* Mobile/Tablet action buttons next to profile box */}
           <div className="flex lg:hidden items-center gap-2 mr-1 sm:mr-2">
             <NotificationBell onNavigate={onNavigate} />
+            <ThemeCustomizer />
             <button
               onClick={onLogout}
               title="Выйти"
-              className="text-muted-foreground hover:text-red-500 transition-colors"
+              className="text-muted-foreground hover:text-red-500 transition-colors flex items-center justify-center p-1.5 border border-tactical-border/40 hover:border-red-500/50 bg-tactical-panel/40 rounded-sm"
             >
-              <Icon name="LogOut" size={18} />
+              <Icon name="LogOut" size={17} />
             </button>
           </div>
 
