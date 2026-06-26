@@ -1,6 +1,10 @@
 /**
  * P1-6: Shared React Query hooks — replaces manual useEffect + useState patterns
  * with TanStack Query for automatic caching, deduplication, and background refetch.
+ *
+ * P2: Accelerated polling — requests every 10s, notifications every 8s when tab
+ * is active. Falls back to 60s when the tab is hidden (visibility-aware).
+ * Instant refetch on window focus via refetchOnWindowFocus.
  */
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -26,6 +30,7 @@ import {
   User,
   InstructorRating,
 } from "@/lib/api";
+import { useSmartRefetchInterval } from "@/lib/useSmartPolling";
 
 // ─── Query Keys ──────────────────────────────────────────────────────────────
 export const queryKeys = {
@@ -39,24 +44,35 @@ export const queryKeys = {
   instructorPromotionConfig: ["instructorPromotionConfig"] as const,
 };
 
+// ─── Helper: invalidate all core data after a mutation ────────────────────────
+function invalidateCore(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: queryKeys.requests });
+  qc.invalidateQueries({ queryKey: queryKeys.notifications });
+  qc.invalidateQueries({ queryKey: queryKeys.grades });
+}
+
 // ─── Query Hooks ─────────────────────────────────────────────────────────────
 
 export function useRequests() {
+  const interval = useSmartRefetchInterval(10_000, 60_000);
   return useQuery({
     queryKey: queryKeys.requests,
     queryFn: fetchRequests,
-    staleTime: 60_000,        // Fresh for 60 seconds
-    refetchInterval: 120_000, // Background refetch every 120s
+    staleTime: 5_000,              // Fresh for 5 seconds (was 60s)
+    refetchInterval: interval,     // 10s active / 60s hidden (was 120s)
+    refetchOnWindowFocus: true,    // Instant refetch when switching back
     placeholderData: [] as TrainingRequest[],
   });
 }
 
 export function useGrades() {
+  const interval = useSmartRefetchInterval(30_000, 120_000);
   return useQuery({
     queryKey: queryKeys.grades,
     queryFn: fetchGrades,
-    staleTime: 60_000,        // Fresh for 60 seconds
-    refetchInterval: 120_000, // Background refetch every 120s
+    staleTime: 10_000,             // Fresh for 10 seconds (was 60s)
+    refetchInterval: interval,     // 30s active / 120s hidden (was 120s)
+    refetchOnWindowFocus: true,
     placeholderData: [] as Grade[],
   });
 }
@@ -80,20 +96,25 @@ export function useRatings(timeframe: "daily" | "weekly" | "monthly" | "yearly" 
 }
 
 export function useNotifications() {
+  const interval = useSmartRefetchInterval(8_000, 60_000);
   return useQuery({
     queryKey: queryKeys.notifications,
     queryFn: fetchNotifications,
-    staleTime: 15_000,
-    refetchInterval: 30_000,
+    staleTime: 3_000,              // Fresh for 3 seconds (was 15s)
+    refetchInterval: interval,     // 8s active / 60s hidden (was 30s)
+    refetchOnWindowFocus: true,    // Instant refetch when switching back
     placeholderData: { notifications: [], unread_count: 0 },
   });
 }
 
 export function usePromotionReports() {
+  const interval = useSmartRefetchInterval(30_000, 120_000);
   return useQuery({
     queryKey: queryKeys.promotionReports,
     queryFn: fetchPromotionReports,
-    staleTime: 60_000,        // Fresh for 60 seconds
+    staleTime: 10_000,             // (was 60s)
+    refetchInterval: interval,     // 30s active / 120s hidden (was none)
+    refetchOnWindowFocus: true,
     placeholderData: [],
   });
 }
@@ -103,6 +124,7 @@ export function useAdminUsers() {
     queryKey: queryKeys.adminUsers,
     queryFn: adminListUsers,
     staleTime: 120_000,       // Whitelist users fresh for 2 minutes
+    refetchOnWindowFocus: true,
     placeholderData: [],
   });
 }
@@ -114,8 +136,8 @@ export function useCreateRequest() {
   return useMutation({
     mutationFn: createRequest,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.requests });
-      qc.invalidateQueries({ queryKey: queryKeys.notifications });
+      // Cascade: new request → refresh requests list + notifications for instructors
+      invalidateCore(qc);
     },
   });
 }
@@ -126,8 +148,8 @@ export function useReviewRequest() {
     mutationFn: ({ id, status, comment }: { id: number; status: "approved" | "rejected"; comment?: string }) =>
       reviewRequest(id, status, comment),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.requests });
-      qc.invalidateQueries({ queryKey: queryKeys.notifications });
+      // Cascade: review creates notifications + auto-grades
+      invalidateCore(qc);
     },
   });
 }
@@ -137,9 +159,8 @@ export function useCreateGrade() {
   return useMutation({
     mutationFn: createGrade,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.grades });
-      qc.invalidateQueries({ queryKey: queryKeys.requests });
-      qc.invalidateQueries({ queryKey: queryKeys.notifications });
+      // Cascade: grade creation may trigger notifications
+      invalidateCore(qc);
     },
   });
 }
@@ -170,8 +191,9 @@ export function useReviewPromotion() {
     mutationFn: ({ id, status, comment }: { id: number; status: "approved" | "rejected"; comment?: string }) =>
       reviewPromotionReport(id, status, comment),
     onSuccess: () => {
+      // Cascade: promotion review notifies cadet
       qc.invalidateQueries({ queryKey: queryKeys.promotionReports });
-      qc.invalidateQueries({ queryKey: queryKeys.requests });
+      invalidateCore(qc);
     },
   });
 }
@@ -182,6 +204,7 @@ export function useCreatePromotionReport() {
     mutationFn: createPromotionReport,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.promotionReports });
+      qc.invalidateQueries({ queryKey: queryKeys.notifications });
     },
   });
 }
