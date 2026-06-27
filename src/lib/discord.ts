@@ -615,9 +615,11 @@ export async function sendPromotionReviewedDiscord({
   reportId: number;
   cadetDiscordId?: string;
 }) {
-  const webhookUrl = 
-    import.meta.env.VITE_DISCORD_PROMOTION_APPROVED_WEBHOOK_URL || 
-    "https://discord.com/api/webhooks/1517165782377697330/dmXqCUJzD_2xp8HE-bwFsLtuOUTAtgjR6vxGeuyG5GT-NJ0ddHAWhAO5i9PDxLjzB9WH";
+  const webhookUrl = import.meta.env.VITE_DISCORD_PROMOTION_APPROVED_WEBHOOK_URL;
+  if (!webhookUrl) {
+    console.warn("Discord promotion approved webhook is not configured.");
+    return;
+  }
 
   const formattedStaticId = fmtStaticId(staticId);
   const targetRankLabel = promotionType === "junior_sergeant" ? "Младшего сержанта" : "Сержанта";
@@ -819,9 +821,11 @@ export async function sendInstructorPromotionReviewedDiscord({
   reportId: number;
   instructorDiscordId?: string;
 }) {
-  const webhookUrl = 
-    import.meta.env.VITE_DISCORD_PROMOTION_APPROVED_WEBHOOK_URL || 
-    "https://discord.com/api/webhooks/1517165782377697330/dmXqCUJzD_2xp8HE-bwFsLtuOUTAtgjR6vxGeuyG5GT-NJ0ddHAWhAO5i9PDxLjzB9WH";
+  const webhookUrl = import.meta.env.VITE_DISCORD_PROMOTION_APPROVED_WEBHOOK_URL;
+  if (!webhookUrl) {
+    console.warn("Discord instructor promotion approved webhook is not configured.");
+    return;
+  }
 
   const formattedStaticId = fmtStaticId(staticId);
   const systemUrl = typeof window !== "undefined" ? window.location.origin : "https://avn-academy.ru";

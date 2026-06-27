@@ -30,6 +30,9 @@ export default defineConfig(({mode}) => {
     const supabaseApiUrl = env.VITE_SUPABASE_API_URL || 'http://localhost:54321';
 
     return {
+        define: mode === 'production' ? {
+            'import.meta.env.VITE_USE_MOCK': JSON.stringify('false')
+        } : {},
         plugins: [
             react(),
             hmrKeepalive,
@@ -50,10 +53,26 @@ export default defineConfig(({mode}) => {
             },
         },
         build: {
+            sourcemap: false, // Ensure source maps are disabled for production builds
             rollupOptions: {
                 output: {
                     manualChunks(id) {
                         if (id.includes('node_modules')) {
+                            if (id.includes('d3')) {
+                                return 'vendor-d3';
+                            }
+                            if (id.includes('recharts')) {
+                                return 'vendor-recharts';
+                            }
+                            if (id.includes('date-fns')) {
+                                return 'vendor-date-fns';
+                            }
+                            if (id.includes('lucide-react')) {
+                                return 'vendor-icons';
+                            }
+                            if (id.includes('@radix-ui') || id.includes('radix-ui')) {
+                                return 'vendor-radix';
+                            }
                             if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
                                 return 'vendor-react';
                             }

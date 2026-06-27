@@ -236,3 +236,66 @@ export function useSaveInstructorPromotionConfig() {
     },
   });
 }
+
+import { testingApi } from "@/lib/testingApi";
+
+export function useAuditLogs(skip: number = 0, limit: number = 50, action?: string, operator?: string) {
+  return useQuery({
+    queryKey: ["adminAuditLogs", skip, limit, action, operator],
+    queryFn: () => testingApi.getAuditLogs(skip, limit, action, operator),
+    staleTime: 10_000,
+  });
+}
+
+export function useAnalyticsSummary() {
+  return useQuery({
+    queryKey: ["adminAnalyticsSummary"],
+    queryFn: () => testingApi.getAnalyticsSummary(),
+    staleTime: 30_000,
+  });
+}
+
+export function useMonitoringAlerts() {
+  return useQuery({
+    queryKey: ["adminMonitoringAlerts"],
+    queryFn: () => testingApi.getMonitoringAlerts(),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useBulkUpdateUsers() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      user_ids: number[];
+      rank?: string | null;
+      unit?: string | null;
+      role?: string | null;
+      action?: string | null;
+      reason?: string | null;
+    }) => testingApi.bulkUpdateUsers(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminUsers });
+      qc.invalidateQueries({ queryKey: ["adminAnalyticsSummary"] });
+      qc.invalidateQueries({ queryKey: ["adminMonitoringAlerts"] });
+    },
+  });
+}
+
+export function useBulkImportUsers() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (cadets: Array<{
+      static_id: string;
+      name: string;
+      rank?: string;
+      unit?: string;
+      password?: string;
+    }>) => testingApi.bulkImportUsers(cadets),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminUsers });
+      qc.invalidateQueries({ queryKey: ["adminAnalyticsSummary"] });
+    },
+  });
+}

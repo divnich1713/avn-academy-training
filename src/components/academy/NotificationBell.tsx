@@ -9,7 +9,7 @@ function playNotificationSound() {
   try {
     const enabled = localStorage.getItem("avng_notification_sound") !== "false";
     if (!enabled) return;
-    const audio = new Audio("/shutdown-beep.mp3");
+    const audio = new Audio("/social-media-logout-sound.mp3");
     audio.volume = 0.45;
     audio.play();
   } catch (_e) { /* silent */ }

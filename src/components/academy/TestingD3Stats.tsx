@@ -1,5 +1,10 @@
 import { useEffect, useRef } from "react";
-import * as d3 from "d3";
+import { select } from "d3-selection";
+import { scaleBand, scaleLinear, scaleOrdinal } from "d3-scale";
+import { pie, arc } from "d3-shape";
+import { axisBottom, axisLeft } from "d3-axis";
+import { max } from "d3-array";
+import { interpolate } from "d3-interpolate";
 import { TimePerQuestion, ScoreDistribution } from "@/lib/testingApi";
 
 interface StatsProps {
@@ -33,14 +38,13 @@ function TimePerQuestionChart({ data }: { data: TimePerQuestion[] }) {
   useEffect(() => {
     if (!containerRef.current || !data || data.length === 0) return;
 
-    d3.select(containerRef.current).selectAll("*").remove();
+    select(containerRef.current).selectAll("*").remove();
 
     const margin = { top: 20, right: 20, bottom: 40, left: 40 };
     const width = containerRef.current.clientWidth - margin.left - margin.right;
     const height = 240 - margin.top - margin.bottom;
 
-    const svg = d3
-      .select(containerRef.current)
+    const svg = select(containerRef.current)
       .append("svg")
       .attr("width", width + margin.left + margin.right)
       .attr("height", height + margin.top + margin.bottom)
@@ -56,16 +60,14 @@ function TimePerQuestionChart({ data }: { data: TimePerQuestion[] }) {
     };
 
     // X Scale (Question types)
-    const x = d3
-      .scaleBand()
+    const x = scaleBand()
       .domain(data.map((d) => typeLabels[d.type] || d.type))
       .range([0, width])
       .padding(0.4);
 
     // Y Scale (Average time in seconds)
-    const y = d3
-      .scaleLinear()
-      .domain([0, d3.max(data, (d) => d.avg_time_seconds) || 60])
+    const y = scaleLinear()
+      .domain([0, max(data, (d) => d.avg_time_seconds) || 60])
       .nice()
       .range([height, 0]);
 
@@ -73,7 +75,7 @@ function TimePerQuestionChart({ data }: { data: TimePerQuestion[] }) {
     svg
       .append("g")
       .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(x))
+      .call(axisBottom(x))
       .call((g) => g.select(".domain").attr("stroke", "rgba(255, 255, 255, 0.1)"))
       .call((g) => g.selectAll(".tick line").remove())
       .call((g) =>
@@ -83,7 +85,7 @@ function TimePerQuestionChart({ data }: { data: TimePerQuestion[] }) {
     // Y Axis
     svg
       .append("g")
-      .call(d3.axisLeft(y).ticks(5).tickSize(-width))
+      .call(axisLeft(y).ticks(5).tickSize(-width))
       .call((g) => g.select(".domain").remove())
       .call((g) =>
         g.selectAll(".tick line").attr("stroke", "rgba(255, 255, 255, 0.05)")
@@ -147,22 +149,20 @@ function ScoreDistributionChart({ data }: { data: ScoreDistribution[] }) {
   useEffect(() => {
     if (!containerRef.current || !data || data.length === 0) return;
 
-    d3.select(containerRef.current).selectAll("*").remove();
+    select(containerRef.current).selectAll("*").remove();
 
     const width = containerRef.current.clientWidth;
     const height = 240;
     const radius = Math.min(width, height) / 2 - 20;
 
-    const svg = d3
-      .select(containerRef.current)
+    const svg = select(containerRef.current)
       .append("svg")
       .attr("width", width)
       .attr("height", height)
       .append("g")
       .attr("transform", `translate(${width / 2},${height / 2})`);
 
-    const color = d3
-      .scaleOrdinal<string>()
+    const color = scaleOrdinal<string>()
       .domain(data.map((d) => d.bucket))
       .range([
         "rgba(239, 68, 68, 0.6)",   // Red (0-20%)
@@ -172,24 +172,21 @@ function ScoreDistributionChart({ data }: { data: ScoreDistribution[] }) {
         "rgba(59, 130, 246, 0.6)"   // Blue (81-100%)
       ]);
 
-    const pie = d3
-      .pie<ScoreDistribution>()
+    const pieGenerator = pie<ScoreDistribution>()
       .value((d) => d.count)
       .sort(null);
 
-    const arc = d3
-      .arc<d3.PieArcDatum<ScoreDistribution>>()
+    const arcGenerator = arc<any>()
       .innerRadius(radius * 0.5) // Donut chart
       .outerRadius(radius);
 
-    const outerArc = d3
-      .arc<d3.PieArcDatum<ScoreDistribution>>()
+    const outerArcGenerator = arc<any>()
       .innerRadius(radius * 0.9)
       .outerRadius(radius * 0.9);
 
     const arcs = svg
       .selectAll(".arc")
-      .data(pie(data))
+      .data(pieGenerator(data))
       .enter()
       .append("g")
       .attr("class", "arc");
@@ -197,16 +194,16 @@ function ScoreDistributionChart({ data }: { data: ScoreDistribution[] }) {
     // Add path with slice animation
     arcs
       .append("path")
-      .attr("d", arc)
+      .attr("d", arcGenerator)
       .attr("fill", (d) => color(d.data.bucket))
       .attr("stroke", "#0e1520")
       .attr("stroke-width", 2)
       .transition()
       .duration(800)
       .attrTween("d", function (d) {
-        const i = d3.interpolate({ startAngle: 0, endAngle: 0 }, d);
+        const i = interpolate({ startAngle: 0, endAngle: 0 }, d);
         return function (t) {
-          return arc(i(t)) || "";
+          return arcGenerator(i(t)) || "";
         };
       });
 
@@ -214,7 +211,7 @@ function ScoreDistributionChart({ data }: { data: ScoreDistribution[] }) {
     arcs
       .filter((d) => d.data.count > 0)
       .append("text")
-      .attr("transform", (d) => `translate(${arc.centroid(d)})`)
+      .attr("transform", (d) => `translate(${arcGenerator.centroid(d)})`)
       .attr("dy", ".35em")
       .attr("text-anchor", "middle")
       .attr("fill", "#ffffff")
@@ -222,13 +219,12 @@ function ScoreDistributionChart({ data }: { data: ScoreDistribution[] }) {
       .style("font-family", "monospace")
       .text((d) => `${d.data.count}`);
 
-    // Simple legend below or overlay
-    // For space reasons, we add small text pointers
+    // Simple legend pointers
     arcs
       .filter((d) => d.data.count > 0)
       .append("text")
       .attr("transform", (d) => {
-        const pos = outerArc.centroid(d);
+        const pos = outerArcGenerator.centroid(d);
         pos[0] = radius * (midAngle(d) < Math.PI ? 1.05 : -1.05);
         return `translate(${pos})`;
       })
@@ -238,7 +234,7 @@ function ScoreDistributionChart({ data }: { data: ScoreDistribution[] }) {
       .style("font-family", "monospace")
       .text((d) => d.data.bucket);
       
-    function midAngle(d: d3.PieArcDatum<any>) {
+    function midAngle(d: any) {
       return d.startAngle + (d.endAngle - d.startAngle) / 2;
     }
   }, [data]);

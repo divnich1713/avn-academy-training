@@ -1,6 +1,27 @@
 import { Pool, Client } from "postgres";
 
 const SCHEMA = "t_p29017774_avn_academy_training";
+
+async function writeAuditLog(
+  client: Client,
+  operatorId: number,
+  operatorName: string,
+  action: string,
+  targetId: string | null,
+  targetName: string | null,
+  details: any
+) {
+  try {
+    await client.queryArray(
+      `INSERT INTO ${SCHEMA}.audit_logs (operator_id, operator_name, action, target_id, target_name, details, created_at) 
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+      [operatorId, operatorName, action, targetId, targetName, JSON.stringify(details)]
+    );
+  } catch (err) {
+    console.error("Error writing audit log:", err);
+  }
+}
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
@@ -217,6 +238,16 @@ export default async function handler(req: Request): Promise<Response> {
         [user.id, Number(requestId)]
       );
 
+      await writeAuditLog(
+        client,
+        user.id,
+        user.name,
+        "take_request_review",
+        requestId,
+        reqInfo.subject,
+        { type: reqInfo.type, status: "pending" }
+      );
+
       // Create notification for cadet with Surname, Name and channel instructions
       const cadetId = reqInfo.user_id;
       const subject = reqInfo.subject;
@@ -293,6 +324,16 @@ export default async function handler(req: Request): Promise<Response> {
          SET status = 'created', instructor_id = NULL, reviewed_by = NULL, updated_at = NOW()
          WHERE id = $1`,
         [Number(requestId)]
+      );
+
+      await writeAuditLog(
+        client,
+        user.id,
+        user.name,
+        "cancel_request_review",
+        requestId,
+        reqInfo.subject,
+        { status: "created" }
       );
 
       // Create notification for cadet that the review was cancelled/returned to queue
@@ -381,6 +422,17 @@ export default async function handler(req: Request): Promise<Response> {
         const reqType = reqRes.rows[0].type;
         const msgId = reqRes.rows[0].discord_message_id;
         const chanId = reqRes.rows[0].discord_channel_id;
+
+        await writeAuditLog(
+          client,
+          user.id,
+          user.name,
+          status === "approved" ? "approve_request" : "reject_request",
+          requestId,
+          subject,
+          { type: reqType, comment: comment || null }
+        );
+
         const statusText = status === "approved" ? "одобрен" : "отклонён";
         let notifMessage = `Инструктор ${user.name} ${statusText} ваш запрос на тему "${subject}".`;
         if (comment) {

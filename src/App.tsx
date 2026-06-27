@@ -11,10 +11,31 @@ import Icon from "@/components/ui/icon";
 const safeLazy = (importFn: () => Promise<any>) => {
   return lazy(async () => {
     try {
+      sessionStorage.removeItem("chunk_reload_count");
       return await importFn();
     } catch (error) {
-      console.error("Chunk loading failed, forcing page reload:", error);
-      window.location.reload();
+      console.error("Chunk loading failed:", error);
+      const reloads = parseInt(sessionStorage.getItem("chunk_reload_count") || "0", 10);
+      if (reloads < 3) {
+        sessionStorage.setItem("chunk_reload_count", (reloads + 1).toString());
+        window.location.reload();
+      } else {
+        console.error("Max chunk reload attempts reached. Rendering fallback error.");
+        return {
+          default: () => (
+            <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 text-center">
+              <h2 className="text-xl font-bold text-red-500 mb-2">Ошибка загрузки страницы</h2>
+              <p className="text-muted-foreground mb-4">Сетевой сбой или обновление приложения. Пожалуйста, обновите страницу.</p>
+              <button 
+                onClick={() => { sessionStorage.removeItem("chunk_reload_count"); window.location.reload(); }}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 font-mono text-xs uppercase"
+              >
+                Обновить вручную
+              </button>
+            </div>
+          )
+        };
+      }
       return { default: () => null };
     }
   });

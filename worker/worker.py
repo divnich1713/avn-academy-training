@@ -2,7 +2,9 @@ import os
 import json
 import time
 import re
+import hashlib
 import psycopg2
+from psycopg2.pool import ThreadedConnectionPool
 from psycopg2.extras import Json
 import redis
 import requests
@@ -16,12 +18,41 @@ SCHEMA = os.environ.get("SCHEMA", "t_p29017774_avn_academy_training")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 
-# Initialize Redis
+# Validate database schema identifier to prevent SQL injection vulnerabilities
+if not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", SCHEMA):
+    raise ValueError(f"CRITICAL: Invalid SCHEMA environment identifier: '{SCHEMA}'")
+
+# Initialize Redis client
 print(f"Connecting to Redis at {REDIS_URL}...")
-r_client = redis.from_url(REDIS_URL)
+r_client = redis.from_url(REDIS_URL, decode_responses=True)
+
+# Initialize Threaded Connection Pool for PostgreSQL to prevent TCP handshake overheads
+print("Initializing Postgres Threaded Connection Pool...")
+db_pool = ThreadedConnectionPool(
+    minconn=2,
+    maxconn=10,
+    dsn=DATABASE_URL
+)
 
 def get_db_connection():
-    return psycopg2.connect(DATABASE_URL)
+    return db_pool.getconn()
+
+def return_db_connection(conn):
+    db_pool.putconn(conn)
+
+def recover_stale_tasks():
+    """
+    Recover tasks stuck in the processing queue from previous worker crashes on startup.
+    Reliable Queue pattern (RPOPLPUSH).
+    """
+    recovered_count = 0
+    while True:
+        task = r_client.rpoplpush("essay_processing", "essay_queue")
+        if not task:
+            break
+        recovered_count += 1
+    if recovered_count > 0:
+        print(f"Startup recovery: moved {recovered_count} stale tasks back to the queue.")
 
 def analyze_essay_local(answer_text: str, criteria_list: list) -> tuple[float, dict, str]:
     """
@@ -90,16 +121,31 @@ def analyze_essay_local(answer_text: str, criteria_list: list) -> tuple[float, d
 
     return round(grade_percent, 1), scores, feedback
 
-def analyze_essay_openai(answer_text: str, criteria_list: list) -> tuple[float, dict, str]:
+def analyze_essay_openai(answer_text: str, criteria_list: list, max_retries: int = 3) -> tuple[float, dict, str]:
     """
-    Calls OpenAI API to grade the essay according to the rubric.
+    Calls OpenAI API with exponential backoff and Redis caching.
     """
+    # Redis cache check to reduce API costs for duplicate essays
+    criteria_str = json.dumps(criteria_list, sort_keys=True)
+    cache_payload = f"{answer_text.strip()}|||{criteria_str}"
+    cache_hash = hashlib.sha256(cache_payload.encode("utf-8")).hexdigest()
+    cache_key = f"essay_cache:{cache_hash}"
+    
+    try:
+        cached_val = r_client.get(cache_key)
+        if cached_val:
+            data = json.loads(cached_val)
+            print("OpenAI evaluation: CACHE HIT. Returning cached grade.")
+            return float(data["grade"]), data["scores"], data["feedback"]
+    except Exception as cache_err:
+        print(f"Redis cache check warning: {cache_err}")
+
+    # Call API if not cached
     headers = {
         "Authorization": f"Bearer {OPENAI_API_KEY}",
         "Content-Type": "application/json"
     }
     
-    # Prompt instructing output as JSON matching requirements
     prompt = f"""
     Вы являетесь строгим военным инструктором. Оцените следующий ответ курсанта на вопрос по 5 предоставленным критериям.
     Каждый критерий нужно оценить по шкале от 1 до 4 баллов (1 - Неудовлетворительно, 2 - Удовлетворительно, 3 - Хорошо, 4 - Отлично).
@@ -126,18 +172,46 @@ def analyze_essay_openai(answer_text: str, criteria_list: list) -> tuple[float, 
         "temperature": 0.2
     }
 
-    try:
-        resp = requests.post(f"{OPENAI_BASE_URL}/chat/completions", headers=headers, json=payload, timeout=15)
-        if resp.status_code == 200:
-            result = resp.json()
-            content = json.loads(result["choices"][0]["message"]["content"])
-            return float(content["grade"]), content["scores"], content["feedback"]
-        else:
-            print(f"OpenAI API error: {resp.status_code} - {resp.text}")
-    except Exception as e:
-        print(f"Failed to call OpenAI API: {e}")
+    url = f"{OPENAI_BASE_URL}/chat/completions"
+    
+    for attempt in range(max_retries):
+        try:
+            # Enforce 5s connect timeout and 30s read timeout
+            resp = requests.post(url, headers=headers, json=payload, timeout=(5, 30))
+            if resp.status_code == 200:
+                result = resp.json()
+                content = json.loads(result["choices"][0]["message"]["content"])
+                
+                # Validate response structure
+                grade = float(content.get("grade", 50.0))
+                grade = max(0.0, min(100.0, grade))
+                scores = content.get("scores", {crit: 2 for crit in criteria_list})
+                feedback = content.get("feedback", "Оценка выполнена автоматически.")
+                
+                # Save to cache for 7 days
+                try:
+                    r_client.set(cache_key, json.dumps({"grade": grade, "scores": scores, "feedback": feedback}), ex=86400 * 7)
+                except Exception as cache_err:
+                    print(f"Failed to cache response in Redis: {cache_err}")
+                
+                return grade, scores, feedback
+            elif resp.status_code in (429, 502, 503, 504):
+                wait_time = (2 ** attempt) * 2
+                print(f"OpenAI service warning ({resp.status_code}). Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                print(f"OpenAI API non-retryable error: {resp.status_code} - {resp.text}")
+                break
+        except requests.exceptions.Timeout:
+            wait_time = (2 ** attempt) * 2
+            print(f"OpenAI request timeout. Retrying in {wait_time}s...")
+            time.sleep(wait_time)
+        except Exception as e:
+            print(f"Failed to call OpenAI API: {e}")
+            break
 
-    # Return local analysis as fallback if OpenAI fails
+    # Fallback to local heuristic analysis
+    print("Falling back to local heuristic analysis after OpenAI failure.")
     return analyze_essay_local(answer_text, criteria_list)
 
 def process_task(task_data: dict):
@@ -156,31 +230,36 @@ def process_task(task_data: dict):
     else:
         grade, scores, feedback = analyze_essay_local(student_answer, criteria)
 
-    # Save results to DB
+    # Save results to DB (secured using schema quotes)
     is_correct = grade >= 60.0
     conn = None
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
+            # Update test answers
             cur.execute(
                 f"""
-                UPDATE {SCHEMA}.test_answers
+                UPDATE "{SCHEMA}".test_answers
                 SET is_correct = %s, grade = %s, feedback = %s, criteria_evaluation = %s
                 WHERE id = %s
                 """,
                 (is_correct, grade, feedback, Json(scores), answer_id)
             )
             
-            # Fetch attempt_id to verify if we should update attempt end_elo
+            # Fetch attempt_id and question_id
             cur.execute(
-                f"SELECT attempt_id, question_id FROM {SCHEMA}.test_answers WHERE id = %s",
+                f'SELECT attempt_id, question_id FROM "{SCHEMA}".test_answers WHERE id = %s',
                 (answer_id,)
             )
-            attempt_id, question_id = cur.fetchone()
+            fetch_res = cur.fetchone()
+            if not fetch_res:
+                conn.commit()
+                return
+            attempt_id, question_id = fetch_res
             
             # Recalculate overall average score for the attempt
             cur.execute(
-                f"SELECT grade FROM {SCHEMA}.test_answers WHERE attempt_id = %s AND grade IS NOT NULL",
+                f'SELECT grade FROM "{SCHEMA}".test_answers WHERE attempt_id = %s AND grade IS NOT NULL',
                 (attempt_id,)
             )
             all_grades = [float(row[0]) for row in cur.fetchall()]
@@ -188,7 +267,7 @@ def process_task(task_data: dict):
             
             # Fetch subject
             cur.execute(
-                f"SELECT subject FROM {SCHEMA}.test_questions WHERE id = %s",
+                f'SELECT subject FROM "{SCHEMA}".test_questions WHERE id = %s',
                 (question_id,)
             )
             subject = cur.fetchone()[0]
@@ -196,7 +275,7 @@ def process_task(task_data: dict):
             # Fetch question count limit from test_settings
             try:
                 cur.execute(
-                    f"SELECT question_count FROM {SCHEMA}.test_settings WHERE subject = %s",
+                    f'SELECT question_count FROM "{SCHEMA}".test_settings WHERE subject = %s',
                     (subject,)
                 )
                 settings_row = cur.fetchone()
@@ -204,31 +283,30 @@ def process_task(task_data: dict):
             except Exception:
                 q_limit = 30
 
-            # If all questions are answered, finalize the attempt
+            # Check if all questions are answered
             cur.execute(
-                f"SELECT count(id) FROM {SCHEMA}.test_answers WHERE attempt_id = %s",
+                f'SELECT count(id) FROM "{SCHEMA}".test_answers WHERE attempt_id = %s',
                 (attempt_id,)
             )
             answered_count = cur.fetchone()[0]
             
             if answered_count >= q_limit:
                 cur.execute(
-                    f"UPDATE {SCHEMA}.test_attempts SET status = 'completed', completed_at = NOW() WHERE id = %s",
+                    f"UPDATE \"{SCHEMA}\".test_attempts SET status = 'completed', completed_at = NOW() WHERE id = %s",
                     (attempt_id,)
                 )
                 
-                # Fetch user_id and subject to update student_elo
+                # Fetch user_id and end_elo
                 cur.execute(
-                    f"SELECT user_id, end_elo FROM {SCHEMA}.test_attempts WHERE id = %s",
+                    f'SELECT user_id, end_elo FROM "{SCHEMA}".test_attempts WHERE id = %s',
                     (attempt_id,)
                 )
                 user_id, end_elo = cur.fetchone()
-
                 
-                # Update ELO profile
+                # Update student ELO profile
                 cur.execute(
                     f"""
-                    INSERT INTO {SCHEMA}.student_elo (user_id, subject, elo_rating, updated_at)
+                    INSERT INTO "{SCHEMA}".student_elo (user_id, subject, elo_rating, updated_at)
                     VALUES (%s, %s, %s, NOW())
                     ON CONFLICT (user_id, subject) DO UPDATE
                     SET elo_rating = EXCLUDED.elo_rating, updated_at = NOW()
@@ -244,18 +322,23 @@ def process_task(task_data: dict):
             conn.rollback()
     finally:
         if conn:
-            conn.close()
+            return_db_connection(conn)
 
 def main():
-    print("Cadet Essay Grading Worker started. Listening for tasks on Redis queue 'essay_queue'...")
+    print("Cadet Essay Grading Worker started. Listening for tasks on Redis queue...")
+    # Recover any stale tasks on startup
+    recover_stale_tasks()
+    
     while True:
         try:
-            # Blocking pop from list
-            task = r_client.blpop("essay_queue", timeout=5)
-            if task:
-                # task[0] is the queue name, task[1] is the stringified JSON
-                task_data = json.loads(task[1])
+            # Reliable Queue Pattern (BRPOPLPUSH)
+            # Pops from 'essay_queue' and atomic-pushes to 'essay_processing'
+            raw_task = r_client.brpoplpush("essay_queue", "essay_processing", timeout=5)
+            if raw_task:
+                task_data = json.loads(raw_task)
                 process_task(task_data)
+                # Success: Acknowledge task removal from processing queue
+                r_client.lrem("essay_processing", 1, raw_task)
         except redis.ConnectionError:
             print("Redis connection lost. Retrying in 5 seconds...")
             time.sleep(5)

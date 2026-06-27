@@ -189,6 +189,63 @@ export const testingApi = {
     return request("/api/stats/d3/score-distribution");
   },
 
+  async getAuditLogs(skip: number = 0, limit: number = 50, action?: string, operator?: string): Promise<{ total: number, logs: any[] }> {
+    let url = `/api/stats/admin/audit-logs?skip=${skip}&limit=${limit}`;
+    if (action) url += `&action=${action}`;
+    if (operator) url += `&operator=${encodeURIComponent(operator)}`;
+    return request(url);
+  },
+
+  async getAnalyticsSummary(): Promise<{
+    total_attempts: number;
+    completed_attempts: number;
+    pass_rate: number;
+    avg_score: number;
+    complex_questions: any[];
+    instructor_activity: any[];
+  }> {
+    return request("/api/stats/admin/analytics/summary");
+  },
+
+  async bulkUpdateUsers(payload: {
+    user_ids: number[];
+    rank?: string | null;
+    unit?: string | null;
+    role?: string | null;
+    action?: string | null;
+    reason?: string | null;
+  }): Promise<{ message: string, count: number, log?: string[] }> {
+    return request("/api/stats/admin/users/bulk-update", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async bulkImportUsers(cadets: Array<{
+    static_id: string;
+    name: string;
+    rank?: string;
+    unit?: string;
+    password?: string;
+  }>): Promise<{ message: string, imported_count: number, skipped: string[] }> {
+    return request("/api/stats/admin/users/bulk-import", {
+      method: "POST",
+      body: JSON.stringify({ cadets }),
+    });
+  },
+
+  async getMonitoringAlerts(): Promise<Array<{
+    user_id: number;
+    static_id: string;
+    name: string;
+    rank: string;
+    type: string;
+    severity: string;
+    message: string;
+  }>> {
+    return request("/api/stats/admin/monitoring/alerts");
+  },
+
   async getQuestionsAdmin(): Promise<QuestionAdmin[]> {
     return request("/api/tests/questions-admin");
   },

@@ -1,6 +1,27 @@
 import { Pool, Client } from "postgres";
 
 const SCHEMA = "t_p29017774_avn_academy_training";
+
+async function writeAuditLog(
+  client: Client,
+  operatorId: number,
+  operatorName: string,
+  action: string,
+  targetId: string | null,
+  targetName: string | null,
+  details: any
+) {
+  try {
+    await client.queryArray(
+      `INSERT INTO ${SCHEMA}.audit_logs (operator_id, operator_name, action, target_id, target_name, details, created_at) 
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+      [operatorId, operatorName, action, targetId, targetName, JSON.stringify(details)]
+    );
+  } catch (err) {
+    console.error("Error writing audit log:", err);
+  }
+}
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -20,10 +41,10 @@ async function hashPassword(password: string): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function getRequester(client: Client, token: string | null): Promise<{ id: number; role: string } | null> {
+async function getRequester(client: Client, token: string | null): Promise<{ id: number; role: string; name: string } | null> {
   if (!token) return null;
-  const res = await client.queryObject<{ id: number; role: string }>(
-    `SELECT u.id, u.role FROM ${SCHEMA}.sessions s
+  const res = await client.queryObject<{ id: number; role: string; name: string }>(
+    `SELECT u.id, u.role, u.name FROM ${SCHEMA}.sessions s
      JOIN ${SCHEMA}.users u ON u.id = s.user_id
      WHERE s.token = $1 AND s.expires_at > NOW() AND u.is_whitelisted = true`,
     [token]
@@ -137,7 +158,19 @@ export default async function handler(req: Request): Promise<Response> {
           `INSERT INTO ${SCHEMA}.users (static_id, password_hash, name, rank, unit, role, is_whitelisted, discord_id, avatar_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
           [static_id, passHash, name, rank, unit, role, is_whitelisted, discord_id, avatar_url]
         );
-        return new Response(JSON.stringify({ ok: true, id: insertRes.rows[0].id }), {
+        const newId = insertRes.rows[0].id;
+
+        await writeAuditLog(
+          client,
+          requester.id,
+          requester.name,
+          "create_user",
+          String(newId),
+          name,
+          { static_id, role, rank, unit }
+        );
+
+        return new Response(JSON.stringify({ ok: true, id: newId }), {
           status: 200,
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
         });
@@ -241,9 +274,25 @@ export default async function handler(req: Request): Promise<Response> {
       fields.push(`updated_at = NOW()`);
       values.push(Number(userId));
 
+      const targetUserRes = await client.queryObject<{ name: string }>(
+        `SELECT name FROM ${SCHEMA}.users WHERE id = $1`,
+        [Number(userId)]
+      );
+      const targetName = targetUserRes.rows[0]?.name || "Неизвестный";
+
       await client.queryArray(
         `UPDATE ${SCHEMA}.users SET ${fields.join(", ")} WHERE id = $${idx}`,
         values
+      );
+
+      await writeAuditLog(
+        client,
+        requester.id,
+        requester.name,
+        "update_user",
+        userId,
+        targetName,
+        { updated_fields: Object.keys(body).filter(k => k !== "password") }
       );
 
       return new Response(JSON.stringify({ ok: true }), {
@@ -268,8 +317,8 @@ export default async function handler(req: Request): Promise<Response> {
         });
       }
 
-      const targetRes = await client.queryObject<{ role: string }>(
-        `SELECT role FROM ${SCHEMA}.users WHERE id = $1`,
+      const targetRes = await client.queryObject<{ role: string, name: string }>(
+        `SELECT role, name FROM ${SCHEMA}.users WHERE id = $1`,
         [Number(userId)]
       );
       if (targetRes.rows.length === 0) {
@@ -300,6 +349,17 @@ export default async function handler(req: Request): Promise<Response> {
         await client.queryArray(`DELETE FROM ${SCHEMA}.instructor_promotion_reports WHERE user_id = $1 OR reviewed_by = $1`, [Number(userId)]);
         await client.queryArray(`DELETE FROM ${SCHEMA}.promotion_reports WHERE user_id = $1 OR reviewed_by = $1`, [Number(userId)]);
         await client.queryArray(`DELETE FROM ${SCHEMA}.users WHERE id = $1`, [Number(userId)]);
+
+        await writeAuditLog(
+          client,
+          requester.id,
+          requester.name,
+          "delete_user",
+          userId,
+          targetUser.name,
+          { role: targetUser.role }
+        );
+
         await client.queryArray("COMMIT");
       } catch (dbErr) {
         await client.queryArray("ROLLBACK");

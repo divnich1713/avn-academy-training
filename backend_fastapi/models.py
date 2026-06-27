@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Numeric, Table, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Numeric, Table, Text, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -34,7 +34,10 @@ class Session(Base):
 
 class TestQuestion(Base):
     __tablename__ = "test_questions"
-    __table_args__ = {"schema": settings.SCHEMA}
+    __table_args__ = (
+        Index("ix_test_questions_subject_type", "subject", "type"),
+        {"schema": settings.SCHEMA}
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     subject = Column(String(255), nullable=False)
@@ -49,7 +52,10 @@ class TestQuestion(Base):
 
 class TestAttempt(Base):
     __tablename__ = "test_attempts"
-    __table_args__ = {"schema": settings.SCHEMA}
+    __table_args__ = (
+        Index("ix_test_attempts_user_status", "user_id", "status"),
+        {"schema": settings.SCHEMA}
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="CASCADE"), nullable=False)
@@ -68,7 +74,11 @@ class TestAttempt(Base):
 
 class TestAnswer(Base):
     __tablename__ = "test_answers"
-    __table_args__ = {"schema": settings.SCHEMA}
+    __table_args__ = (
+        Index("ix_test_answers_attempt_id", "attempt_id"),
+        UniqueConstraint("attempt_id", "question_id", name="uq_test_answers_attempt_question"),
+        {"schema": settings.SCHEMA}
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     attempt_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.test_attempts.id", ondelete="CASCADE"), nullable=False)
@@ -85,7 +95,10 @@ class TestAnswer(Base):
 
 class StudentElo(Base):
     __tablename__ = "student_elo"
-    __table_args__ = {"schema": settings.SCHEMA}
+    __table_args__ = (
+        UniqueConstraint("user_id", "subject", name="uq_student_elo_user_subject"),
+        {"schema": settings.SCHEMA}
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="CASCADE"), nullable=False)
@@ -116,5 +129,18 @@ class CustomMaterial(Base):
     material_type = Column(String(50), unique=True, nullable=False)
     data = Column(JSONB, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+    __table_args__ = {"schema": settings.SCHEMA}
+
+    id = Column(Integer, primary_key=True, index=True)
+    operator_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="SET NULL"), nullable=True)
+    operator_name = Column(String(255), nullable=False)
+    action = Column(String(100), nullable=False)
+    target_id = Column(String(100), nullable=True)
+    target_name = Column(String(255), nullable=True)
+    details = Column(JSONB, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 

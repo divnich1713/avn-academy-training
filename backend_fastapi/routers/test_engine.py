@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Any, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select, update, and_
+from sqlalchemy import select, update, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
@@ -84,19 +84,23 @@ async def get_current_user(
 ) -> User:
     # Rate limit check (60 requests per minute)
     ip_limit_key = f"ratelimit:{x_session_token}"
-    if check_rate_limit(ip_limit_key, limit=60, window=60):
+    if await check_rate_limit(ip_limit_key, limit=60, window=60):
         raise HTTPException(status_code=429, detail="Too many requests. Please wait a minute.")
 
     # Try cache first
-    cached_user = redis_client.get(f"session:{x_session_token}")
+    cached_user = await redis_client.get(f"session:{x_session_token}")
     if cached_user:
         user_data = json.loads(cached_user)
-        # Verify user exists in database
-        stmt = select(User).where(User.id == user_data["id"])
-        res = await db.execute(stmt)
-        user = res.scalar_one_or_none()
-        if user and user.is_whitelisted:
-            return user
+        if user_data.get("is_whitelisted"):
+            return User(
+                id=user_data["id"],
+                static_id=user_data["static_id"],
+                name=user_data["name"],
+                rank=user_data["rank"],
+                unit=user_data["unit"],
+                role=user_data["role"],
+                is_whitelisted=True
+            )
 
     # Query DB
     stmt = (
@@ -116,9 +120,10 @@ async def get_current_user(
         "name": user.name,
         "rank": user.rank,
         "unit": user.unit,
-        "role": user.role
+        "role": user.role,
+        "is_whitelisted": user.is_whitelisted
     }
-    redis_client.set(f"session:{x_session_token}", json.dumps(user_dict), ex=1800)
+    await redis_client.set(f"session:{x_session_token}", json.dumps(user_dict), ex=1800)
     return user
 
 @router.get("/active-session")
@@ -126,23 +131,6 @@ async def get_active_session(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    # Inline DB schema migration
-    try:
-        from sqlalchemy import text
-        await db.execute(text(f"ALTER TABLE {settings.SCHEMA}.test_settings ADD COLUMN IF NOT EXISTS time_limit_per_question INTEGER DEFAULT 0;"))
-        await db.execute(text(f"ALTER TABLE {settings.SCHEMA}.test_settings ADD COLUMN IF NOT EXISTS passing_score_percent INTEGER DEFAULT 80;"))
-        await db.execute(text(f"""
-            CREATE TABLE IF NOT EXISTS {settings.SCHEMA}.custom_materials (
-                id SERIAL PRIMARY KEY,
-                material_type VARCHAR(50) NOT NULL UNIQUE,
-                data JSONB NOT NULL,
-                updated_at TIMESTAMP DEFAULT NOW()
-            );
-        """))
-        await db.commit()
-    except Exception as mig_err:
-        print(f"FastAPI active-session inline migration warning: {mig_err}")
-
     stmt = select(TestAttempt).where(
         and_(
             TestAttempt.user_id == user.id,
@@ -347,10 +335,7 @@ async def get_next_question(
     else:
         q_types = ["essay"]
 
-    # Calculate current ELO rating of attempt (if no answers yet, use start_elo)
-    current_elo = attempt.end_elo if attempt.end_elo is not None else attempt.start_elo
-
-    # Fetch pool of questions not yet answered, in matching types and subject
+    # Fetch pool of questions not yet answered, in matching types and subject using database-level random sorting
     sub_subjects = get_sub_subjects(subject)
     q_stmt = select(TestQuestion).where(
         and_(
@@ -358,26 +343,24 @@ async def get_next_question(
             TestQuestion.type.in_(q_types),
             ~TestQuestion.id.in_(answered_ids) if answered_ids else True
         )
-    )
+    ).order_by(func.random()).limit(1)
+    
     q_res = await db.execute(q_stmt)
-    pool = q_res.scalars().all()
+    selected_question = q_res.scalar_one_or_none()
 
-    if not pool:
+    if not selected_question:
         # Fallback if specific pool exhausted (try same subject, any type)
         fallback_stmt = select(TestQuestion).where(
             and_(
                 TestQuestion.subject.in_(sub_subjects),
                 ~TestQuestion.id.in_(answered_ids) if answered_ids else True
             )
-        )
+        ).order_by(func.random()).limit(1)
         fallback_res = await db.execute(fallback_stmt)
-        pool = fallback_res.scalars().all()
+        selected_question = fallback_res.scalar_one_or_none()
         
-        if not pool:
+        if not selected_question:
             return {"completed": True}
-
-    # Pick a random question from the pool
-    selected_question = random.choice(pool)
 
     # Return question details (without correct answers / explanation)
     options = selected_question.options
@@ -521,7 +504,7 @@ async def submit_answer(
                 "student_answer": payload.answer,
                 "criteria": question.criteria_matrix
             }
-            redis_client.rpush("essay_queue", json.dumps(task))
+            await redis_client.rpush("essay_queue", json.dumps(task))
         except Exception as e:
             print(f"Error queueing essay task: {e}")
 
@@ -866,20 +849,6 @@ async def get_custom_materials(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    try:
-        from sqlalchemy import text
-        await db.execute(text(f"""
-            CREATE TABLE IF NOT EXISTS {settings.SCHEMA}.custom_materials (
-                id SERIAL PRIMARY KEY,
-                material_type VARCHAR(50) NOT NULL UNIQUE,
-                data JSONB NOT NULL,
-                updated_at TIMESTAMP DEFAULT NOW()
-            );
-        """))
-        await db.commit()
-    except Exception as mig_err:
-        print(f"FastAPI custom-materials inline migration warning: {mig_err}")
-
     stmt = select(CustomMaterial).where(CustomMaterial.material_type == type)
     res = await db.execute(stmt)
     material = res.scalar_one_or_none()
@@ -894,20 +863,6 @@ async def save_custom_materials(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    try:
-        from sqlalchemy import text
-        await db.execute(text(f"""
-            CREATE TABLE IF NOT EXISTS {settings.SCHEMA}.custom_materials (
-                id SERIAL PRIMARY KEY,
-                material_type VARCHAR(50) NOT NULL UNIQUE,
-                data JSONB NOT NULL,
-                updated_at TIMESTAMP DEFAULT NOW()
-            );
-        """))
-        await db.commit()
-    except Exception as mig_err:
-        print(f"FastAPI custom-materials inline migration warning: {mig_err}")
-
     allowed_mutators = ["head_avng", "deputy_head", "chief_instructor", "senior_ufsvng"]
     if user.role not in allowed_mutators:
         raise HTTPException(status_code=403, detail="Недостаточно прав для сохранения материалов")

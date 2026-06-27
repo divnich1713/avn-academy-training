@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, Fragment } from "react";
+import { useState, useEffect, useMemo, Fragment, lazy, Suspense } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Icon from "@/components/ui/icon";
 import { SectionHeader, StatCard, StatusBadge, GradeCircle, OnlineStatus, InstructorAvatar } from "./UIComponents";
@@ -6,7 +6,8 @@ import { User, reviewRequest, startReviewRequest, cancelReviewRequest, TrainingR
 import { useRequests, useGrades, useAdminUsers, usePromotionReports, queryKeys, useDeleteUser } from "@/lib/useQueries";
 import { TYPE_LABEL, fmt, Spinner, Empty, fmtStaticId, renderTextWithLinks } from "./SectionsShared";
 import { PromotionInstructorTab } from "./Promotions";
-import { TestingAdmin } from "./TestingAdmin";
+
+const TestingAdmin = lazy(() => import("./TestingAdmin").then(m => ({ default: m.TestingAdmin })));
 
 type EditForm = { static_id: string; name: string; rank: string; unit: string; role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed" | "senior_ufsvng"; password: string; created_at: string; discord_id: string; avatar_url: string };
 
@@ -50,11 +51,22 @@ const ACADEMY_UNITS = [
 // ═══════════════════════════════════════════════════════════════════════════════
 // INSTRUCTOR PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
+import { AnalyticsTab, AuditLogTab, BulkActionsBar, BulkImportDialog } from "./InstructorPanelExtensions";
+
 export function InstructorPanel({ authUser, highlightRequestId, highlightReportId, onViewProfile }: { authUser: User; highlightRequestId?: number; highlightReportId?: number; onViewProfile?: (c: User) => void }) {
-  const [activeTab, setActiveTab] = useState<"requests" | "grades" | "cadets" | "whitelist" | "promotions" | "expired" | "testing">(() => {
+  const [activeTab, setActiveTab] = useState<"requests" | "grades" | "cadets" | "whitelist" | "promotions" | "expired" | "testing" | "analytics" | "audit">(() => {
     if (highlightReportId) return "promotions";
     return "requests";
   });
+
+  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+
+  const toggleSelectUser = (id: number) => {
+    setSelectedUsers((prev) =>
+      prev.includes(id) ? prev.filter((uid) => uid !== id) : [...prev, id]
+    );
+  };
 
   useEffect(() => {
     if (highlightReportId) {
@@ -109,6 +121,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
 
   const handleTabClick = (tab: typeof activeTab) => {
     setActiveTab(tab);
+    setSelectedUsers([]);
     // Caching optimization: do NOT invalidate queries on tab click.
     // React Query will serve cached data instantly and fetch updates in the background.
   };
@@ -416,6 +429,54 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
         if (!groups[r.type]) groups[r.type] = [];
         groups[r.type].push(r);
       }
+    });
+    return groups;
+  }, [filteredRequests]);
+
+  const countsByStatusForFiltered = useMemo(() => {
+    const counts = {
+      created: 0,
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+      all: 0
+    };
+    allRequestsPlusDismissals.forEach((r) => {
+      if (filterType !== "all" && r.type !== filterType) return;
+      if (selectedReqDate !== "all") {
+        const dateStr = new Date(r.created_at).toLocaleDateString("ru-RU");
+        if (dateStr !== selectedReqDate) return;
+      }
+      if (filterInstructor === "me") {
+        if (r.instructor_id !== authUser.id) return;
+      }
+
+      counts.all++;
+      if (r.status === "created") counts.created++;
+      else if (r.status === "pending") counts.pending++;
+      else if (r.status === "approved") counts.approved++;
+      else if (r.status === "rejected") counts.rejected++;
+    });
+    return counts;
+  }, [allRequestsPlusDismissals, filterType, selectedReqDate, filterInstructor, authUser.id]);
+
+  const groupedRequestsByStatus = useMemo(() => {
+    const groups: {
+      created: typeof filteredRequests;
+      pending: typeof filteredRequests;
+      approved: typeof filteredRequests;
+      rejected: typeof filteredRequests;
+    } = {
+      created: [],
+      pending: [],
+      approved: [],
+      rejected: []
+    };
+    filteredRequests.forEach((r) => {
+      if (r.status === "created") groups.created.push(r);
+      else if (r.status === "pending") groups.pending.push(r);
+      else if (r.status === "approved") groups.approved.push(r);
+      else if (r.status === "rejected") groups.rejected.push(r);
     });
     return groups;
   }, [filteredRequests]);
@@ -803,6 +864,8 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
           { id: "expired", label: "Просроченные" },
           { id: "whitelist", label: "Вайтлист" },
           { id: "testing", label: "Результаты тестов" },
+          { id: "analytics", label: "Аналитика 📊" },
+          { id: "audit", label: "Журнал аудита 🚨" },
         ] as const)
           .filter((tab) => tab.id !== "whitelist" || authUser.role === "head_avng" || authUser.role === "deputy_head" || authUser.role === "senior_ufsvng")
           .map((tab) => {
@@ -883,18 +946,39 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
           </div>
 
           <div className="flex gap-2 flex-wrap items-center justify-between">
+            <div className="flex gap-2 flex-wrap bg-tactical-panel/40 p-1 rounded border border-tactical-border/40">
+              {([
+                { id: "created", label: "Новые", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" },
+                { id: "pending", label: "На рассмотрении", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
+                { id: "approved", label: "Одобрены", color: "bg-green-500/20 text-green-400 border-green-500/30" },
+                { id: "rejected", label: "Отклонены", color: "bg-red-500/20 text-red-400 border-red-500/30" },
+                { id: "all", label: "Все статусы", color: "bg-tactical-border/20 text-muted-foreground" },
+              ] as const).map((statusTab) => {
+                const count = countsByStatusForFiltered[statusTab.id];
+                const isActive = filterStatus === statusTab.id;
+                return (
+                  <button
+                    key={statusTab.id}
+                    type="button"
+                    onClick={() => setFilterStatus(statusTab.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1 text-xs uppercase font-oswald tracking-wider border rounded transition-all duration-200 cursor-pointer ${
+                      isActive
+                        ? "bg-primary text-black border-primary font-bold shadow-md shadow-primary/10"
+                        : "bg-tactical-panel/80 hover:bg-tactical-panel border-tactical-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {statusTab.label}
+                    {count > 0 && (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${isActive ? "bg-black/25 text-black" : statusTab.color}`}>
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="flex gap-2 flex-wrap">
-              <select
-                className="bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-              >
-                <option value="created">Созданы</option>
-                <option value="pending">На рассмотрении</option>
-                <option value="approved">Одобренные</option>
-                <option value="rejected">Отказано</option>
-                <option value="all">Все статусы</option>
-              </select>
               <select
                 className="bg-tactical-panel border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary cursor-pointer transition-colors"
                 value={filterInstructor}
@@ -917,49 +1001,87 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
               </select>
             </div>
           </div>
+
           {reqLoading ? <Spinner /> : allRequestsPlusDismissals.length === 0 ? <Empty text="Нет запросов" /> : (
             filteredRequests.length === 0 ? (
               <Empty text={`Нет запросов на ${selectedReqDate === new Date().toLocaleDateString("ru-RU") ? "сегодня" : `дату ${selectedReqDate}`}`} />
             ) : (
-              filterType === "all" ? (
-                <div className="space-y-6">
-                  {groupedRequests.lecture.length > 0 && (
+              filterStatus === "all" ? (
+                <div className="space-y-6 animate-fade-in">
+                  {groupedRequestsByStatus.created.length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="font-oswald text-xs tracking-wider uppercase text-yellow-500 border-l-2 border-yellow-500 pl-2">Запросы на лекции ({groupedRequests.lecture.length})</h4>
+                      <h4 className="font-oswald text-xs tracking-wider uppercase text-yellow-500 border-l-2 border-yellow-500 pl-2">Новые запросы ({groupedRequestsByStatus.created.length})</h4>
                       <div className="space-y-3">
-                        {groupedRequests.lecture.map(renderRequestCard)}
+                        {groupedRequestsByStatus.created.map(renderRequestCard)}
                       </div>
                     </div>
                   )}
-                  {groupedRequests.practice.length > 0 && (
+                  {groupedRequestsByStatus.pending.length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="font-oswald text-xs tracking-wider uppercase text-blue-500 border-l-2 border-blue-500 pl-2">Запросы на практики ({groupedRequests.practice.length})</h4>
+                      <h4 className="font-oswald text-xs tracking-wider uppercase text-blue-500 border-l-2 border-blue-500 pl-2">На рассмотрении ({groupedRequestsByStatus.pending.length})</h4>
                       <div className="space-y-3">
-                        {groupedRequests.practice.map(renderRequestCard)}
+                        {groupedRequestsByStatus.pending.map(renderRequestCard)}
                       </div>
                     </div>
                   )}
-                  {groupedRequests.exam.length > 0 && (
+                  {groupedRequestsByStatus.approved.length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="font-oswald text-xs tracking-wider uppercase text-purple-500 border-l-2 border-purple-500 pl-2">Запросы на экзамены ({groupedRequests.exam.length})</h4>
+                      <h4 className="font-oswald text-xs tracking-wider uppercase text-green-500 border-l-2 border-green-500 pl-2">Одобренные ({groupedRequestsByStatus.approved.length})</h4>
                       <div className="space-y-3">
-                        {groupedRequests.exam.map(renderRequestCard)}
+                        {groupedRequestsByStatus.approved.map(renderRequestCard)}
                       </div>
                     </div>
                   )}
-                  {groupedRequests.dismissal.length > 0 && (
+                  {groupedRequestsByStatus.rejected.length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="font-oswald text-xs tracking-wider uppercase text-red-500 border-l-2 border-red-500 pl-2">Рапорты на увольнение ({groupedRequests.dismissal.length})</h4>
+                      <h4 className="font-oswald text-xs tracking-wider uppercase text-red-500 border-l-2 border-red-500 pl-2">Отклоненные ({groupedRequestsByStatus.rejected.length})</h4>
                       <div className="space-y-3">
-                        {groupedRequests.dismissal.map(renderRequestCard)}
+                        {groupedRequestsByStatus.rejected.map(renderRequestCard)}
                       </div>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {filteredRequests.map(renderRequestCard)}
-                </div>
+                filterType === "all" ? (
+                  <div className="space-y-6">
+                    {groupedRequests.lecture.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="font-oswald text-xs tracking-wider uppercase text-yellow-500 border-l-2 border-yellow-500 pl-2">Запросы на лекции ({groupedRequests.lecture.length})</h4>
+                        <div className="space-y-3">
+                          {groupedRequests.lecture.map(renderRequestCard)}
+                        </div>
+                      </div>
+                    )}
+                    {groupedRequests.practice.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="font-oswald text-xs tracking-wider uppercase text-blue-500 border-l-2 border-blue-500 pl-2">Запросы на практики ({groupedRequests.practice.length})</h4>
+                        <div className="space-y-3">
+                          {groupedRequests.practice.map(renderRequestCard)}
+                        </div>
+                      </div>
+                    )}
+                    {groupedRequests.exam.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="font-oswald text-xs tracking-wider uppercase text-purple-500 border-l-2 border-purple-500 pl-2">Запросы на экзамены ({groupedRequests.exam.length})</h4>
+                        <div className="space-y-3">
+                          {groupedRequests.exam.map(renderRequestCard)}
+                        </div>
+                      </div>
+                    )}
+                    {groupedRequests.dismissal.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="font-oswald text-xs tracking-wider uppercase text-red-500 border-l-2 border-red-500 pl-2">Рапорты на увольнение ({groupedRequests.dismissal.length})</h4>
+                        <div className="space-y-3">
+                          {groupedRequests.dismissal.map(renderRequestCard)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredRequests.map(renderRequestCard)}
+                  </div>
+                )
               )
             )
           )}
@@ -1056,6 +1178,19 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-tactical-border bg-tactical-panel">
+                    <th className="text-center px-4 py-3 w-12 rank-badge text-muted-foreground">
+                      <input 
+                        type="checkbox"
+                        checked={selectedUsers.length > 0 && selectedUsers.length === cadets.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedUsers(cadets.map(cd => cd.id));
+                          } else {
+                            setSelectedUsers([]);
+                          }
+                        }}
+                      />
+                    </th>
                     <th className="text-left px-4 py-3 rank-badge text-muted-foreground">Курсант</th>
                     <th className="text-left px-4 py-3 rank-badge text-muted-foreground hidden md:table-cell">Звание</th>
                     <th className="text-left px-4 py-3 rank-badge text-muted-foreground hidden md:table-cell">Подразделение</th>
@@ -1090,6 +1225,13 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
 
                     return (
                       <tr key={c.id} className="border-b border-tactical-border last:border-0 hover:bg-primary/5 transition-colors">
+                        <td className="px-4 py-3 text-center">
+                          <input 
+                            type="checkbox"
+                            checked={selectedUsers.includes(c.id)}
+                            onChange={() => toggleSelectUser(c.id)}
+                          />
+                        </td>
                         <td className="px-4 py-3 text-sm font-ibm text-foreground">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-primary/10 border border-primary/25 flex items-center justify-center overflow-hidden rounded-full">
@@ -1281,12 +1423,20 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                 </div>
               </div>
             </div>
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="bg-primary text-primary-foreground font-oswald text-sm tracking-widest uppercase py-2 px-4 hover:bg-primary/90 transition-colors flex items-center gap-2"
-            >
-              <Icon name="Plus" size={14} />Добавить пользователя
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="bg-primary text-primary-foreground font-oswald text-sm tracking-widest uppercase py-2 px-4 hover:bg-primary/90 transition-colors flex items-center gap-2"
+              >
+                <Icon name="Plus" size={14} />Добавить пользователя
+              </button>
+              <button
+                onClick={() => setIsImportOpen(true)}
+                className="border border-tactical-border hover:bg-tactical-card/50 text-muted-foreground hover:text-foreground font-oswald text-sm tracking-widest uppercase py-2 px-4 transition-colors flex items-center gap-2"
+              >
+                <Icon name="Upload" size={14} />Импортировать CSV
+              </button>
+            </div>
           </div>
           {showAddForm && (
             <form onSubmit={handleAddUser} className="bg-tactical-card border border-primary/40 p-4 space-y-3 animate-fade-in">
@@ -1496,6 +1646,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
               <table className="w-full min-w-[600px]">
                 <thead>
                   <tr className="border-b border-tactical-border bg-tactical-panel">
+                    <th className="text-center px-4 py-3 w-12 rank-badge text-muted-foreground">Выбор</th>
                     <th className="text-left px-4 py-3 rank-badge text-muted-foreground">Static ID</th>
                     <th className="text-left px-4 py-3 rank-badge text-muted-foreground">Имя</th>
                     <th className="text-left px-4 py-3 rank-badge text-muted-foreground">Звание</th>
@@ -1515,7 +1666,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                     filteredGroupedWlUsers.map((group) => (
                       <Fragment key={group.dateStr}>
                         <tr className="bg-tactical-panel/40 border-b border-tactical-border/50">
-                          <td colSpan={6} className="px-4 py-2 bg-tactical-panel/20">
+                          <td colSpan={7} className="px-4 py-2 bg-tactical-panel/20">
                             <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-primary select-none">
                               <Icon name="Calendar" size={12} className="text-primary/70" />
                               <span>Дата зачисления: {group.dateStr}</span>
@@ -1524,6 +1675,13 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                         </tr>
                         {group.users.map((u) => (
                           <tr key={u.id} className="border-b border-tactical-border last:border-0 hover:bg-primary/5 transition-colors">
+                            <td className="px-4 py-3 text-center">
+                              <input 
+                                type="checkbox"
+                                checked={selectedUsers.includes(u.id)}
+                                onChange={() => toggleSelectUser(u.id)}
+                              />
+                            </td>
                             <td className="px-4 py-3 font-mono text-sm text-primary">{fmtStaticId(u.static_id)}</td>
                             <td className="px-4 py-3 text-sm font-ibm text-foreground">
                               <div className="flex items-center gap-3">
@@ -1607,8 +1765,40 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
 
       {/* ── TESTING TAB ── */}
       {activeTab === "testing" && (
-        <TestingAdmin authUser={authUser} />
+        <Suspense fallback={<div className="flex justify-center p-8"><Spinner /></div>}>
+          <TestingAdmin authUser={authUser} />
+        </Suspense>
       )}
+
+      {/* ── ANALYTICS TAB ── */}
+      {activeTab === "analytics" && (
+        <AnalyticsTab />
+      )}
+
+      {/* ── AUDIT LOG TAB ── */}
+      {activeTab === "audit" && (
+        <AuditLogTab />
+      )}
+
+      {/* Bulk operations bar */}
+      {selectedUsers.length > 0 && (
+        <BulkActionsBar 
+          selectedIds={selectedUsers} 
+          onClearSelection={() => setSelectedUsers([])}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers });
+          }}
+        />
+      )}
+
+      {/* Bulk import dialog */}
+      <BulkImportDialog 
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers });
+        }}
+      />
     </div>
   );
 }
