@@ -1,9 +1,9 @@
 import json
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select, update, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +14,10 @@ from elo import update_elo
 from redis_client import redis_client, check_rate_limit
 
 router = APIRouter(prefix="/api/tests", tags=["Test Engine"])
+
+# Centralized role constants for permission checks
+ADMIN_ROLES = ('head_avng', 'chief_instructor', 'deputy_head', 'senior_ufsvng')
+INSTRUCTOR_ROLES = ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head', 'senior_ufsvng')
 
 async def get_test_settings(db: AsyncSession, subject: str) -> dict:
     try:
@@ -65,8 +69,8 @@ def get_sub_subjects(subject: str) -> list[str]:
 # Pydantic Request Schemas
 class StartTestRequest(BaseModel):
     subject: str
-    difficulty: int  # 1-10
-    timer_minutes: int  # 15-120
+    difficulty: int = Field(ge=1, le=10)
+    timer_minutes: int = Field(ge=1, le=120)
 
 class SubmitAnswerRequest(BaseModel):
     attempt_id: int
@@ -106,7 +110,7 @@ async def get_current_user(
     stmt = (
         select(User)
         .join(Session, Session.user_id == User.id)
-        .where(and_(Session.token == x_session_token, Session.expires_at > datetime.utcnow(), User.is_whitelisted == True))
+        .where(and_(Session.token == x_session_token, Session.expires_at > datetime.now(timezone.utc), User.is_whitelisted == True))
     )
     res = await db.execute(stmt)
     user = res.scalar_one_or_none()
@@ -144,7 +148,7 @@ async def get_active_session(
         return {"active": False}
 
     # Auto submit check
-    if attempt.remaining_seconds is None and attempt.expires_at < datetime.utcnow():
+    if attempt.remaining_seconds is None and attempt.expires_at < datetime.now(timezone.utc):
         attempt.status = "completed"
         attempt.completed_at = attempt.expires_at
         await db.commit()
@@ -153,7 +157,7 @@ async def get_active_session(
     # Calculate remaining seconds
     rem_seconds = attempt.remaining_seconds
     if rem_seconds is None:
-        rem_seconds = int(max(0, (attempt.expires_at - datetime.utcnow()).total_seconds()))
+        rem_seconds = int(max(0, (attempt.expires_at - datetime.now(timezone.utc)).total_seconds()))
 
     # Fetch answered question IDs
     ans_stmt = select(TestAnswer.question_id).where(TestAnswer.attempt_id == attempt.id)
@@ -198,7 +202,7 @@ async def start_test(
     abort_stmt = (
         update(TestAttempt)
         .where(and_(TestAttempt.user_id == user.id, TestAttempt.status == "in_progress"))
-        .values(status="aborted", completed_at=datetime.utcnow())
+        .values(status="aborted", completed_at=datetime.now(timezone.utc))
     )
     await db.execute(abort_stmt)
 
@@ -217,7 +221,7 @@ async def start_test(
         start_elo = settings_data["base_elo"] + (payload.difficulty - 5) * 150
 
     timer_min = settings_data["timer_minutes"]
-    expires_at = datetime.utcnow() + timedelta(minutes=timer_min)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=timer_min)
     
     attempt = TestAttempt(
         user_id=user.id,
@@ -256,7 +260,7 @@ async def freeze_test(
         return {"message": "Тест уже заморожен"}
 
     # Calculate remaining time
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     rem_seconds = int(max(0, (attempt.expires_at - now).total_seconds()))
     
     attempt.remaining_seconds = rem_seconds
@@ -282,7 +286,7 @@ async def resume_test(
         return {"message": "Тест не заморожен"}
 
     # Restore expiration timer based on remaining seconds
-    attempt.expires_at = datetime.utcnow() + timedelta(seconds=attempt.remaining_seconds)
+    attempt.expires_at = datetime.now(timezone.utc) + timedelta(seconds=attempt.remaining_seconds)
     attempt.remaining_seconds = None
     await db.commit()
 
@@ -305,7 +309,7 @@ async def get_next_question(
         raise HTTPException(status_code=400, detail="Тест не найден или уже завершен")
 
     # Time expiration check
-    if attempt.remaining_seconds is None and attempt.expires_at < datetime.utcnow():
+    if attempt.remaining_seconds is None and attempt.expires_at < datetime.now(timezone.utc):
         attempt.status = "completed"
         attempt.completed_at = attempt.expires_at
         await db.commit()
@@ -398,7 +402,7 @@ async def submit_answer(
         raise HTTPException(status_code=400, detail="Тест не найден или уже завершен")
 
     # Time expiration check
-    if attempt.remaining_seconds is None and attempt.expires_at < datetime.utcnow():
+    if attempt.remaining_seconds is None and attempt.expires_at < datetime.now(timezone.utc):
         attempt.status = "completed"
         attempt.completed_at = attempt.expires_at
         await db.commit()
@@ -522,7 +526,7 @@ async def submit_answer(
     certificate_data = None
     if completed:
         attempt.status = "completed"
-        attempt.completed_at = datetime.utcnow()
+        attempt.completed_at = datetime.now(timezone.utc)
         
         # Save ELO rating to student_elo profile table
         save_elo_stmt = select(StudentElo).where(
@@ -533,7 +537,7 @@ async def submit_answer(
         
         if student_elo_row:
             student_elo_row.elo_rating = new_student_elo
-            student_elo_row.updated_at = datetime.utcnow()
+            student_elo_row.updated_at = datetime.now(timezone.utc)
         else:
             db.add(StudentElo(
                 user_id=user.id,
@@ -568,7 +572,7 @@ async def submit_answer(
             "rank": user.rank,
             "unit": user.unit,
             "subject": attempt.subject,
-            "completed_at": attempt.completed_at.isoformat() if attempt.completed_at else datetime.utcnow().isoformat(),
+            "completed_at": attempt.completed_at.isoformat() if attempt.completed_at else datetime.now(timezone.utc).isoformat(),
             "correct_answers_count": correct_count,
             "total_questions": q_limit,
             "percentage": percentage,
@@ -607,7 +611,7 @@ async def update_warnings(
     aborted = False
     if payload.warnings_count >= 3:
         attempt.status = "aborted"
-        attempt.completed_at = datetime.utcnow()
+        attempt.completed_at = datetime.now(timezone.utc)
         aborted = True
 
     await db.commit()
@@ -643,11 +647,7 @@ class TestSettingsUpdate(BaseModel):
     passing_score_percent: Optional[int] = 80
 
 def check_admin_access(user: User, is_mutation: bool = False):
-    allowed = (
-        ("head_avng", "chief_instructor", "deputy_head")
-        if is_mutation
-        else ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head")
-    )
+    allowed = ADMIN_ROLES if is_mutation else INSTRUCTOR_ROLES
     if user.role not in allowed:
         raise HTTPException(status_code=403, detail="Недостаточно прав для выполнения операции")
 
@@ -737,7 +737,7 @@ async def get_attempt_details(
     if owner_id is None:
         raise HTTPException(status_code=404, detail="Попытка не найдена")
         
-    is_instructor = user.role in ("instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head")
+    is_instructor = user.role in INSTRUCTOR_ROLES
     if user.id != owner_id and not is_instructor:
         raise HTTPException(status_code=403, detail="Доступ запрещен")
         
@@ -863,7 +863,7 @@ async def save_custom_materials(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    allowed_mutators = ["head_avng", "deputy_head", "chief_instructor", "senior_ufsvng"]
+    allowed_mutators = ADMIN_ROLES
     if user.role not in allowed_mutators:
         raise HTTPException(status_code=403, detail="Недостаточно прав для сохранения материалов")
         
@@ -873,7 +873,7 @@ async def save_custom_materials(
     
     if material:
         material.data = payload.data
-        material.updated_at = datetime.utcnow()
+        material.updated_at = datetime.now(timezone.utc)
     else:
         material = CustomMaterial(
             material_type=payload.type,

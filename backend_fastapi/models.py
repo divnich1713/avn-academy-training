@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Numeric, Table, Text, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from config import settings
 from database import Base
 
@@ -17,8 +17,8 @@ class User(Base):
     unit = Column(String(255), default="")
     role = Column(String(20), nullable=False, default="cadet")
     is_whitelisted = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     discord_id = Column(String(255), nullable=True)
     avatar_url = Column(String(1024), nullable=True)
     department_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.departments.id", ondelete="SET NULL"), nullable=True)
@@ -37,7 +37,7 @@ class Session(Base):
     id = Column(Integer, primary_key=True, index=True)
     token = Column(String(64), unique=True, nullable=False)
     user_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="CASCADE"), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     expires_at = Column(DateTime, nullable=False)
 
 class TestQuestion(Base):
@@ -56,7 +56,7 @@ class TestQuestion(Base):
     explanation = Column(Text, nullable=True)
     elo_rating = Column(Integer, default=1000)
     criteria_matrix = Column(JSONB, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 class TestAttempt(Base):
     __tablename__ = "test_attempts"
@@ -73,7 +73,7 @@ class TestAttempt(Base):
     start_elo = Column(Integer, nullable=False, default=1000)
     end_elo = Column(Integer, nullable=True)
     warnings_count = Column(Integer, nullable=False, default=0)
-    started_at = Column(DateTime, default=datetime.utcnow)
+    started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     completed_at = Column(DateTime, nullable=True)
     expires_at = Column(DateTime, nullable=False)
     remaining_seconds = Column(Integer, nullable=True)
@@ -96,7 +96,7 @@ class TestAnswer(Base):
     grade = Column(Numeric(5, 2), nullable=True)
     feedback = Column(Text, nullable=True)
     criteria_evaluation = Column(JSONB, nullable=True)
-    answered_at = Column(DateTime, default=datetime.utcnow)
+    answered_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     attempt = relationship("TestAttempt")
     question = relationship("TestQuestion")
@@ -112,7 +112,7 @@ class StudentElo(Base):
     user_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="CASCADE"), nullable=False)
     subject = Column(String(255), nullable=False)
     elo_rating = Column(Integer, nullable=False, default=1000)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User")
 
@@ -136,7 +136,7 @@ class CustomMaterial(Base):
     id = Column(Integer, primary_key=True, index=True)
     material_type = Column(String(50), unique=True, nullable=False)
     data = Column(JSONB, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
@@ -149,7 +149,7 @@ class AuditLog(Base):
     target_id = Column(String(100), nullable=True)
     target_name = Column(String(255), nullable=True)
     details = Column(JSONB, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class Department(Base):
@@ -162,7 +162,7 @@ class Department(Base):
     discord_role_id = Column(String(50), nullable=True)
     leader_role_id = Column(String(50), nullable=True)
     channel_id = Column(String(50), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class Rank(Base):
@@ -173,7 +173,7 @@ class Rank(Base):
     name = Column(String(255), unique=True, nullable=False)
     level = Column(Integer, unique=True, nullable=False)
     discord_role_id = Column(String(50), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class DismissalReport(Base):
@@ -188,7 +188,7 @@ class DismissalReport(Base):
     status = Column(String(20), nullable=False, default="pending")
     reviewed_by = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="SET NULL"), nullable=True)
     reviewed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", foreign_keys=[user_id])
     reviewer = relationship("User", foreign_keys=[reviewed_by])
@@ -206,8 +206,8 @@ class Transfer(Base):
     status = Column(String(30), nullable=False, default="pending")
     sender_leader_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="SET NULL"), nullable=True)
     receiver_leader_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", foreign_keys=[user_id])
     from_department = relationship("Department", foreign_keys=[from_department_id])
@@ -227,7 +227,7 @@ class WarehouseRequest(Base):
     status = Column(String(20), nullable=False, default="pending")
     reviewed_by = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="SET NULL"), nullable=True)
     reviewed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", foreign_keys=[user_id])
     reviewer = relationship("User", foreign_keys=[reviewed_by])
@@ -242,7 +242,7 @@ class DepartmentTemplate(Base):
     type = Column(String(50), nullable=False)
     requirements = Column(JSONB, nullable=False)
     min_points = Column(Integer, default=0)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     department = relationship("Department")
 
@@ -268,6 +268,6 @@ class PromotionReport(Base):
     status = Column(String(20), nullable=False, default="pending")
     reviewed_by_discord_id = Column(String(255), nullable=True)
     reviewed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", foreign_keys=[user_id])

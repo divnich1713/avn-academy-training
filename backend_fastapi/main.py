@@ -66,11 +66,13 @@ async def health_check():
             checks["db"] = True
     except Exception as e:
         checks["status"] = "degraded"
-        checks["db_error"] = str(e)
+        logger.error(f'Health check DB error: {e}')
+        checks["db_error"] = True
     try:
         await redis_client.ping()
         checks["redis"] = True
     except Exception as e:
         checks["status"] = "degraded"
-        checks["redis_error"] = str(e)
+        logger.error(f'Health check Redis error: {e}')
+        checks["redis_error"] = True
     return checks

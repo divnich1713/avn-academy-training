@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy import select, and_, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import json
+import logging
 from pydantic import BaseModel
 
 from database import get_db
@@ -12,7 +13,13 @@ from routers.test_engine import get_current_user
 from config import settings
 from redis_client import redis_client
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/stats", tags=["Statistics"])
+
+# Centralized role constants for permission checks
+ADMIN_ROLES = ('head_avng', 'chief_instructor', 'deputy_head', 'senior_ufsvng')
+INSTRUCTOR_ROLES = ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head', 'senior_ufsvng')
 
 @router.get("/cadet/dashboard")
 async def get_cadet_dashboard(
@@ -299,13 +306,13 @@ async def log_admin_action(
             target_id=str(target_id) if target_id is not None else None,
             target_name=target_name,
             details=details,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         db.add(log)
         await db.commit()
     except Exception as e:
         await db.rollback()
-        print(f"Error writing audit log: {e}")
+        logger.error(f"Error writing audit log: {e}")
 
 @router.get("/admin/audit-logs")
 async def get_audit_logs(
@@ -316,7 +323,7 @@ async def get_audit_logs(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role not in ["instructor", "head_avng", "chief_instructor", "senior_instructor", "deputy_head", "senior_ufsvng"]:
+    if current_user.role not in INSTRUCTOR_ROLES:
         raise HTTPException(status_code=403, detail="Доступ запрещен")
     
     stmt = select(AuditLog).order_by(AuditLog.created_at.desc())
@@ -356,7 +363,7 @@ async def get_analytics_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role not in ["instructor", "head_avng", "chief_instructor", "senior_instructor", "deputy_head", "senior_ufsvng"]:
+    if current_user.role not in INSTRUCTOR_ROLES:
         raise HTTPException(status_code=403, detail="Доступ запрещен")
 
     attempts_cnt_stmt = select(func.count(TestAttempt.id))
@@ -449,7 +456,7 @@ async def bulk_update_users(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role not in ["instructor", "head_avng", "chief_instructor", "senior_instructor", "deputy_head", "senior_ufsvng"]:
+    if current_user.role not in INSTRUCTOR_ROLES:
         raise HTTPException(status_code=403, detail="Доступ запрещен")
     
     if not payload.user_ids:
@@ -537,11 +544,11 @@ async def bulk_import_users(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role not in ["instructor", "head_avng", "chief_instructor", "senior_instructor", "deputy_head", "senior_ufsvng"]:
+    if current_user.role not in INSTRUCTOR_ROLES:
         raise HTTPException(status_code=403, detail="Доступ запрещен")
 
     import re
-    from passlib.hash import bcrypt
+    import bcrypt
 
     created_users = []
     skipped_users = []
@@ -558,7 +565,7 @@ async def bulk_import_users(
             skipped_users.append(f"ID {c.static_id} уже занят")
             continue
 
-        pw_hash = bcrypt.hash(c.password)
+        pw_hash = bcrypt.hashpw(c.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
         new_user = User(
             static_id=clean_id,
             password_hash=pw_hash,
@@ -567,8 +574,8 @@ async def bulk_import_users(
             unit=c.unit,
             role="cadet",
             is_whitelisted=True,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
         )
         db.add(new_user)
         created_users.append(f"Создан {c.rank} {c.name} ({clean_id})")
@@ -597,24 +604,82 @@ async def get_monitoring_alerts(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role not in ["instructor", "head_avng", "chief_instructor", "senior_instructor", "deputy_head", "senior_ufsvng"]:
+    if current_user.role not in INSTRUCTOR_ROLES:
         raise HTTPException(status_code=403, detail="Доступ запрещен")
 
     alerts = []
     from datetime import timedelta
-    seven_days_ago = datetime.utcnow() - timedelta(days=7)
-    ten_days_ago = datetime.utcnow() - timedelta(days=10)
+    now = datetime.now(timezone.utc)
+    seven_days_ago = now - timedelta(days=7)
+    ten_days_ago = now - timedelta(days=10)
 
+    # 1. Fetch all cadets
     cadets_stmt = select(User).where(User.role == "cadet")
     cadets_res = await db.execute(cadets_stmt)
     cadets_list = cadets_res.scalars().all()
+    cadet_ids = [c.id for c in cadets_list]
+    cadets_map = {c.id: c for c in cadets_list}
 
-    for c in cadets_list:
-        att_stmt = select(TestAttempt).where(TestAttempt.user_id == c.id).order_by(TestAttempt.started_at.desc())
-        att_res = await db.execute(att_stmt)
-        attempts = att_res.scalars().all()
+    if not cadet_ids:
+        return alerts
 
-        if not attempts:
+    # 2. Single query: latest attempt per cadet (using window function)
+    row_num = func.row_number().over(
+        partition_by=TestAttempt.user_id,
+        order_by=TestAttempt.started_at.desc()
+    ).label("rn")
+    latest_sub = (
+        select(TestAttempt.user_id, TestAttempt.started_at, row_num)
+        .where(TestAttempt.user_id.in_(cadet_ids))
+    ).subquery()
+    latest_stmt = (
+        select(latest_sub.c.user_id, latest_sub.c.started_at)
+        .where(latest_sub.c.rn == 1)
+    )
+    latest_res = await db.execute(latest_stmt)
+    latest_map = {r[0]: r[1] for r in latest_res.all()}
+
+    # 3. Single query: avg grade of last 3 completed attempts per cadet
+    comp_rn = func.row_number().over(
+        partition_by=TestAttempt.user_id,
+        order_by=TestAttempt.started_at.desc()
+    ).label("rn")
+    comp_sub = (
+        select(TestAttempt.id.label("att_id"), TestAttempt.user_id, comp_rn)
+        .where(
+            and_(
+                TestAttempt.user_id.in_(cadet_ids),
+                TestAttempt.status == "completed"
+            )
+        )
+    ).subquery()
+    top3_sub = (
+        select(comp_sub.c.att_id, comp_sub.c.user_id)
+        .where(comp_sub.c.rn <= 3)
+    ).subquery()
+    grades_stmt = (
+        select(
+            top3_sub.c.user_id,
+            top3_sub.c.att_id,
+            func.avg(TestAnswer.grade).label("avg_grade")
+        )
+        .join(TestAnswer, TestAnswer.attempt_id == top3_sub.c.att_id)
+        .group_by(top3_sub.c.user_id, top3_sub.c.att_id)
+    )
+    grades_res = await db.execute(grades_stmt)
+    # Group grades by cadet: {user_id: [avg_grade1, avg_grade2, avg_grade3]}
+    from collections import defaultdict
+    grades_by_cadet = defaultdict(list)
+    for uid, att_id, avg_grade in grades_res.all():
+        avg_val = float(avg_grade) if avg_grade is not None else 0.0
+        grades_by_cadet[uid].append(avg_val)
+
+    # 4. Build alerts from pre-fetched data
+    for cid, c in cadets_map.items():
+        last_started = latest_map.get(cid)
+
+        if last_started is None:
+            # No attempts at all
             if c.created_at < seven_days_ago:
                 alerts.append({
                     "user_id": c.id,
@@ -626,8 +691,7 @@ async def get_monitoring_alerts(
                     "message": f"Нет активности с момента регистрации ({c.created_at.strftime('%d.%m.%Y')})"
                 })
         else:
-            last_att = attempts[0]
-            if last_att.started_at < ten_days_ago:
+            if last_started < ten_days_ago:
                 alerts.append({
                     "user_id": c.id,
                     "static_id": c.static_id,
@@ -635,24 +699,13 @@ async def get_monitoring_alerts(
                     "rank": c.rank,
                     "type": "inactive_long_time",
                     "severity": "warning",
-                    "message": f"Последний тест запущен {last_att.started_at.strftime('%d.%m.%Y')}"
+                    "message": f"Последний тест запущен {last_started.strftime('%d.%m.%Y')}"
                 })
 
-        comp_attempts = [a for a in attempts if a.status == "completed"][:3]
-        if len(comp_attempts) >= 3:
-            failures_cnt = 0
-            for ca in comp_attempts:
-                grade_stmt = (
-                    select(func.avg(TestAnswer.grade))
-                    .join(TestAttempt, TestAttempt.id == TestAnswer.attempt_id)
-                    .where(TestAnswer.attempt_id == ca.id)
-                )
-                grade_res = await db.execute(grade_stmt)
-                avg_grade = grade_res.scalar()
-                avg_val = float(avg_grade) if avg_grade is not None else 0.0
-                if avg_val < 80.0:
-                    failures_cnt += 1
-            
+        # Check struggling cadets: last 3 completed attempts all failed
+        cadet_grades = grades_by_cadet.get(cid, [])
+        if len(cadet_grades) >= 3:
+            failures_cnt = sum(1 for g in cadet_grades[:3] if g < 80.0)
             if failures_cnt == 3:
                 alerts.append({
                     "user_id": c.id,
@@ -663,7 +716,7 @@ async def get_monitoring_alerts(
                     "severity": "critical",
                     "message": "3 проваленных теста подряд (требуется помощь инструктора)"
                 })
-                
+
     return alerts
 
 class DiscordResolveRequest(BaseModel):
@@ -794,7 +847,7 @@ async def resolve_request_from_discord(
     
     await db.commit()
     logger_msg = f"Request ID {req_id} successfully {new_status} by instructor {instructor.name} (Discord ID: {payload.discord_user_id})"
-    print(logger_msg)
+    logger.info(logger_msg)
     
     return {"success": True, "message": logger_msg}
 
@@ -852,7 +905,7 @@ async def discord_create_user(
         raise HTTPException(status_code=401, detail="Unauthorized. Invalid bot secret.")
 
     import re
-    import bcrypt as _bcrypt
+    import bcrypt
 
     # Validate static_id
     clean_id = str(payload.static_id).replace("-", "").strip()
@@ -866,7 +919,7 @@ async def discord_create_user(
         raise HTTPException(status_code=409, detail=f"Пользователь с ID {clean_id} уже существует.")
 
     # Create user with password = static_id (user can change later)
-    pw_hash = _bcrypt.hashpw(clean_id.encode("utf-8"), _bcrypt.gensalt()).decode("utf-8")
+    pw_hash = bcrypt.hashpw(clean_id.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
     new_user = User(
         static_id=clean_id,
         password_hash=pw_hash,
@@ -876,8 +929,8 @@ async def discord_create_user(
         role=payload.role,
         discord_id=payload.discord_id,
         is_whitelisted=True,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc)
     )
     db.add(new_user)
     await db.commit()

@@ -28,6 +28,33 @@ from faction_views import (
 )
 from promo_builder import PromotionReportBuilderView
 
+
+def validate_static_id(raw: str) -> str | None:
+    """Clean and validate a 6-digit static ID. Returns cleaned ID or None."""
+    clean = raw.replace('-', '').replace(' ', '').strip()
+    if re.fullmatch(r'\d{6}', clean):
+        return clean
+    return None
+
+
+async def _handle_modal_error(interaction: discord.Interaction, error: Exception, modal_name: str = "Modal"):
+    """Shared error handler for all Modals."""
+    logger.error(f"{modal_name} error for {interaction.user}: {error}", exc_info=True)
+    try:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(
+                "❌ Произошла ошибка при обработке формы. Попробуйте позже.",
+                ephemeral=True
+            )
+        else:
+            await interaction.followup.send(
+                "❌ Произошла ошибка при обработке формы. Попробуйте позже.",
+                ephemeral=True
+            )
+    except Exception:
+        pass
+
+
 load_dotenv()
 
 
@@ -38,7 +65,9 @@ TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "")
 GUILD_ID = os.environ.get("DISCORD_GUILD_ID", "")
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 API_URL = os.environ.get("API_URL", "http://api:8000")
-BOT_SECRET = os.environ.get("DISCORD_BOT_SECRET", "default_secret")
+BOT_SECRET = os.environ.get("DISCORD_BOT_SECRET")
+if not BOT_SECRET:
+    logger.warning("DISCORD_BOT_SECRET is not set! Bot-to-API authentication is disabled.")
 
 # ── Notification channel IDs ──
 CHANNELS = {
@@ -362,9 +391,8 @@ class GovApplicationModal(Modal):
         department = self.department_input.value.strip()
         details = self.details_input.value.strip()
 
-        # Validate static_id
-        clean_id = raw_static_id.replace("-", "").replace(" ", "")
-        if not re.fullmatch(r"\d{6}", clean_id):
+        clean_id = validate_static_id(raw_static_id)
+        if not clean_id:
             await interaction.response.send_message(
                 "❌ **Ошибка:** Статик ID должен содержать 6 цифр (например: 123-456 или 123456).",
                 ephemeral=True
@@ -389,11 +417,15 @@ class GovApplicationModal(Modal):
 
         app_key = f"application:{interaction.user.id}"
         try:
-            redis_conn = aioredis.from_url(REDIS_URL, decode_responses=True)
+            redis_conn = await interaction.client.get_redis()
             await redis_conn.set(app_key, json.dumps(app_data), ex=86400 * 7)
-            await redis_conn.close()
         except Exception as e:
             logger.error(f"Redis error saving application: {e}")
+            await interaction.response.send_message(
+                "❌ **Ошибка:** Не удалось сохранить заявку. Попробуйте позже.",
+                ephemeral=True
+            )
+            return
 
         await interaction.response.send_message(
             "✅ **Заявка Гос.Сотрудника отправлена!**\n"
@@ -428,6 +460,9 @@ class GovApplicationModal(Modal):
 
         await review_channel.send(embed=embed, view=review_view)
         logger.info(f"Gov application from {interaction.user} ({clean_id}) sent to review channel")
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        await _handle_modal_error(interaction, error, "GovApplicationModal")
 
 
 class TransferApplicationModal(Modal):
@@ -483,9 +518,8 @@ class TransferApplicationModal(Modal):
         military_id_raw = self.military_id_input.value.strip().lower()
         has_military_id = military_id_raw in ("да", "yes", "есть", "+", "1")
 
-        # Validate static_id
-        clean_id = raw_static_id.replace("-", "").replace(" ", "")
-        if not re.fullmatch(r"\d{6}", clean_id):
+        clean_id = validate_static_id(raw_static_id)
+        if not clean_id:
             await interaction.response.send_message(
                 "❌ **Ошибка:** Статик ID должен содержать 6 цифр (например: 123-456 или 123456).",
                 ephemeral=True
@@ -510,11 +544,15 @@ class TransferApplicationModal(Modal):
 
         app_key = f"application:{interaction.user.id}"
         try:
-            redis_conn = aioredis.from_url(REDIS_URL, decode_responses=True)
+            redis_conn = await interaction.client.get_redis()
             await redis_conn.set(app_key, json.dumps(app_data), ex=86400 * 7)
-            await redis_conn.close()
         except Exception as e:
             logger.error(f"Redis error saving application: {e}")
+            await interaction.response.send_message(
+                "❌ **Ошибка:** Не удалось сохранить заявку. Попробуйте позже.",
+                ephemeral=True
+            )
+            return
 
         await interaction.response.send_message(
             "✅ **Заявка на перевод/восстановление отправлена!**\n"
@@ -549,6 +587,9 @@ class TransferApplicationModal(Modal):
 
         await review_channel.send(embed=embed, view=review_view)
         logger.info(f"Transfer application from {interaction.user} ({clean_id}) sent to review channel")
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        await _handle_modal_error(interaction, error, "TransferApplicationModal")
 
 
 class ApplicationModal(Modal):
@@ -604,9 +645,8 @@ class ApplicationModal(Modal):
         military_id_raw = self.military_id_input.value.strip().lower()
         has_military_id = military_id_raw in ("да", "yes", "есть", "+", "1")
 
-        # Validate static_id: must be 6 digits (with or without dash)
-        clean_id = raw_static_id.replace("-", "").replace(" ", "")
-        if not re.fullmatch(r"\d{6}", clean_id):
+        clean_id = validate_static_id(raw_static_id)
+        if not clean_id:
             await interaction.response.send_message(
                 "❌ **Ошибка:** Статик ID должен содержать 6 цифр (например: 123-456 или 123456).",
                 ephemeral=True
@@ -633,11 +673,15 @@ class ApplicationModal(Modal):
         app_key = f"application:{interaction.user.id}"
 
         try:
-            redis_conn = aioredis.from_url(REDIS_URL, decode_responses=True)
+            redis_conn = await interaction.client.get_redis()
             await redis_conn.set(app_key, json.dumps(app_data), ex=86400 * 7)  # TTL: 7 days
-            await redis_conn.close()
         except Exception as e:
             logger.error(f"Redis error saving application: {e}")
+            await interaction.response.send_message(
+                "❌ **Ошибка:** Не удалось сохранить заявку. Попробуйте позже.",
+                ephemeral=True
+            )
+            return
 
         # Notify user
         await interaction.response.send_message(
@@ -678,6 +722,9 @@ class ApplicationModal(Modal):
         await review_channel.send(embed=embed, view=review_view)
         logger.info(f"Application from {interaction.user} ({clean_id}) sent to review channel")
 
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        await _handle_modal_error(interaction, error, "ApplicationModal")
+
 
 class ApplicationReviewView(View):
     """Review buttons: Accept / Reject / Request revision."""
@@ -713,12 +760,11 @@ class ApplicationReviewView(View):
         await interaction.response.send_message("❌ У вас нет прав для рассмотрения заявок.", ephemeral=True)
         return False
 
-    async def _load_app_data(self) -> dict | None:
+    async def _load_app_data(self, interaction: discord.Interaction) -> dict | None:
         """Load application data from Redis."""
         try:
-            redis_conn = aioredis.from_url(REDIS_URL, decode_responses=True)
+            redis_conn = await interaction.client.get_redis()
             data = await redis_conn.get(f"application:{self.applicant_id}")
-            await redis_conn.close()
             if data:
                 return json.loads(data)
         except Exception as e:
@@ -731,7 +777,7 @@ class ApplicationReviewView(View):
 
         await interaction.response.defer(ephemeral=True)
 
-        app = await self._load_app_data()
+        app = await self._load_app_data(interaction)
         if not app:
             await interaction.followup.send("❌ Данные заявки не найдены.", ephemeral=True)
             return
@@ -859,9 +905,8 @@ class ApplicationReviewView(View):
 
         # Clean up Redis
         try:
-            redis_conn = aioredis.from_url(REDIS_URL, decode_responses=True)
+            redis_conn = await interaction.client.get_redis()
             await redis_conn.delete(f"application:{self.applicant_id}")
-            await redis_conn.close()
         except Exception:
             pass
 
@@ -877,7 +922,7 @@ class ApplicationReviewView(View):
 
         await interaction.response.defer(ephemeral=True)
 
-        app = await self._load_app_data()
+        app = await self._load_app_data(interaction)
         guild = interaction.guild
         member = guild.get_member(int(app["discord_user_id"])) if app else None
 
@@ -907,9 +952,8 @@ class ApplicationReviewView(View):
 
         # Clean up Redis
         try:
-            redis_conn = aioredis.from_url(REDIS_URL, decode_responses=True)
+            redis_conn = await interaction.client.get_redis()
             await redis_conn.delete(f"application:{self.applicant_id}")
-            await redis_conn.close()
         except Exception:
             pass
 
@@ -922,7 +966,7 @@ class ApplicationReviewView(View):
 
         await interaction.response.defer(ephemeral=True)
 
-        app = await self._load_app_data()
+        app = await self._load_app_data(interaction)
         guild = interaction.guild
         member = guild.get_member(int(app["discord_user_id"])) if app else None
 
@@ -951,9 +995,8 @@ class ApplicationReviewView(View):
 
         # Clean up Redis
         try:
-            redis_conn = aioredis.from_url(REDIS_URL, decode_responses=True)
+            redis_conn = await interaction.client.get_redis()
             await redis_conn.delete(f"application:{self.applicant_id}")
-            await redis_conn.close()
         except Exception:
             pass
 
@@ -978,9 +1021,17 @@ class AVNBotClient(discord.Client):
         super().__init__(intents=intents)
         self.redis_task = None
         self.tree = app_commands.CommandTree(self)
+        self.redis_pool = None
+
+    async def get_redis(self):
+        if self.redis_pool is None:
+            self.redis_pool = aioredis.from_url(REDIS_URL, decode_responses=True)
+        return self.redis_pool
 
     async def setup_hook(self):
         """Called when the bot starts, before on_ready."""
+        self.redis_pool = aioredis.from_url(REDIS_URL, decode_responses=True)
+
         # Register persistent views so buttons work after bot restart
         self.add_view(ApplicationStartView())
         self.add_view(FactionApplicationStartView())
@@ -1257,9 +1308,8 @@ class AVNBotClient(discord.Client):
 
                 # Load app data from Redis
                 try:
-                    redis_conn = aioredis.from_url(REDIS_URL, decode_responses=True)
+                    redis_conn = await self.get_redis()
                     data = await redis_conn.get(f"application:{applicant_id}")
-                    await redis_conn.close()
                     if data:
                         app_data = json.loads(data)
                     else:
@@ -1383,9 +1433,8 @@ class AVNBotClient(discord.Client):
 
                 # Load app data from Redis
                 try:
-                    redis_conn = aioredis.from_url(REDIS_URL, decode_responses=True)
+                    redis_conn = await self.get_redis()
                     data = await redis_conn.get(f"faction_application:{applicant_id}")
-                    await redis_conn.close()
                     if data:
                         app_data = json.loads(data)
                     else:
@@ -1479,9 +1528,8 @@ class AVNBotClient(discord.Client):
 
                     # Clean up Redis
                     try:
-                        redis_conn = aioredis.from_url(REDIS_URL, decode_responses=True)
+                        redis_conn = await self.get_redis()
                         await redis_conn.delete(f"faction_application:{applicant_id}")
-                        await redis_conn.close()
                     except Exception:
                         pass
 
@@ -1532,9 +1580,8 @@ class AVNBotClient(discord.Client):
 
                     # Clean up Redis
                     try:
-                        redis_conn = aioredis.from_url(REDIS_URL, decode_responses=True)
+                        redis_conn = await self.get_redis()
                         await redis_conn.delete(f"faction_application:{applicant_id}")
-                        await redis_conn.close()
                     except Exception:
                         pass
 
@@ -1569,12 +1616,14 @@ class AVNBotClient(discord.Client):
 
     async def listen_redis(self):
         logger.info(f"Connecting to Redis at {REDIS_URL}...")
+        backoff = 5
         while True:
             try:
-                redis_conn = aioredis.from_url(REDIS_URL, decode_responses=True)
+                redis_conn = await self.get_redis()
                 pubsub = redis_conn.pubsub()
                 await pubsub.subscribe("discord_notifications")
                 logger.info("Subscribed to 'discord_notifications'. Listening...")
+                backoff = 5  # reset on successful connection
 
                 async for message in pubsub.listen():
                     if message["type"] == "message":
@@ -1586,8 +1635,9 @@ class AVNBotClient(discord.Client):
                         except Exception as ex:
                             logger.error(f"Error handling notification: {ex}", exc_info=True)
             except Exception as conn_err:
-                logger.error(f"Redis connection error: {conn_err}. Retrying in 5s...")
-                await asyncio.sleep(5)
+                logger.error(f"Redis connection error: {conn_err}. Retrying in {backoff}s...")
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 60)  # cap at 60 seconds
 
     def get_target_channel(self, data: dict, fallback_type: str = "requests"):
         channel_type = data.get("channel_type") or fallback_type
@@ -1622,9 +1672,8 @@ class AVNBotClient(discord.Client):
             if data.get("channel_type") == "promotion_reviewed" and "report_id" in data:
                 report_id = data["report_id"]
                 try:
-                    redis_conn = aioredis.from_url(REDIS_URL, decode_responses=True)
+                    redis_conn = await self.get_redis()
                     msg_id = await redis_conn.get(f"promotion_message_id:{report_id}")
-                    await redis_conn.close()
                     if msg_id:
                         promo_chan_id = resolve_channel_id("promotion")
                         discord_link = f"https://discord.com/channels/{GUILD_ID}/{promo_chan_id}/{msg_id}"
@@ -1646,9 +1695,8 @@ class AVNBotClient(discord.Client):
             if data.get("channel_type") == "promotion" and "report_id" in data:
                 report_id = data["report_id"]
                 try:
-                    redis_conn = aioredis.from_url(REDIS_URL, decode_responses=True)
-                    await redis_conn.set(f"promotion_message_id:{report_id}", str(message.id), ex=86400 * 30) # 30 days TTL
-                    await redis_conn.close()
+                    redis_conn = await self.get_redis()
+                    await redis_conn.set(f"promotion_message_id:{report_id}", str(message.id), ex=86400 * 30)  # 30 days TTL
                     logger.info(f"Saved Discord message ID {message.id} for report {report_id} to Redis")
                 except Exception as ex:
                     logger.error(f"Error saving message ID to Redis: {ex}")

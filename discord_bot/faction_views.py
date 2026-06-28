@@ -11,42 +11,89 @@ from datetime import datetime
 logger = logging.getLogger("discord_bot.faction_views")
 
 API_URL = os.environ.get("API_URL", "http://api:8000")
-BOT_SECRET = os.environ.get("DISCORD_BOT_SECRET", "default_secret")
+BOT_SECRET = os.environ.get("DISCORD_BOT_SECRET")
+if not BOT_SECRET:
+    logger.warning("DISCORD_BOT_SECRET is not set! Bot-to-API authentication is disabled.")
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
 async def get_redis():
     import redis.asyncio as aioredis
     return aioredis.from_url(REDIS_URL, decode_responses=True)
 
+
+def validate_static_id(raw: str) -> str | None:
+    """Clean and validate a 6-digit static ID. Returns cleaned ID or None."""
+    clean = raw.replace('-', '').replace(' ', '').strip()
+    if re.fullmatch(r'\d{6}', clean):
+        return clean
+    return None
+
+
+_http_session: aiohttp.ClientSession = None
+
+
+async def get_http_session():
+    global _http_session
+    if _http_session is None or _http_session.closed:
+        _http_session = aiohttp.ClientSession()
+    return _http_session
+
+
+async def _handle_modal_error(interaction: discord.Interaction, error: Exception, modal_name: str = "Modal"):
+    """Shared error handler for all Modals."""
+    logger.error(f"{modal_name} error for {interaction.user}: {error}", exc_info=True)
+    try:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(
+                "❌ Произошла ошибка при обработке формы. Попробуйте позже.",
+                ephemeral=True
+            )
+        else:
+            await interaction.followup.send(
+                "❌ Произошла ошибка при обработке формы. Попробуйте позже.",
+                ephemeral=True
+            )
+    except Exception:
+        pass
+
 # --- Helper functions for API ---
 
-async def api_request(method: str, path: str, data: dict = None) -> dict:
+async def api_request(method: str, path: str, data: dict = None, json: dict = None) -> dict:
     url = f"{API_URL}{path}"
     headers = {
-        "X-Bot-Secret": BOT_SECRET,
+        "X-Bot-Secret": BOT_SECRET or "",
         "Content-Type": "application/json"
     }
-    async with aiohttp.ClientSession() as session:
-        try:
-            if method.lower() == "post":
-                async with session.post(url, json=data, headers=headers) as resp:
-                    if resp.status in [200, 201]:
-                        return await resp.json()
-                    else:
-                        text = await resp.text()
-                        logger.error(f"API Error {path}: {resp.status} - {text}")
-                        return {"error": text, "status": resp.status}
-            else:
-                async with session.get(url, headers=headers) as resp:
-                    if resp.status == 200:
-                        return await resp.json()
-                    else:
-                        text = await resp.text()
-                        logger.error(f"API Error {path}: {resp.status} - {text}")
-                        return {"error": text, "status": resp.status}
-        except Exception as e:
-            logger.error(f"API Connection Exception {path}: {e}")
-            return {"error": str(e)}
+    request_data = json or data
+    session = await get_http_session()
+    try:
+        if method.lower() == "post":
+            async with session.post(url, json=request_data, headers=headers) as resp:
+                if resp.status in [200, 201]:
+                    return await resp.json()
+                else:
+                    text = await resp.text()
+                    logger.error(f"API Error {path}: {resp.status} - {text}")
+                    return {"error": text, "status": resp.status}
+        elif method.lower() == "put":
+            async with session.put(url, json=request_data, headers=headers) as resp:
+                if resp.status in [200, 201]:
+                    return await resp.json()
+                else:
+                    text = await resp.text()
+                    logger.error(f"API Error {path}: {resp.status} - {text}")
+                    return {"error": text, "status": resp.status}
+        else:
+            async with session.get(url, headers=headers) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+                else:
+                    text = await resp.text()
+                    logger.error(f"API Error {path}: {resp.status} - {text}")
+                    return {"error": text, "status": resp.status}
+    except Exception as e:
+        logger.error(f"API Connection Exception {path}: {e}")
+        return {"error": str(e)}
 
 # --- Discord Interactions ---
 
@@ -81,8 +128,8 @@ class RegistrationModal(Modal):
         raw_static = self.static_id_input.value.strip()
         rank = self.rank_input.value.strip()
         
-        clean_id = raw_static.replace("-", "").replace(" ", "")
-        if not re.fullmatch(r"\d{6}", clean_id):
+        clean_id = validate_static_id(raw_static)
+        if not clean_id:
             await interaction.response.send_message("❌ Неверный формат статик ID (должно быть 6 цифр).", ephemeral=True)
             return
 
@@ -104,6 +151,9 @@ class RegistrationModal(Modal):
             except Exception:
                 pass
             await interaction.response.send_message(f"✅ Вы успешно зарегистрированы как **{name}** ({formatted_id})!", ephemeral=True)
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        await _handle_modal_error(interaction, error, "RegistrationModal")
 
 
 # --- 1. Заявка на вступление ---
@@ -133,8 +183,8 @@ class FactionApplicationModal(Modal):
         reason = self.reason_input.value.strip()
         rank = self.rank_input.value.strip()
 
-        clean_id = raw_static.replace("-", "").replace(" ", "")
-        if not re.fullmatch(r"\d{6}", clean_id):
+        clean_id = validate_static_id(raw_static)
+        if not clean_id:
             await interaction.response.send_message("❌ Неверный формат статик ID (должно быть 6 цифр).", ephemeral=True)
             return
 
@@ -183,6 +233,9 @@ class FactionApplicationModal(Modal):
 
         view = FactionApplicationReviewView(interaction.user.id, app_data)
         await channel.send(embed=embed, view=view)
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        await _handle_modal_error(interaction, error, "FactionApplicationModal")
 
 
 class FactionApplicationReviewView(View):
@@ -447,8 +500,8 @@ class FactionDismissalModal(Modal):
         reason = self.reason_input.value.strip()
         photo = self.photo_input.value.strip()
 
-        clean_id = raw_static_id.replace("-", "").replace(" ", "")
-        if not re.fullmatch(r"\d{6}", clean_id):
+        clean_id = validate_static_id(raw_static_id)
+        if not clean_id:
             await interaction.response.send_message(
                 "❌ **Ошибка:** Статик ID должен содержать 6 цифр.",
                 ephemeral=True
@@ -501,6 +554,9 @@ class FactionDismissalModal(Modal):
 
         view = DismissalReviewView(report_id, interaction.user.id)
         await channel.send(content=role_mentions, embed=embed, view=view)
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        await _handle_modal_error(interaction, error, "FactionDismissalModal")
 
 
 class DismissalReviewView(View):
@@ -831,6 +887,9 @@ class QuickDraftModal(Modal):
         await r.close()
         await interaction.response.send_message("✅ Черновик сохранен на 14 дней! Нажмите «Заполнить рапорт», чтобы продолжить в любое время.", ephemeral=True)
 
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        await _handle_modal_error(interaction, error, "QuickDraftModal")
+
 
 class PromotionReviewView(View):
     def __init__(self, applicant_id: int, report_details: dict):
@@ -896,6 +955,17 @@ class PromotionReviewView(View):
             "operator_discord_id": str(interaction.user.id)
         }
         await api_request("POST", "/api/faction/members/update", update_payload)
+
+        # Update promotion report status in backend
+        report_id = self.report_details.get("report_id")
+        if report_id:
+            try:
+                await api_request("PUT", f"/api/faction/promotions/{report_id}/review", json={
+                    "status": "approved",
+                    "reviewer_discord_id": str(interaction.user.id)
+                })
+            except Exception as e:
+                logger.error(f"Failed to update promotion report status: {e}")
 
         # Discord role management and nick update
         guild = interaction.guild
@@ -1049,8 +1119,8 @@ class TransferReasonModal(Modal):
         rank = self.rank_input.value.strip()
         reason = self.reason_input.value.strip()
 
-        clean_id = raw_static_id.replace("-", "").replace(" ", "")
-        if not re.fullmatch(r"\d{6}", clean_id):
+        clean_id = validate_static_id(raw_static_id)
+        if not clean_id:
             await interaction.response.send_message(
                 "❌ **Ошибка:** Статик ID должен содержать 6 цифр.",
                 ephemeral=True
@@ -1140,6 +1210,9 @@ class TransferReasonModal(Modal):
         all_mentions = f"{from_tags} {to_tags}"
         await channel.send(content=all_mentions, embed=embed, view=view)
 
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        await _handle_modal_error(interaction, error, "TransferReasonModal")
+
 
 class TransferApprovalView(View):
     def __init__(self, transfer_id: int, employee_id: int, from_name: str, to_name: str):
@@ -1164,12 +1237,18 @@ class TransferApprovalView(View):
         btn_reject.callback = self.reject
         self.add_item(btn_reject)
 
-    async def check_leader(self, interaction: discord.Interaction, dept_name: str) -> bool:
+    def _has_leader_role(self, interaction: discord.Interaction, dept_name: str) -> bool:
+        """Check if user has leader permissions for a specific department, without sending a response."""
         if interaction.user.guild_permissions.administrator:
             return True
         for role in interaction.user.roles:
             if role.name.lower() in ["руководство", "chief", "head", f"начальник {dept_name.lower()}"]:
                 return True
+        return False
+
+    async def check_leader(self, interaction: discord.Interaction, dept_name: str) -> bool:
+        if self._has_leader_role(interaction, dept_name):
+            return True
         await interaction.response.send_message(f"❌ Вы не являетесь руководителем отдела {dept_name}.", ephemeral=True)
         return False
 
@@ -1220,12 +1299,14 @@ class TransferApprovalView(View):
 
     async def reject(self, interaction: discord.Interaction):
         # Permission check: must be leader of either department or admin
-        is_sender_leader = await self.check_leader(interaction, self.from_name)
-        if not is_sender_leader:
-            # check_leader already sent an error response, check receiver side
-            is_receiver_leader = await self.check_leader(interaction, self.to_name)
-            if not is_receiver_leader:
-                return
+        is_sender_leader = self._has_leader_role(interaction, self.from_name)
+        is_receiver_leader = self._has_leader_role(interaction, self.to_name)
+        if not is_sender_leader and not is_receiver_leader:
+            await interaction.response.send_message(
+                f"❌ Вы не являетесь руководителем ни отдела {self.from_name}, ни отдела {self.to_name}.",
+                ephemeral=True
+            )
+            return
         await interaction.response.defer(ephemeral=True)
         payload = {
             "transfer_id": self.transfer_id,
@@ -1360,6 +1441,9 @@ class WarehouseRequestModal(Modal):
 
         view = WarehouseRequestReviewView(request_id, interaction.user.id, items_list)
         await channel.send(embed=embed, view=view)
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        await _handle_modal_error(interaction, error, "WarehouseRequestModal")
 
 
 class WarehouseRequestReviewView(View):

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy import select, and_, update, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel
 
 from database import get_db
@@ -71,7 +71,7 @@ class WarehouseReviewPayload(BaseModel):
 # --- Endpoints ---
 
 @router.get("/profile/{discord_id}")
-async def get_profile(discord_id: str, db: AsyncSession = Depends(get_db)):
+async def get_profile(discord_id: str, db: AsyncSession = Depends(get_db), _ = Depends(verify_bot_secret)):
     stmt = (
         select(User, Department, Rank)
         .outerjoin(Department, Department.id == User.department_id)
@@ -217,7 +217,7 @@ async def update_member(
         changes["notes"] = payload.notes
 
     if changes:
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
         db.add(user)
         
         # Log action
@@ -278,7 +278,7 @@ async def review_dismissal(
     status = "approved" if payload.action == "approve" else "rejected"
     report.status = status
     report.reviewed_by = operator.id
-    report.reviewed_at = datetime.utcnow()
+    report.reviewed_at = datetime.now(timezone.utc)
     report.comment = payload.comment or report.comment
     db.add(report)
 
@@ -289,7 +289,7 @@ async def review_dismissal(
             employee.role = "dismissed"
             employee.unit = "Архив"
             employee.rank = "Уволен"
-            employee.updated_at = datetime.utcnow()
+            employee.updated_at = datetime.now(timezone.utc)
             db.add(employee)
 
     # Log action
@@ -320,7 +320,7 @@ async def submit_transfer(
 
     # Check for 3-day cooldown on approved transfers
     from datetime import timedelta
-    cooldown_limit = datetime.utcnow() - timedelta(days=3)
+    cooldown_limit = datetime.now(timezone.utc) - timedelta(days=3)
     
     cooldown_stmt = select(Transfer).where(
         and_(
@@ -333,7 +333,7 @@ async def submit_transfer(
     recent_transfer = cooldown_res.scalar()
     
     if recent_transfer:
-        time_passed = datetime.utcnow() - recent_transfer.updated_at
+        time_passed = datetime.now(timezone.utc) - recent_transfer.updated_at
         time_left = timedelta(days=3) - time_passed
         hours_left = int(time_left.total_seconds() // 3600)
         minutes_left = int((time_left.total_seconds() % 3600) // 60)
@@ -397,7 +397,7 @@ async def approve_transfer(
             dept = await db.get(Department, transfer.to_department_id)
             if dept:
                 employee.unit = dept.name
-            employee.updated_at = datetime.utcnow()
+            employee.updated_at = datetime.now(timezone.utc)
             db.add(employee)
 
     db.add(transfer)
@@ -448,7 +448,7 @@ async def review_warehouse(
     status = "approved" if payload.action == "approve" else "rejected"
     req.status = status
     req.reviewed_by = operator.id
-    req.reviewed_at = datetime.utcnow()
+    req.reviewed_at = datetime.now(timezone.utc)
     db.add(req)
 
     # Log action
@@ -568,7 +568,7 @@ async def update_promotion_status(
     status = "approved" if payload.action == "approved" else "rejected"
     report.status = status
     report.reviewed_by_discord_id = payload.reviewed_by_discord_id
-    report.reviewed_at = datetime.utcnow()
+    report.reviewed_at = datetime.now(timezone.utc)
     db.add(report)
 
     # Audit log
@@ -591,7 +591,8 @@ async def list_promotions(
     department: Optional[str] = None,
     status: Optional[str] = None,
     limit: int = 50,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(verify_bot_secret)
 ):
     """List recent promotion reports with optional filters."""
     stmt = select(PromotionReport).order_by(PromotionReport.created_at.desc())

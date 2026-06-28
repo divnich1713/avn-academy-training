@@ -2,7 +2,7 @@ import { Pool, Client } from "postgres";
 
 const SCHEMA = "t_p29017774_avn_academy_training";
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": Deno.env.get('CORS_ORIGIN') || "https://avn-academy.ru",
   "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, X-Session-Token",
 };

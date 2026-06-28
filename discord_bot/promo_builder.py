@@ -2,7 +2,7 @@ import discord
 from discord.ui import View, Select, Button, Modal, TextInput
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from faction_views import api_request, get_redis
 
 logger = logging.getLogger("promo_builder")
@@ -204,7 +204,7 @@ class PromotionReportBuilderView(View):
         embed.add_field(name="📊 Критерии повышения", value="\n".join(checklist_status), inline=False)
         
         embed.set_footer(text="Росгвардия RMRP Арбат")
-        embed.timestamp = datetime.utcnow()
+        embed.timestamp = datetime.now(timezone.utc)
         return embed
 
     async def update_message(self, interaction: discord.Interaction):
@@ -333,7 +333,7 @@ class PromotionReportBuilderView(View):
                 
                 report_embed.add_field(name="Выполненная работа", value="\\n".join(work_details)[:1024], inline=False)
                 report_embed.set_footer(text='Росгвардия RMRP Арбат')
-                report_embed.timestamp = datetime.utcnow()
+                report_embed.timestamp = datetime.now(timezone.utc)
 
                 # Add approve/reject buttons
                 from faction_views import PromotionReviewView
