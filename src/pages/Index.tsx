@@ -29,24 +29,32 @@ interface IndexProps {
   onReloadUser?: () => void;
 }
 
+const ACADEMY_STAFF_ROLES = ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"];
+
+function getDefaultSection(role: UserRole): Section {
+  if (role === "cadet") return "dashboard";
+  if (ACADEMY_STAFF_ROLES.includes(role)) return "instructor";
+  return "promotions";
+}
+
 export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) {
   const [section, setSection] = useState<Section>(() => {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get("tab");
-    const isInstr = authUser.role !== "cadet";
-    let initialSection: Section = isInstr ? "instructor" : "dashboard";
+    const role = authUser.role as UserRole;
+    let initialSection: Section = getDefaultSection(role);
     if (tabParam) {
       const candidateSection = tabParam as Section;
-      if (candidateSection === "dashboard" && isInstr) {
-        initialSection = "instructor";
+      if (candidateSection === "dashboard" && role !== "cadet") {
+        initialSection = getDefaultSection(role);
       } else {
         initialSection = candidateSection;
       }
     }
     // Authorization check
     const navItem = NAV_ITEMS.find((item) => item.id === initialSection);
-    if (navItem && !navItem.roles.includes(authUser.role as UserRole)) {
-      initialSection = authUser.role === "cadet" ? "dashboard" : "instructor";
+    if (navItem && !navItem.roles.includes(role)) {
+      initialSection = getDefaultSection(role);
     }
     return initialSection;
   });
@@ -78,15 +86,14 @@ export default function Index({ authUser, onLogout, onReloadUser }: IndexProps) 
   const role = authUser.role as UserRole;
 
   const navigateTo = (s: Section, requestId?: number, targetCadet?: User) => {
-    const isInstr = authUser.role !== "cadet";
     let targetSection = s;
-    if (isInstr && s === "dashboard") {
-      targetSection = "instructor";
+    if (s === "dashboard" && authUser.role !== "cadet") {
+      targetSection = getDefaultSection(role);
     }
     // Authorization check
     const navItem = NAV_ITEMS.find((item) => item.id === targetSection);
-    if (navItem && !navItem.roles.includes(authUser.role as UserRole)) {
-      targetSection = authUser.role === "cadet" ? "dashboard" : "instructor";
+    if (navItem && !navItem.roles.includes(role)) {
+      targetSection = getDefaultSection(role);
     }
     setSection(targetSection);
     setHighlightRequestId(requestId);
