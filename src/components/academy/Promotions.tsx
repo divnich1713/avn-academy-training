@@ -1987,6 +1987,9 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                               const isUploading = uploadingLink === `${entry.id}_${linkIdx}`;
                               return (
                                 <div key={linkIdx} className="flex items-center gap-2">
+                                  <span className="text-[10px] font-mono text-yellow-500 font-bold bg-tactical-panel/60 border border-tactical-border px-2 py-1 min-w-[32px] text-center select-none rounded-xs flex-shrink-0">
+                                    №{linkIdx + 1}
+                                  </span>
                                   <input
                                     type={entry.isAuto ? "text" : "url"}
                                     placeholder={`Ссылка на скриншот №${linkIdx + 1}...`}
