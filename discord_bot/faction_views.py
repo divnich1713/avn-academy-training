@@ -808,7 +808,24 @@ class FactionPromotionModal(Modal):
         embed.add_field(name="Повышение", value=f"{self.current_rank.value} ➡️ {self.target_rank.value}", inline=False)
         embed.add_field(name="Баллы", value=str(points), inline=True)
         embed.add_field(name="Комментарий", value=self.comment_input.value or "—", inline=False)
-        embed.add_field(name="Выполненная работа", value=self.report_links.value, inline=False)
+        import re
+        raw_links = self.report_links.value
+        lines = [line.strip() for line in raw_links.replace("\r\n", "\n").split("\n") if line.strip()]
+        formatted_lines = []
+        url_idx = 1
+        for line in lines:
+            urls = re.findall(r'(https?://\S+)', line)
+            if urls:
+                line_formatted = line
+                for url in urls:
+                    line_formatted = line_formatted.replace(url, f"[№{url_idx}]({url})")
+                    url_idx += 1
+                formatted_lines.append(f"• {line_formatted}")
+            else:
+                formatted_lines.append(f"• {line}")
+        links_display = "\n".join(formatted_lines) if formatted_lines else raw_links
+
+        embed.add_field(name="Выполненная работа", value=links_display[:1024], inline=False)
         embed.set_footer(text='Росгвардия RMRP Арбат')
         embed.timestamp = discord.utils.utcnow()
 
