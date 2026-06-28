@@ -249,9 +249,11 @@ class PromotionReportBuilderView(View):
         initial_count = str(existing["count"]) if existing else ""
         
         if existing:
-            initial_links = "\n".join(f"{idx + 1}. {lnk}" for idx, lnk in enumerate(existing["links"]))
+            existing_links = [f"{idx + 1}. {lnk}" for idx, lnk in enumerate(existing["links"])]
+            extra_lines = [f"{idx + 1}. " for idx in range(len(existing["links"]), 15)]
+            initial_links = "\n".join(existing_links + extra_lines)
         else:
-            initial_links = "1. \n2. \n3. \n4. \n5. "
+            initial_links = "\n".join(f"{idx + 1}. " for idx in range(15))
 
         modal = ActivityInputModal(activity_num, cfg["name"], self, initial_count, initial_links)
         await interaction.response.send_modal(modal)
