@@ -26,7 +26,30 @@ class ActivityInputModal(Modal):
             style=discord.TextStyle.paragraph,
             required=True
         )
+        
         self.add_item(self.count_input)
+        
+        # Check if activity config supports sub-points (bonus points)
+        cfg = next((c for c in self.parent_view.points_config if c["num"] == activity_num), None)
+        self.has_sub_points = False
+        self.success_input = None
+        if cfg and cfg.get("hasSubPoints"):
+            self.has_sub_points = True
+            label = cfg.get("bonusLabel", "Количество успешных")
+            label = label[:45]  # Limit length for discord.py label constraints
+            
+            # Retrieve existing successCount if editing
+            existing = next((e for e in self.parent_view.entries if e["num"] == activity_num), None)
+            initial_success = str(existing.get("successCount", 0)) if existing else "0"
+            
+            self.success_input = TextInput(
+                label=label,
+                placeholder="Например: 3",
+                default=initial_success,
+                required=True
+            )
+            self.add_item(self.success_input)
+
         self.add_item(self.links_input)
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -38,6 +61,22 @@ class ActivityInputModal(Modal):
         except ValueError:
             await interaction.followup.send("❌ **Ошибка:** Количество должно быть целым числом больше нуля!", ephemeral=True)
             return
+
+        success_count = 0
+        if self.has_sub_points and self.success_input:
+            try:
+                success_count = int(self.success_input.value.strip())
+                if success_count < 0:
+                    raise ValueError()
+                if success_count > count:
+                    await interaction.followup.send(
+                        f"❌ **Ошибка:** Количество успешных раз ({success_count}) не может превышать общее количество ({count})!",
+                        ephemeral=True
+                    )
+                    return
+            except ValueError:
+                await interaction.followup.send("❌ **Ошибка:** Количество успешных раз должно быть целым неотрицательным числом!", ephemeral=True)
+                return
 
         # Extract only valid URLs, ignoring numbering markers
         tokens = self.links_input.value.replace(",", " ").replace(";", " ").split()
@@ -61,7 +100,7 @@ class ActivityInputModal(Modal):
             return
 
         # Save to parent view state
-        self.parent_view.add_activity_data(self.activity_num, count, links)
+        self.parent_view.add_activity_data(self.activity_num, count, success_count, links)
         await self.parent_view.update_message(interaction)
 
 
@@ -144,13 +183,13 @@ class PromotionReportBuilderView(View):
         submit_btn.callback = self.on_submit
         self.add_item(submit_btn)
 
-    def add_activity_data(self, num: int, count: int, links: list):
+    def add_activity_data(self, num: int, count: int, success_count: int, links: list):
         # Remove existing if any
         self.entries = [e for e in self.entries if e["num"] != num]
         self.entries.append({
             "num": num,
             "count": count,
-            "successCount": 0,
+            "successCount": success_count,
             "links": links
         })
 
@@ -162,7 +201,9 @@ class PromotionReportBuilderView(View):
         for e in self.entries:
             cfg = next((c for c in self.points_config if c["num"] == e["num"]), None)
             if cfg:
-                pts = e["count"] * cfg.get("points", 0)
+                base_pts = e["count"] * cfg.get("points", 0)
+                bonus_pts = e.get("successCount", 0) * cfg.get("bonusPoints", 0)
+                pts = base_pts + bonus_pts
                 total_points += pts
                 formatted_links = []
                 for idx, lnk in enumerate(e["links"]):
@@ -171,8 +212,9 @@ class PromotionReportBuilderView(View):
                         formatted_links.append(f"[№{idx + 1}]({lnk_str})")
                     else:
                         formatted_links.append(f"№{idx + 1}: {lnk_str}")
+                success_str = f" (успешных: {e.get('successCount', 0)})" if cfg.get("hasSubPoints") and e.get("successCount", 0) > 0 else ""
                 links_str = f" (ссылки: {', '.join(formatted_links)})" if formatted_links else ""
-                added_text.append(f"• **{cfg['name']}** — {e['count']} шт.{links_str} (`+{pts}` б.)")
+                added_text.append(f"• **{cfg['name']}** — {e['count']} шт.{success_str}{links_str} (`+{pts}` б.)")
         
         if not added_text:
             added_text.append("*Ничего не добавлено (выберите действия из меню ниже)*")
@@ -295,7 +337,8 @@ class PromotionReportBuilderView(View):
         for e in self.entries:
             cfg = next((c for c in self.points_config if c["num"] == e["num"]), None)
             if cfg:
-                comment_parts.append(f"{cfg['name']}: {e['count']} шт.")
+                success_text = f", успешных: {e.get('successCount', 0)}" if cfg.get("hasSubPoints") and e.get("successCount", 0) > 0 else ""
+                comment_parts.append(f"{cfg['name']}: {e['count']} шт{success_text}")
                 links_list.extend(e["links"])
 
         submit_payload = {
@@ -362,7 +405,8 @@ class PromotionReportBuilderView(View):
                                 formatted_links.append(f"[№{idx + 1}]({lnk_str})")
                             else:
                                 formatted_links.append(f"№{idx + 1}: {lnk_str}")
-                        work_details.append(f"• **{cfg['name']}** — {e['count']} шт. (ссылки: {', '.join(formatted_links)})")
+                        success_str = f" (успешных: {e.get('successCount', 0)})" if cfg.get("hasSubPoints") and e.get("successCount", 0) > 0 else ""
+                        work_details.append(f"• **{cfg['name']}** — {e['count']} шт.{success_str} (ссылки: {', '.join(formatted_links)})")
                 
                 report_embed.add_field(name="Выполненная работа", value="\\n".join(work_details)[:1024], inline=False)
                 report_embed.set_footer(text='Росгвардия RMRP Арбат')
