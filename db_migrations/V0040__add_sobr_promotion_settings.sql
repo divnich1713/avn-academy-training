@@ -1,5 +1,5 @@
 -- Migration: Add initial promotion settings for SOBR
-INSERT INTO ${schema}.instructor_promotion_settings (unit, points_config, ranks_flow)
+INSERT INTO t_p29017774_avn_academy_training.instructor_promotion_settings (unit, points_config, ranks_flow)
 VALUES (
     'СОБР',
     $$[
