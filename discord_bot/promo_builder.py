@@ -152,7 +152,15 @@ class PromotionReportBuilderView(View):
             if cfg:
                 pts = e["count"] * cfg.get("points", 0)
                 total_points += pts
-                added_text.append(f"• **{cfg['name']}** — {e['count']} шт. (`+{pts}` б.)")
+                formatted_links = []
+                for idx, lnk in enumerate(e["links"]):
+                    lnk_str = lnk.strip()
+                    if lnk_str.startswith("http://") or lnk_str.startswith("https://"):
+                        formatted_links.append(f"[№{idx + 1}]({lnk_str})")
+                    else:
+                        formatted_links.append(f"№{idx + 1}: {lnk_str}")
+                links_str = f" (ссылки: {', '.join(formatted_links)})" if formatted_links else ""
+                added_text.append(f"• **{cfg['name']}** — {e['count']} шт.{links_str} (`+{pts}` б.)")
         
         if not added_text:
             added_text.append("*Ничего не добавлено (выберите действия из меню ниже)*")
