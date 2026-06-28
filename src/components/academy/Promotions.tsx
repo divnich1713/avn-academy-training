@@ -952,6 +952,9 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
   const [reviewLoading, setReviewLoading] = useState<Record<number, boolean>>({});
   const [reviewComment, setReviewComment] = useState<Record<number, string>>({});
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [rejectTargetReport, setRejectTargetReport] = useState<InstructorPromotionReport | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   const [selectedUnit, setSelectedUnit] = useState<string>(() => {
     return authUser.unit || "АВНГ";
@@ -1639,6 +1642,15 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       alert("Ошибка проверки: " + err.message);
     }
     setReviewLoading(prev => ({ ...prev, [report.id]: false }));
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectTargetReport || !rejectReason.trim()) return;
+    setReviewComment(prev => ({ ...prev, [rejectTargetReport.id]: rejectReason }));
+    setIsRejectModalOpen(false);
+    await handleReviewClick(rejectTargetReport, "rejected");
+    setRejectTargetReport(null);
+    setRejectReason("");
   };
 
   const hasPendingReport = reports.some(r => r.instructor_id === authUser.id && r.status === "pending");
@@ -2549,7 +2561,11 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                                   </button>
                                   <button
                                     disabled={reviewLoading[r.id]}
-                                    onClick={() => handleReviewClick(r, "rejected")}
+                                    onClick={() => {
+                                      setRejectTargetReport(r);
+                                      setRejectReason("");
+                                      setIsRejectModalOpen(true);
+                                    }}
                                     className="rank-badge text-red-400 border border-red-800 px-3 py-1.5 hover:bg-red-900/30 transition-colors disabled:opacity-50 flex items-center gap-1 text-xs"
                                   >
                                     <Icon name="X" size={12} /> Отклонить
@@ -3192,6 +3208,51 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
           </div>
         </div>
       )}
+      {/* Reject Modal */}
+      {isRejectModalOpen && rejectTargetReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-tactical-dark border border-tactical-border max-w-md w-full p-5 space-y-4 shadow-[0_0_32px_rgba(239,68,68,0.15)] corner-mark relative animate-zoom-in" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-oswald text-base text-red-500 uppercase tracking-wider flex items-center gap-2">
+              <Icon name="AlertTriangle" size={18} /> Отклонение рапорта
+            </h3>
+            
+            <p className="text-xs font-ibm text-muted-foreground leading-relaxed">
+              Укажите причину отклонения рапорта для{" "}
+              <span className="text-foreground font-semibold">
+                {rejectTargetReport.instructor_name}
+              </span>. Эта информация будет записана в историю рапорта и отправлена в Discord.
+            </p>
+
+            <textarea
+              className="w-full h-24 bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-ibm focus:outline-none focus:border-red-500 transition-colors placeholder:text-muted-foreground/50 resize-none rounded-sm"
+              placeholder="Введите причину отклонения (обязательно)..."
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              autoFocus
+            />
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setIsRejectModalOpen(false);
+                  setRejectTargetReport(null);
+                  setRejectReason("");
+                }}
+                className="rank-badge text-muted-foreground border border-tactical-border px-3 py-1.5 hover:bg-tactical-panel transition-colors text-xs"
+              >
+                Отмена
+              </button>
+              <button
+                disabled={!rejectReason.trim()}
+                onClick={handleConfirmReject}
+                className="rank-badge bg-red-950/40 text-red-400 border border-red-800 px-4 py-1.5 hover:bg-red-900/30 transition-colors disabled:opacity-50 text-xs font-semibold"
+              >
+                Подтвердить отклонение
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3229,6 +3290,9 @@ export function PromotionInstructorTab({
   const [reviewLoading, setReviewLoading] = useState<NumberBooleanMap>({});
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [selectedPromoDate, setSelectedPromoDate] = useState<string>(() => new Date().toLocaleDateString("ru-RU"));
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [rejectTargetReport, setRejectTargetReport] = useState<PromotionReport | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   const loadReports = useCallback(async () => {
     setLoading(true);
@@ -3299,6 +3363,15 @@ export function PromotionInstructorTab({
       // silent fail
     }
     setReviewLoading((prev) => ({ ...prev, [report.id]: false }));
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectTargetReport || !rejectReason.trim()) return;
+    setReviewComment(prev => ({ ...prev, [rejectTargetReport.id]: rejectReason }));
+    setIsRejectModalOpen(false);
+    await handleReview(rejectTargetReport, "rejected");
+    setRejectTargetReport(null);
+    setRejectReason("");
   };
 
   const promoDates = useMemo(() => {
@@ -3534,7 +3607,11 @@ export function PromotionInstructorTab({
                               </button>
                               <button
                                 disabled={reviewLoading[r.id]}
-                                onClick={() => handleReview(r, "rejected")}
+                                onClick={() => {
+                                  setRejectTargetReport(r);
+                                  setRejectReason("");
+                                  setIsRejectModalOpen(true);
+                                }}
                                 className="rank-badge text-red-400 border border-red-800 px-3 py-1 hover:bg-red-900/30 transition-colors disabled:opacity-50 flex items-center gap-1"
                               >
                                 <Icon name="X" size={12} />Отклонить
@@ -3562,6 +3639,51 @@ export function PromotionInstructorTab({
               </div>
             );
           })}
+        </div>
+      )}
+      {/* Reject Modal */}
+      {isRejectModalOpen && rejectTargetReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-tactical-dark border border-tactical-border max-w-md w-full p-5 space-y-4 shadow-[0_0_32px_rgba(239,68,68,0.15)] corner-mark relative animate-zoom-in" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-oswald text-base text-red-500 uppercase tracking-wider flex items-center gap-2">
+              <Icon name="AlertTriangle" size={18} /> Отклонение рапорта
+            </h3>
+            
+            <p className="text-xs font-ibm text-muted-foreground leading-relaxed">
+              Укажите причину отклонения рапорта для{" "}
+              <span className="text-foreground font-semibold">
+                {rejectTargetReport.cadet_name}
+              </span>. Эта информация будет записана в историю рапорта и отправлена в Discord.
+            </p>
+
+            <textarea
+              className="w-full h-24 bg-tactical-panel border border-tactical-border px-3 py-2 text-xs text-foreground font-ibm focus:outline-none focus:border-red-500 transition-colors placeholder:text-muted-foreground/50 resize-none rounded-sm"
+              placeholder="Введите причину отклонения (обязательно)..."
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              autoFocus
+            />
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setIsRejectModalOpen(false);
+                  setRejectTargetReport(null);
+                  setRejectReason("");
+                }}
+                className="rank-badge text-muted-foreground border border-tactical-border px-3 py-1.5 hover:bg-tactical-panel transition-colors text-xs"
+              >
+                Отмена
+              </button>
+              <button
+                disabled={!rejectReason.trim()}
+                onClick={handleConfirmReject}
+                className="rank-badge bg-red-950/40 text-red-400 border border-red-800 px-4 py-1.5 hover:bg-red-900/30 transition-colors disabled:opacity-50 text-xs font-semibold"
+              >
+                Подтвердить отклонение
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
