@@ -1200,6 +1200,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
   }, [currentRank, targetRank, gratitude, gratitudeLink, entries, replacements, replacementLinks, authUser.id]);
 
   const isLeadership = ["head_avng", "chief_instructor", "deputy_head", "senior_ufsvng"].includes(authUser.role);
+  const isGlobalAdmin = ["head_avng", "deputy_head", "senior_ufsvng"].includes(authUser.role);
 
   useEffect(() => {
     const matched = INSTRUCTOR_RANKS.find(r => r.toLowerCase() === authUser.rank.toLowerCase());
@@ -1684,7 +1685,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
               <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
             )}
           </button>
-          {(authUser.role === "head_avng" || authUser.role === "deputy_head") && (
+          {isLeadership && (
             <button
               onClick={() => setActiveSubTab("settings")}
               className={`px-4 py-2 text-xs tracking-wider uppercase font-oswald border-b-2 transition-colors ${
@@ -2405,6 +2406,11 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                             <span className="rank-badge text-green-400 border border-green-800 bg-green-950/40 px-1.5 py-0.5 text-[10px]">
                               {r.current_rank} → {r.target_rank}
                             </span>
+                            {r.instructor_unit && (
+                              <span className="rank-badge text-blue-400 border border-blue-900 bg-blue-950/40 px-1.5 py-0.5 text-[10px]">
+                                {r.instructor_unit}
+                              </span>
+                            )}
                           </div>
                           <p className="text-xs text-muted-foreground font-mono mt-0.5">
                             ID: {r.instructor_static_id} · {fmt(r.created_at)} · {r.total_points} баллов
@@ -2600,19 +2606,25 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
 
             <div className="flex items-center gap-3 bg-tactical-panel/40 p-3 border border-tactical-border/30 rounded-sm">
               <label className="text-[10px] uppercase font-mono text-muted-foreground font-bold">Редактируемое подразделение:</label>
-              <select
-                className="bg-tactical-card border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary cursor-pointer rounded-sm"
-                value={selectedUnit}
-                onChange={(e) => setSelectedUnit(e.target.value)}
-              >
-                <option value="АВНГ">АВНГ (Академия)</option>
-                <option value="УВО">УВО (Вневедомственная Охрана)</option>
-                <option value="ОМОН">ОМОН</option>
-                <option value="СОБР">СОБР</option>
-                <option value="УСБ">УСБ</option>
-              </select>
+              {isGlobalAdmin ? (
+                <select
+                  className="bg-tactical-card border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary cursor-pointer rounded-sm"
+                  value={selectedUnit}
+                  onChange={(e) => setSelectedUnit(e.target.value)}
+                >
+                  <option value="АВНГ">АВНГ (Академия)</option>
+                  <option value="УВО">УВО (Вневедомственная Охрана)</option>
+                  <option value="ОМОН">ОМОН</option>
+                  <option value="СОБР">СОБР</option>
+                  <option value="УСБ">УСБ</option>
+                </select>
+              ) : (
+                <span className="font-ibm text-xs text-primary font-bold bg-tactical-panel border border-tactical-border px-3 py-1.5 rounded-sm">
+                  {selectedUnit}
+                </span>
+              )}
               <span className="text-[10px] text-muted-foreground/80 font-mono">
-                (При редактировании настройки будут применены конкретно к выбранному отделу)
+                {isGlobalAdmin ? "(При редактировании настройки будут применены к выбранному отделу)" : "(Вы можете редактировать критерии только для своего отдела)"}
               </span>
             </div>
 

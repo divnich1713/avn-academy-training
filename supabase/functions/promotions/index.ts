@@ -422,19 +422,36 @@ export default async function handler(req: Request): Promise<Response> {
     if (method === "GET" && action === "instructor_reports") {
       let query = "";
       const params: any[] = [];
-      const isLeadership = (r: string) => ["head_avng", "chief_instructor", "deputy_head"].includes(r);
+      const isLeadership = (r: string) => ["head_avng", "chief_instructor", "deputy_head", "senior_ufsvng"].includes(r);
       if (isLeadership(user.role)) {
-        query = `
-          SELECT ipr.id, ipr.current_rank, ipr.target_rank, ipr.total_points, ipr.items_completed,
-                 ipr.status, ipr.instructor_comment, ipr.reviewed_at, ipr.created_at,
-                 u.name as instructor_name, u.static_id as instructor_static_id,
-                 u.id as instructor_id, u.discord_id as instructor_discord_id, u.unit as instructor_unit,
-                 rv.name as reviewer_name
-          FROM ${SCHEMA}.instructor_promotion_reports ipr
-          JOIN ${SCHEMA}.users u ON ipr.user_id = u.id
-          LEFT JOIN ${SCHEMA}.users rv ON ipr.reviewed_by = rv.id
-          ORDER BY ipr.created_at DESC
-        `;
+        const isGlobalAdmin = ["head_avng", "deputy_head", "senior_ufsvng"].includes(user.role);
+        if (isGlobalAdmin) {
+          query = `
+            SELECT ipr.id, ipr.current_rank, ipr.target_rank, ipr.total_points, ipr.items_completed,
+                   ipr.status, ipr.instructor_comment, ipr.reviewed_at, ipr.created_at,
+                   u.name as instructor_name, u.static_id as instructor_static_id,
+                   u.id as instructor_id, u.discord_id as instructor_discord_id, u.unit as instructor_unit,
+                   rv.name as reviewer_name
+            FROM ${SCHEMA}.instructor_promotion_reports ipr
+            JOIN ${SCHEMA}.users u ON ipr.user_id = u.id
+            LEFT JOIN ${SCHEMA}.users rv ON ipr.reviewed_by = rv.id
+            ORDER BY ipr.created_at DESC
+          `;
+        } else {
+          query = `
+            SELECT ipr.id, ipr.current_rank, ipr.target_rank, ipr.total_points, ipr.items_completed,
+                   ipr.status, ipr.instructor_comment, ipr.reviewed_at, ipr.created_at,
+                   u.name as instructor_name, u.static_id as instructor_static_id,
+                   u.id as instructor_id, u.discord_id as instructor_discord_id, u.unit as instructor_unit,
+                   rv.name as reviewer_name
+            FROM ${SCHEMA}.instructor_promotion_reports ipr
+            JOIN ${SCHEMA}.users u ON ipr.user_id = u.id
+            LEFT JOIN ${SCHEMA}.users rv ON ipr.reviewed_by = rv.id
+            WHERE u.unit = $1
+            ORDER BY ipr.created_at DESC
+          `;
+          params.push(user.unit);
+        }
       } else {
         query = `
           SELECT ipr.id, ipr.current_rank, ipr.target_rank, ipr.total_points, ipr.items_completed,
@@ -601,8 +618,9 @@ export default async function handler(req: Request): Promise<Response> {
 
     // ===== POST /promotions?action=save_instructor_config — сохранить настройки повышения инструкторов =====
     if (method === "POST" && action === "save_instructor_config") {
-      if (user.role !== "head_avng") {
-        return new Response(JSON.stringify({ error: "Доступ запрещён. Настраивать систему повышения может только Начальник АВНГ." }), {
+      const isConfigAllowed = (r: string) => ["head_avng", "deputy_head", "senior_ufsvng", "chief_instructor"].includes(r);
+      if (!isConfigAllowed(user.role)) {
+        return new Response(JSON.stringify({ error: "Доступ запрещён." }), {
           status: 403,
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
         });
@@ -620,6 +638,13 @@ export default async function handler(req: Request): Promise<Response> {
       }
 
       const unitParam = body.unit || user.unit || "АВНГ";
+      const isGlobalAdmin = ["head_avng", "deputy_head", "senior_ufsvng"].includes(user.role);
+      if (!isGlobalAdmin && unitParam !== user.unit) {
+        return new Response(JSON.stringify({ error: "Вы можете настраивать систему повышения только для своего подразделения." }), {
+          status: 403,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
 
       await client.queryArray(
         `INSERT INTO ${SCHEMA}.instructor_promotion_settings (points_config, ranks_flow, unit)
@@ -886,8 +911,12 @@ export default async function handler(req: Request): Promise<Response> {
         user_id: number;
         target_rank: string;
         status: string;
+        instructor_unit: string;
       }>(
-        `SELECT id, user_id, target_rank, status FROM ${SCHEMA}.instructor_promotion_reports WHERE id = $1`,
+        `SELECT ipr.id, ipr.user_id, ipr.target_rank, ipr.status, u.unit as instructor_unit 
+         FROM ${SCHEMA}.instructor_promotion_reports ipr
+         JOIN ${SCHEMA}.users u ON ipr.user_id = u.id
+         WHERE ipr.id = $1`,
         [Number(reportId)]
       );
 
@@ -899,6 +928,14 @@ export default async function handler(req: Request): Promise<Response> {
       }
 
       const report = reportRes.rows[0];
+      const isGlobalAdmin = ["head_avng", "deputy_head", "senior_ufsvng"].includes(user.role);
+      if (!isGlobalAdmin && report.instructor_unit !== user.unit) {
+        return new Response(JSON.stringify({ error: "Вы можете рассматривать рапорты только сотрудников своего подразделения." }), {
+          status: 403,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+        });
+      }
+
       if (report.status !== "pending") {
         return new Response(JSON.stringify({ error: "Рапорт уже рассмотрен" }), {
           status: 400,
