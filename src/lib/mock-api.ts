@@ -293,7 +293,7 @@ export async function adminCreateUser(payload: {
   name: string;
   rank: string;
   unit: string;
-  role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed" | "senior_ufsvng";
+  role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed" | "senior_ufsvng" | "chief_sobr" | "deputy_chief_sobr" | "chief_omon" | "deputy_chief_omon";
   is_whitelisted: boolean;
   discord_id?: string | null;
   avatar_url?: string | null;
@@ -356,7 +356,7 @@ export async function adminRemoveUser(id: number) {
 
 export async function fetchInstructors(): Promise<User[]> {
   await delay();
-  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"].includes(r);
+  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"].includes(r);
   return USERS.filter((u) => isInstructor(u.role) && u.is_whitelisted).map(({ password: _, ...u }) => u);
 }
 
@@ -366,7 +366,7 @@ export async function fetchRequests(): Promise<TrainingRequest[]> {
   await delay();
   const user = getUser();
   if (!user) return [];
-  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"].includes(r);
+  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"].includes(r);
   
   const mapRequest = (r: TrainingRequest): TrainingRequest => {
     const cadet = USERS.find((u) => u.id === r.cadet_id);
@@ -570,7 +570,7 @@ export async function fetchRatings(timeframe: "daily" | "weekly" | "monthly" | "
   // Calculate mock point statistics
   // Let's generate some mock numbers based on instructor ID
   const instructors: import("./api").InstructorRating[] = USERS
-    .filter((u) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head"].includes(u.role))
+    .filter((u) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"].includes(u.role))
     .map((u) => {
       // Seed with pseudo-random numbers
       const seed = u.id * 3;
@@ -692,7 +692,7 @@ export async function checkPromotionRequirements(type: import("./api").Promotion
 export async function fetchPromotionReports(): Promise<import("./api").PromotionReport[]> {
   await delay(200);
   const user = USERS.find(u => u.id === (currentUserId || 1));
-  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"].includes(r);
+  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"].includes(r);
   if (user && isInstructor(user.role)) {
     return [...PROMOTION_REPORTS];
   }
@@ -738,7 +738,7 @@ export async function createPromotionReport(promotion_type: import("./api").Prom
   PROMOTION_REPORTS.unshift(newReport);
 
   // Add notifications to instructors
-  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng"].includes(r);
+  const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"].includes(r);
   USERS.filter(u => isInstructor(u.role)).forEach(inst => {
     NOTIFICATIONS.unshift({
       id: nextNotifId++,
@@ -955,7 +955,7 @@ export async function submitWeeklyReport(weekStart: string, items: Record<string
   saveWeeklyReports();
 
   // Add notification to leadership
-  const leadershipUsers = USERS.filter(u => ["head_avng", "chief_instructor", "deputy_head"].includes(u.role));
+  const leadershipUsers = USERS.filter(u => ["head_avng", "chief_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"].includes(u.role));
   for (const leader of leadershipUsers) {
     NOTIFICATIONS.unshift({
       id: nextNotifId++,
