@@ -20,8 +20,8 @@ class ActivityInputModal(Modal):
             required=True
         )
         self.links_input = TextInput(
-            label="Ссылки на скриншоты (через пробел)",
-            placeholder="https://imgur.com/... https://imgur.com/...",
+            label="Ссылки на скриншоты (по одной на строке)",
+            placeholder="1. https://imgur.com/...\n2. https://imgur.com/...",
             default=initial_links,
             style=discord.TextStyle.paragraph,
             required=True
@@ -39,11 +39,23 @@ class ActivityInputModal(Modal):
             await interaction.followup.send("❌ **Ошибка:** Количество должно быть целым числом больше нуля!", ephemeral=True)
             return
 
-        links = [lnk.strip() for lnk in self.links_input.value.replace(",", " ").split() if lnk.strip()]
+        # Extract only valid URLs, ignoring numbering markers
+        tokens = self.links_input.value.replace(",", " ").replace(";", " ").split()
+        links = []
+        for t in tokens:
+            t_clean = t.strip()
+            if t_clean.startswith(("http://", "https://")):
+                links.append(t_clean)
+            elif "." in t_clean and not t_clean.replace(".", "").isdigit():
+                # Ignore list markers like '1.' or '10.'
+                if not (t_clean.endswith(".") and t_clean[:-1].isdigit()):
+                    links.append(t_clean)
+
         if len(links) < count:
             await interaction.followup.send(
-                f"❌ **Ошибка:** Вы указали количество {count}, но предоставили только {len(links)} ссылок! "
-                f"Количество ссылок должно быть не меньше количества выполненных раз.",
+                f"❌ **Ошибка:** Вы указали количество {count}, но предоставили только {len(links)} ссылок!\n"
+                f"Вы указали следующие ссылки:\n" + "\n".join(f"{i+1}. {lnk}" for i, lnk in enumerate(links)) + "\n"
+                f"Пожалуйста, заполните ссылки рядом с номерами (например, '1. https://...').",
                 ephemeral=True
             )
             return
@@ -235,7 +247,11 @@ class PromotionReportBuilderView(View):
         # Find existing data in state
         existing = next((e for e in self.entries if e["num"] == activity_num), None)
         initial_count = str(existing["count"]) if existing else ""
-        initial_links = " ".join(existing["links"]) if existing else ""
+        
+        if existing:
+            initial_links = "\n".join(f"{idx + 1}. {lnk}" for idx, lnk in enumerate(existing["links"]))
+        else:
+            initial_links = "1. \n2. \n3. \n4. \n5. "
 
         modal = ActivityInputModal(activity_num, cfg["name"], self, initial_count, initial_links)
         await interaction.response.send_modal(modal)
