@@ -8,16 +8,19 @@ logger = logging.getLogger("discord_bot.permissions")
 # ── Role name patterns for permission levels (fallback) ──
 ADMIN_ROLE_NAMES = [
     'руководство', 'admin', 'администратор', 'head', 'chief',
-    'начальник', 'заместитель начальника', 'подполковник', 'полковник'
+    'начальник', 'заместитель начальника', 'подполковник', 'полковник',
+    'командир собр', 'заместитель командира собр', 'командир омон', 'заместитель командира омон'
 ]
 
 INSTRUCTOR_ROLE_NAMES = [
     'инструктор', 'instructor', 'senior_instructor', 'chief_instructor',
-    'старший инструктор', 'главный инструктор', 'офицер'
+    'старший инструктор', 'главный инструктор', 'офицер',
+    'командир собр', 'заместитель командира собр', 'командир омон', 'заместитель командира омон'
 ]
 
 LEADER_ROLE_NAMES = ADMIN_ROLE_NAMES + [
-    'командир', 'leader', 'лидер', 'замком'
+    'командир', 'leader', 'лидер', 'замком',
+    'командир собр', 'заместитель командира собр', 'командир омон', 'заместитель командира омон'
 ]
 
 ALL_STAFF_ROLE_NAMES = list(set(ADMIN_ROLE_NAMES + INSTRUCTOR_ROLE_NAMES + LEADER_ROLE_NAMES))
