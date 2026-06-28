@@ -94,7 +94,7 @@ class ActivityInputModal(Modal):
             await interaction.followup.send(
                 f"❌ **Ошибка:** Вы указали количество {count}, но предоставили только {len(links)} ссылок!\n"
                 f"Вы указали следующие ссылки:\n" + "\n".join(f"{i+1}. {lnk}" for i, lnk in enumerate(links)) + "\n"
-                f"Пожалуйста, заполните ссылки рядом с номерами (например, '1. https://...').",
+                f"Пожалуйста, заполните ссылки (вы можете дописывать новые строки ниже: 26. https://... или просто вставлять их списком без номеров — бот автоматически распознает все ссылки).",
                 ephemeral=True
             )
             return
@@ -292,10 +292,10 @@ class PromotionReportBuilderView(View):
         
         if existing:
             existing_links = [f"{idx + 1}. {lnk}" for idx, lnk in enumerate(existing["links"])]
-            extra_lines = [f"{idx + 1}. " for idx in range(len(existing["links"]), 15)]
+            extra_lines = [f"{idx + 1}. " for idx in range(len(existing["links"]), 25)]
             initial_links = "\n".join(existing_links + extra_lines)
         else:
-            initial_links = "\n".join(f"{idx + 1}. " for idx in range(15))
+            initial_links = "\n".join(f"{idx + 1}. " for idx in range(25))
 
         modal = ActivityInputModal(activity_num, cfg["name"], self, initial_count, initial_links)
         await interaction.response.send_modal(modal)
