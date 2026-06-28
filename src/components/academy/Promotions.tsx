@@ -1199,7 +1199,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
     }
   }, [currentRank, targetRank, gratitude, gratitudeLink, entries, replacements, replacementLinks, authUser.id]);
 
-  const isLeadership = ["head_avng", "chief_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"].includes(authUser.role);
+  const isLeadership = ["head_avng", "chief_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon", "chief_uvo", "deputy_chief_uvo"].includes(authUser.role);
   const isGlobalAdmin = ["head_avng", "deputy_head", "senior_ufsvng"].includes(authUser.role);
 
   useEffect(() => {

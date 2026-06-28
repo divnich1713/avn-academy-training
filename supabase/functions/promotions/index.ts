@@ -387,7 +387,7 @@ export default async function handler(req: Request): Promise<Response> {
       let targetUserId = user.id;
       const cadetIdParam = url.searchParams.get("cadet_id");
       if (cadetIdParam) {
-        const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"].includes(r);
+        const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon", "chief_uvo", "deputy_chief_uvo"].includes(r);
         if (!isInstructor(user.role)) {
           return new Response(JSON.stringify({ error: "Только для инструкторов" }), {
             status: 403,
@@ -422,7 +422,7 @@ export default async function handler(req: Request): Promise<Response> {
     if (method === "GET" && action === "instructor_reports") {
       let query = "";
       const params: any[] = [];
-      const isLeadership = (r: string) => ["head_avng", "chief_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"].includes(r);
+      const isLeadership = (r: string) => ["head_avng", "chief_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon", "chief_uvo", "deputy_chief_uvo"].includes(r);
       if (isLeadership(user.role)) {
         const isGlobalAdmin = ["head_avng", "deputy_head", "senior_ufsvng"].includes(user.role);
         if (isGlobalAdmin) {
@@ -603,7 +603,7 @@ export default async function handler(req: Request): Promise<Response> {
         `INSERT INTO ${SCHEMA}.notifications (user_id, type, title, message)
          SELECT id, 'promotion_request', $1, $2
          FROM ${SCHEMA}.users
-         WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head', 'senior_ufsvng', 'chief_sobr', 'deputy_chief_sobr', 'chief_omon', 'deputy_chief_omon')`,
+         WHERE role IN ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head', 'senior_ufsvng', 'chief_sobr', 'deputy_chief_sobr', 'chief_omon', 'deputy_chief_omon', 'chief_uvo', 'deputy_chief_uvo')`,
         [
           `Рапорт на повышение: ${reqs.label}`,
           `${user.rank} ${user.name} подал рапорт на повышение до ${reqs.label}.`
@@ -618,7 +618,7 @@ export default async function handler(req: Request): Promise<Response> {
 
     // ===== POST /promotions?action=save_instructor_config — сохранить настройки повышения инструкторов =====
     if (method === "POST" && action === "save_instructor_config") {
-      const isConfigAllowed = (r: string) => ["head_avng", "deputy_head", "senior_ufsvng", "chief_instructor", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"].includes(r);
+      const isConfigAllowed = (r: string) => ["head_avng", "deputy_head", "senior_ufsvng", "chief_instructor", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon", "chief_uvo", "deputy_chief_uvo"].includes(r);
       if (!isConfigAllowed(user.role)) {
         return new Response(JSON.stringify({ error: "Доступ запрещён." }), {
           status: 403,
@@ -762,7 +762,7 @@ export default async function handler(req: Request): Promise<Response> {
         `INSERT INTO ${SCHEMA}.notifications (user_id, type, title, message)
          SELECT id, 'instructor_promotion_request', $1, $2
          FROM ${SCHEMA}.users
-         WHERE role IN ('head_avng', 'chief_instructor', 'deputy_head', 'senior_ufsvng', 'chief_sobr', 'deputy_chief_sobr', 'chief_omon', 'deputy_chief_omon')`,
+         WHERE role IN ('head_avng', 'chief_instructor', 'deputy_head', 'senior_ufsvng', 'chief_sobr', 'deputy_chief_sobr', 'chief_omon', 'deputy_chief_omon', 'chief_uvo', 'deputy_chief_uvo')`,
         [
           `Рапорт инструктора: ${targetRank}`,
           `${user.rank} ${user.name} подал рапорт на повышение до ${targetRank} (${totalPoints} баллов).`
@@ -777,7 +777,7 @@ export default async function handler(req: Request): Promise<Response> {
 
     // ===== PUT /promotions?action=review&id=N — инструктор рассматривает рапорт =====
     if (method === "PUT" && action === "review") {
-        const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"].includes(r);
+        const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon", "chief_uvo", "deputy_chief_uvo"].includes(r);
         if (!isInstructor(user.role)) {
           return new Response(JSON.stringify({ error: "Только для инструкторов" }), {
             status: 403,
@@ -878,7 +878,7 @@ export default async function handler(req: Request): Promise<Response> {
 
     // ===== PUT /promotions?action=review_instructor_report =====
     if (method === "PUT" && action === "review_instructor_report") {
-      const isLeadership = (r: string) => ["head_avng", "chief_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"].includes(r);
+      const isLeadership = (r: string) => ["head_avng", "chief_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon", "chief_uvo", "deputy_chief_uvo"].includes(r);
       if (!isLeadership(user.role)) {
         return new Response(JSON.stringify({ error: "Только для руководства АВНГ" }), {
           status: 403,

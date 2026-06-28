@@ -9,7 +9,7 @@ import { PromotionInstructorTab } from "./Promotions";
 
 const TestingAdmin = lazy(() => import("./TestingAdmin").then(m => ({ default: m.TestingAdmin })));
 
-type EditForm = { static_id: string; name: string; rank: string; unit: string; role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed" | "senior_ufsvng" | "chief_sobr" | "deputy_chief_sobr" | "chief_omon" | "deputy_chief_omon"; password: string; created_at: string; discord_id: string; avatar_url: string };
+type EditForm = { static_id: string; name: string; rank: string; unit: string; role: "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed" | "senior_ufsvng" | "chief_sobr" | "deputy_chief_sobr" | "chief_omon" | "deputy_chief_omon" | "chief_uvo" | "deputy_chief_uvo"; password: string; created_at: string; discord_id: string; avatar_url: string };
 
 const ROLE_LABELS: Record<string, string> = {
   head_avng: "Нач.АВНГ",
@@ -23,6 +23,8 @@ const ROLE_LABELS: Record<string, string> = {
   deputy_chief_sobr: "Зам.командира СОБР",
   chief_omon: "Командир ОМОН",
   deputy_chief_omon: "Зам.командира ОМОН",
+  chief_uvo: "Начальник УВО",
+  deputy_chief_uvo: "Зам.начальника УВО",
   cadet: "Курсант",
   dismissed: "Уволен"
 };
@@ -110,7 +112,7 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
   const { data: wlUsers = [], isLoading: wlLoading } = useAdminUsers();
   const deleteUserMutation = useDeleteUser();
   const [showAddForm, setShowAddForm] = useState(false);
-  const [form, setForm] = useState({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "АВНГ", role: "cadet" as "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed" | "senior_ufsvng" | "chief_sobr" | "deputy_chief_sobr" | "chief_omon" | "deputy_chief_omon", discord_id: "", avatar_url: "" });
+  const [form, setForm] = useState({ static_id: "", password: "", name: "", rank: "Рядовой", unit: "АВНГ", role: "cadet" as "cadet" | "instructor" | "head_avng" | "chief_instructor" | "senior_instructor" | "junior_instructor" | "deputy_head" | "dismissed" | "senior_ufsvng" | "chief_sobr" | "deputy_chief_sobr" | "chief_omon" | "deputy_chief_omon" | "chief_uvo" | "deputy_chief_uvo", discord_id: "", avatar_url: "" });
   const [formError, setFormError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
   const [editUser, setEditUser] = useState<import("@/lib/api").AdminUser | null>(null);
@@ -1512,6 +1514,8 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                         <option value="deputy_chief_sobr">Зам.командира СОБР</option>
                         <option value="chief_omon">Командир ОМОН</option>
                         <option value="deputy_chief_omon">Зам.командира ОМОН</option>
+                        <option value="chief_uvo">Начальник УВО</option>
+                        <option value="deputy_chief_uvo">Зам.начальника УВО</option>
                       </>
                     )}
                     <option value="cadet">Курсант</option>
@@ -1614,6 +1618,8 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
                     <option value="deputy_chief_sobr">Зам.командира СОБР</option>
                     <option value="chief_omon">Командир ОМОН</option>
                     <option value="deputy_chief_omon">Зам.командира ОМОН</option>
+                    <option value="chief_uvo">Начальник УВО</option>
+                    <option value="deputy_chief_uvo">Зам.начальника УВО</option>
                     <option value="cadet">Курсант</option>
                     <option value="dismissed">Уволен</option>
                   </select>

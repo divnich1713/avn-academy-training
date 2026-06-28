@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/tests", tags=["Test Engine"])
 
 # Centralized role constants for permission checks
 ADMIN_ROLES = ('head_avng', 'chief_instructor', 'deputy_head', 'senior_ufsvng')
-INSTRUCTOR_ROLES = ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head', 'senior_ufsvng', 'chief_sobr', 'deputy_chief_sobr', 'chief_omon', 'deputy_chief_omon')
+INSTRUCTOR_ROLES = ('instructor', 'head_avng', 'chief_instructor', 'senior_instructor', 'junior_instructor', 'deputy_head', 'senior_ufsvng', 'chief_sobr', 'deputy_chief_sobr', 'chief_omon', 'deputy_chief_omon', 'chief_uvo', 'deputy_chief_uvo')
 
 async def get_test_settings(db: AsyncSession, subject: str) -> dict:
     try:

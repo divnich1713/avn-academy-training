@@ -49,7 +49,7 @@ async function getRequester(client: Client, token: string | null): Promise<{ id:
      WHERE s.token = $1 AND s.expires_at > NOW() AND u.is_whitelisted = true`,
     [token]
   );
-  if (res.rows.length > 0 && (res.rows[0].role === "instructor" || res.rows[0].role === "head_avng" || res.rows[0].role === "chief_instructor" || res.rows[0].role === "senior_instructor" || res.rows[0].role === "junior_instructor" || res.rows[0].role === "deputy_head" || res.rows[0].role === "senior_ufsvng" || res.rows[0].role === "chief_sobr" || res.rows[0].role === "deputy_chief_sobr" || res.rows[0].role === "chief_omon" || res.rows[0].role === "deputy_chief_omon")) {
+  if (res.rows.length > 0 && (res.rows[0].role === "instructor" || res.rows[0].role === "head_avng" || res.rows[0].role === "chief_instructor" || res.rows[0].role === "senior_instructor" || res.rows[0].role === "junior_instructor" || res.rows[0].role === "deputy_head" || res.rows[0].role === "senior_ufsvng" || res.rows[0].role === "chief_sobr" || res.rows[0].role === "deputy_chief_sobr" || res.rows[0].role === "chief_omon" || res.rows[0].role === "deputy_chief_omon" || res.rows[0].role === "chief_uvo" || res.rows[0].role === "deputy_chief_uvo")) {
     return res.rows[0];
   }
   return null;
@@ -137,7 +137,7 @@ export default async function handler(req: Request): Promise<Response> {
         });
       }
 
-      const allowedRoles = ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "dismissed", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"];
+      const allowedRoles = ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "dismissed", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon", "chief_uvo", "deputy_chief_uvo"];
       if (!allowedRoles.includes(role)) {
         return new Response(JSON.stringify({ error: "Неверная роль" }), {
           status: 400,
@@ -145,7 +145,7 @@ export default async function handler(req: Request): Promise<Response> {
         });
       }
 
-      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"].includes(r);
+      const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon", "chief_uvo", "deputy_chief_uvo"].includes(r);
       if (isInstructor(role) && requester.role !== "head_avng" && requester.role !== "deputy_head" && requester.role !== "senior_ufsvng") {
         return new Response(JSON.stringify({ error: "Только Начальник АВНГ или его Заместитель может назначать инструкторов" }), {
           status: 403,
@@ -215,7 +215,7 @@ export default async function handler(req: Request): Promise<Response> {
         fields.push(`is_whitelisted = $${idx++}`);
         values.push(Boolean(body.is_whitelisted));
       }
-      const allowedRoles = ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "dismissed", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"];
+      const allowedRoles = ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "dismissed", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon", "chief_uvo", "deputy_chief_uvo"];
       if (body.role && allowedRoles.includes(body.role)) {
         if (requester.role !== "head_avng" && requester.role !== "deputy_head" && requester.role !== "senior_ufsvng") {
           const curUserRes = await client.queryObject<{ role: string }>(
@@ -224,7 +224,7 @@ export default async function handler(req: Request): Promise<Response> {
           );
           const currentRole = curUserRes.rows[0]?.role;
           if (currentRole !== body.role) {
-            const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"].includes(r);
+            const isInstructor = (r: string) => ["instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon", "chief_uvo", "deputy_chief_uvo"].includes(r);
             if (isInstructor(body.role) || isInstructor(currentRole)) {
               return new Response(JSON.stringify({ error: "Только Начальник АВНГ или его Заместитель может изменять роли инструкторов" }), {
                 status: 403,

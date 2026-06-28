@@ -17,7 +17,7 @@ export type Section =
   | "flashcards"
   | "weekly-reports";
 
-export type UserRole = "head_avng" | "deputy_head" | "chief_instructor" | "senior_instructor" | "instructor" | "junior_instructor" | "cadet" | "dismissed" | "senior_ufsvng" | "chief_sobr" | "deputy_chief_sobr" | "chief_omon" | "deputy_chief_omon";
+export type UserRole = "head_avng" | "deputy_head" | "chief_instructor" | "senior_instructor" | "instructor" | "junior_instructor" | "cadet" | "dismissed" | "senior_ufsvng" | "chief_sobr" | "deputy_chief_sobr" | "chief_omon" | "deputy_chief_omon" | "chief_uvo" | "deputy_chief_uvo";
 
 export const NAV_ITEMS: {
   id: Section;
@@ -35,7 +35,7 @@ export const NAV_ITEMS: {
     id: "materials",
     label: "Обучающие материалы",
     icon: "BookOpen",
-    roles: ["cadet", "instructor", "head_avng", "senior_ufsvng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"],
+    roles: ["cadet", "instructor", "head_avng", "senior_ufsvng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon", "chief_uvo", "deputy_chief_uvo"],
   },
   {
     id: "lectures",
@@ -71,19 +71,19 @@ export const NAV_ITEMS: {
     id: "simulator",
     label: "Тренажер ситуаций",
     icon: "Target",
-    roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"],
+    roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon", "chief_uvo", "deputy_chief_uvo"],
   },
   {
     id: "flashcards",
     label: "Карточки законов",
     icon: "Brain",
-    roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"],
+    roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon", "chief_uvo", "deputy_chief_uvo"],
   },
   {
     id: "promotions",
     label: "Повышение",
     icon: "Medal",
-    roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"],
+    roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon", "chief_uvo", "deputy_chief_uvo"],
   },
   {
     id: "reports",
@@ -97,7 +97,7 @@ export const NAV_ITEMS: {
     icon: "BarChart3",
     roles: ["cadet"],
   },
-  { id: "profile", label: "Профиль курсанта", icon: "User", roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon"] },
+  { id: "profile", label: "Профиль курсанта", icon: "User", roles: ["cadet", "instructor", "head_avng", "chief_instructor", "senior_instructor", "junior_instructor", "deputy_head", "senior_ufsvng", "chief_sobr", "deputy_chief_sobr", "chief_omon", "deputy_chief_omon", "chief_uvo", "deputy_chief_uvo"] },
   {
     id: "ratings",
     label: "Рейтинг инструкторов",
