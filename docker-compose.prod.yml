@@ -28,7 +28,7 @@ services:
     cpus: 1.0
     healthcheck:
       # Evaluated inside container shell
-      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD} ping | grep PONG"]
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-redis_secure_prod_pass} ping | grep PONG"]
       interval: 5s
       timeout: 3s
       retries: 5
