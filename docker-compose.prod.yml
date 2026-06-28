@@ -7,7 +7,7 @@ services:
       - "127.0.0.1:54322:5432"
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=postgres
     volumes:
       - db_data:/var/lib/postgresql/data
@@ -22,7 +22,7 @@ services:
 
   redis:
     image: mirror.gcr.io/library/redis:7-alpine
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_secure_prod_pass}
     restart: always
     mem_limit: 512m
     cpus: 1.0
@@ -42,7 +42,7 @@ services:
       - .:/app
     working_dir: /app
     environment:
-      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
       - SCHEMA=${SCHEMA:-t_p29017774_avn_academy_training}
     command: python db_migrations/migrate.py
     depends_on:
@@ -57,11 +57,11 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_prod_pass}@redis:6379/0
       - SCHEMA=${SCHEMA:-t_p29017774_avn_academy_training}
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
-      - DISCORD_BOT_SECRET=${DISCORD_BOT_SECRET}
+      - DISCORD_BOT_SECRET=${DISCORD_BOT_SECRET:-default_secret}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL}
       - HTTP_PROXY=${HTTP_PROXY}
@@ -81,8 +81,8 @@ services:
       dockerfile: Dockerfile
       network: host
     environment:
-      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_prod_pass}@redis:6379/0
       - SCHEMA=${SCHEMA:-t_p29017774_avn_academy_training}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL}
@@ -105,7 +105,7 @@ services:
       - .:/app
     working_dir: /app/supabase/functions
     environment:
-      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
       - SCHEMA=${SCHEMA:-t_p29017774_avn_academy_training}
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -126,8 +126,8 @@ services:
       dockerfile: Dockerfile
     environment:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
-      - DISCORD_GUILD_ID=${DISCORD_GUILD_ID}
-      - DISCORD_BOT_SECRET=${DISCORD_BOT_SECRET}
+      - DISCORD_GUILD_ID=${DISCORD_GUILD_ID:-1515286392576638976}
+      - DISCORD_BOT_SECRET=${DISCORD_BOT_SECRET:-default_secret}
       - DISCORD_INSTRUCTORS_CHANNEL_ID=${DISCORD_INSTRUCTORS_CHANNEL_ID}
       - DISCORD_COURSES_REPORT_CHANNEL_ID=${DISCORD_COURSES_REPORT_CHANNEL_ID}
       - DISCORD_EXAMS_REPORT_CHANNEL_ID=${DISCORD_EXAMS_REPORT_CHANNEL_ID}
@@ -141,7 +141,7 @@ services:
       - DISCORD_CADET_ROLE_ID=${DISCORD_CADET_ROLE_ID}
       - DISCORD_TRANSFER_ROLE_ID=${DISCORD_TRANSFER_ROLE_ID}
       - DISCORD_VERIFIED_ROLE_ID=${DISCORD_VERIFIED_ROLE_ID}
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_prod_pass}@redis:6379/0
       - API_URL=http://api:8000
     depends_on:
       redis:
