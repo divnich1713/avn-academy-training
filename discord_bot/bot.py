@@ -1248,10 +1248,15 @@ class AVNBotClient(discord.Client):
 
         # Sync commands to the guild
         if GUILD_ID:
-            guild = discord.Object(id=int(GUILD_ID))
-            self.tree.copy_global_to(guild=guild)
-            await self.tree.sync(guild=guild)
-            logger.info(f"Slash commands synced to guild {GUILD_ID}")
+            try:
+                guild = discord.Object(id=int(GUILD_ID))
+                self.tree.copy_global_to(guild=guild)
+                await self.tree.sync(guild=guild)
+                logger.info(f"Slash commands synced to guild {GUILD_ID}")
+            except discord.errors.Forbidden as e:
+                logger.warning(f"Failed to sync slash commands to guild {GUILD_ID}: {e}. Make sure the bot is invited with 'applications.commands' scope.")
+            except Exception as e:
+                logger.error(f"Failed to sync slash commands: {e}")
 
     async def on_ready(self):
         logger.info(f"Logged in as {self.user} (ID: {self.user.id})")
