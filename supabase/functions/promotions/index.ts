@@ -257,12 +257,23 @@ export default async function handler(req: Request): Promise<Response> {
 
     // ===== GET /promotions?action=instructor_config — получить настройки повышения инструкторов =====
     if (method === "GET" && action === "instructor_config") {
-      const res = await client.queryObject<{
+      const unitParam = url.searchParams.get("unit") || user.unit || "АВНГ";
+      let res = await client.queryObject<{
         points_config: string;
         ranks_flow: string;
       }>(
-        `SELECT points_config, ranks_flow FROM ${SCHEMA}.instructor_promotion_settings LIMIT 1`
+        `SELECT points_config, ranks_flow FROM ${SCHEMA}.instructor_promotion_settings WHERE unit = $1`,
+        [unitParam]
       );
+      if (res.rows.length === 0 && unitParam !== "АВНГ") {
+        res = await client.queryObject<{
+          points_config: string;
+          ranks_flow: string;
+        }>(
+          `SELECT points_config, ranks_flow FROM ${SCHEMA}.instructor_promotion_settings WHERE unit = 'АВНГ'`
+        );
+      }
+
       if (res.rows.length > 0) {
         const row = res.rows[0];
         let points_config = row.points_config;
@@ -417,7 +428,7 @@ export default async function handler(req: Request): Promise<Response> {
           SELECT ipr.id, ipr.current_rank, ipr.target_rank, ipr.total_points, ipr.items_completed,
                  ipr.status, ipr.instructor_comment, ipr.reviewed_at, ipr.created_at,
                  u.name as instructor_name, u.static_id as instructor_static_id,
-                 u.id as instructor_id, u.discord_id as instructor_discord_id,
+                 u.id as instructor_id, u.discord_id as instructor_discord_id, u.unit as instructor_unit,
                  rv.name as reviewer_name
           FROM ${SCHEMA}.instructor_promotion_reports ipr
           JOIN ${SCHEMA}.users u ON ipr.user_id = u.id
@@ -429,7 +440,7 @@ export default async function handler(req: Request): Promise<Response> {
           SELECT ipr.id, ipr.current_rank, ipr.target_rank, ipr.total_points, ipr.items_completed,
                  ipr.status, ipr.instructor_comment, ipr.reviewed_at, ipr.created_at,
                  u.name as instructor_name, u.static_id as instructor_static_id,
-                 u.id as instructor_id, u.discord_id as instructor_discord_id,
+                 u.id as instructor_id, u.discord_id as instructor_discord_id, u.unit as instructor_unit,
                  rv.name as reviewer_name
           FROM ${SCHEMA}.instructor_promotion_reports ipr
           JOIN ${SCHEMA}.users u ON ipr.user_id = u.id
@@ -608,25 +619,15 @@ export default async function handler(req: Request): Promise<Response> {
         });
       }
 
-      // Check if row exists
-      const existRes = await client.queryObject<{ id: number }>(
-        `SELECT id FROM ${SCHEMA}.instructor_promotion_settings LIMIT 1`
-      );
+      const unitParam = body.unit || user.unit || "АВНГ";
 
-      if (existRes.rows.length > 0) {
-        await client.queryArray(
-          `UPDATE ${SCHEMA}.instructor_promotion_settings
-           SET points_config = $1, ranks_flow = $2, updated_at = NOW()
-           WHERE id = $3`,
-          [JSON.stringify(points_config), JSON.stringify(ranks_flow), existRes.rows[0].id]
-        );
-      } else {
-        await client.queryArray(
-          `INSERT INTO ${SCHEMA}.instructor_promotion_settings (points_config, ranks_flow)
-           VALUES ($1, $2)`,
-          [JSON.stringify(points_config), JSON.stringify(ranks_flow)]
-        );
-      }
+      await client.queryArray(
+        `INSERT INTO ${SCHEMA}.instructor_promotion_settings (points_config, ranks_flow, unit)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (unit)
+         DO UPDATE SET points_config = EXCLUDED.points_config, ranks_flow = EXCLUDED.ranks_flow, updated_at = NOW()`,
+        [JSON.stringify(points_config), JSON.stringify(ranks_flow), unitParam]
+      );
 
       return new Response(JSON.stringify({ success: true }), {
         status: 200,

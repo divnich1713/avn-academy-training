@@ -338,10 +338,19 @@ export function RequestForm({
       let discord_message_id: string | undefined = undefined;
       let discord_channel_id: string | undefined = undefined;
 
-      // Trigger Discord notifications
+      // 1. Create request on database first to obtain request ID
+      const newRequest = await createRequest({ 
+        type, 
+        subject, 
+        description: finalDescription, 
+        preferred_date: date || undefined,
+        instructor_id: selectedInstructorId ? Number(selectedInstructorId) : undefined
+      });
+
+      // 2. Trigger Discord notifications via Bot
       if (subject === "Рапорт на увольнение из академии") {
         try {
-          const discordRes = await sendDismissalReportDiscord({
+          await sendDismissalReportDiscord({
             name: dismissalName,
             rank: dismissalRank,
             reason: dismissalReason,
@@ -349,10 +358,6 @@ export function RequestForm({
             staticId: authUser.static_id,
             unit: authUser.unit || "АВНГ"
           });
-          if (discordRes) {
-            discord_message_id = discordRes.messageId;
-            discord_channel_id = discordRes.channelId;
-          }
         } catch (err) {
           console.error("Discord error:", err);
         }
@@ -370,19 +375,11 @@ export function RequestForm({
           preferredDate: date || "Не указана",
           details: finalDescription,
           cadetDiscordId: authUser.discord_id || undefined,
-          instructorName
+          instructorName,
+          request_id: newRequest?.id,
+          requestType: type
         }).catch(err => console.error("Discord error:", err));
       }
-
-      await createRequest({ 
-        type, 
-        subject, 
-        description: finalDescription, 
-        preferred_date: date || undefined,
-        discord_message_id,
-        discord_channel_id,
-        instructor_id: selectedInstructorId ? Number(selectedInstructorId) : undefined
-      });
 
       onSubmit();
     } catch (err: unknown) {

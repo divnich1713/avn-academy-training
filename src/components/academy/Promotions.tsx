@@ -924,6 +924,26 @@ export function InstructorMilitaryReport({
   );
 }
 
+function getPromoDraft(userId: number) {
+  try {
+    const key = `instructor_promo_draft_${userId}`;
+    const saved = localStorage.getItem(key);
+    if (!saved) return null;
+    const parsed = JSON.parse(saved);
+    if (parsed && parsed.savedAt) {
+      const savedAt = new Date(parsed.savedAt).getTime();
+      const twoWeeks = 14 * 24 * 60 * 60 * 1000;
+      if (Date.now() - savedAt > twoWeeks) {
+        localStorage.removeItem(key);
+        return null;
+      }
+    }
+    return parsed;
+  } catch (_) {
+    return null;
+  }
+}
+
 export function InstructorPromotionSection({ authUser }: { authUser: User }) {
   const [activeSubTab, setActiveSubTab] = useState<"submit" | "review" | "settings">("submit");
   const [reports, setReports] = useState<InstructorPromotionReport[]>([]);
@@ -933,7 +953,11 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
   const [reviewComment, setReviewComment] = useState<Record<number, string>>({});
   const [filterStatus, setFilterStatus] = useState<string>("all");
 
-  const { data: configData } = useInstructorPromotionConfig();
+  const [selectedUnit, setSelectedUnit] = useState<string>(() => {
+    return authUser.unit || "АВНГ";
+  });
+
+  const { data: configData } = useInstructorPromotionConfig(selectedUnit);
   const saveConfigMutation = useSaveInstructorPromotionConfig();
 
   const pointsConfig = useMemo(() => {
@@ -1025,6 +1049,7 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
       await saveConfigMutation.mutateAsync({
         points_config: editPoints,
         ranks_flow: editRanks,
+        unit: selectedUnit
       });
       setSaveStatus({ success: true });
       setTimeout(() => setSaveStatus(null), 5000);
@@ -1034,47 +1059,27 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
   };
   
   const [currentRank, _setCurrentRank] = useState<string>(() => {
-    try {
-      const saved = localStorage.getItem(`instructor_promo_draft_${authUser.id}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.currentRank) return parsed.currentRank;
-      }
-    } catch (_) {}
+    const draft = getPromoDraft(authUser.id);
+    if (draft && draft.currentRank) return draft.currentRank;
     const matched = INSTRUCTOR_RANKS.find(r => r.toLowerCase() === authUser.rank.toLowerCase());
     return matched || "Сержант";
   });
   
   const [targetRank, setTargetRank] = useState<string>(() => {
-    try {
-      const saved = localStorage.getItem(`instructor_promo_draft_${authUser.id}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.targetRank) return parsed.targetRank;
-      }
-    } catch (_) {}
+    const draft = getPromoDraft(authUser.id);
+    if (draft && draft.targetRank) return draft.targetRank;
     return "Старший Сержант";
   });
 
   const [gratitude, setGratitude] = useState(() => {
-    try {
-      const saved = localStorage.getItem(`instructor_promo_draft_${authUser.id}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.gratitude !== undefined) return parsed.gratitude;
-      }
-    } catch (_) {}
+    const draft = getPromoDraft(authUser.id);
+    if (draft && draft.gratitude !== undefined) return draft.gratitude;
     return false;
   });
 
   const [gratitudeLink, setGratitudeLink] = useState(() => {
-    try {
-      const saved = localStorage.getItem(`instructor_promo_draft_${authUser.id}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.gratitudeLink !== undefined) return parsed.gratitudeLink;
-      }
-    } catch (_) {}
+    const draft = getPromoDraft(authUser.id);
+    if (draft && draft.gratitudeLink !== undefined) return draft.gratitudeLink;
     return "";
   });
   
@@ -1086,15 +1091,10 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
     links: string[];
     isAuto?: boolean;
   }>>(() => {
-    try {
-      const saved = localStorage.getItem(`instructor_promo_draft_${authUser.id}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.entries) {
-          return parsed.entries.filter((e: any) => !e.isAuto);
-        }
-      }
-    } catch (_) {}
+    const draft = getPromoDraft(authUser.id);
+    if (draft && draft.entries) {
+      return draft.entries.filter((e: any) => !e.isAuto);
+    }
     return [];
   });
 
@@ -1106,24 +1106,14 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   
   const [replacements, setReplacements] = useState<Record<number, number>>(() => {
-    try {
-      const saved = localStorage.getItem(`instructor_promo_draft_${authUser.id}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.replacements) return parsed.replacements;
-      }
-    } catch (_) {}
+    const draft = getPromoDraft(authUser.id);
+    if (draft && draft.replacements) return draft.replacements;
     return {};
   });
 
   const [replacementLinks, setReplacementLinks] = useState<Record<number, string>>(() => {
-    try {
-      const saved = localStorage.getItem(`instructor_promo_draft_${authUser.id}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.replacementLinks) return parsed.replacementLinks;
-      }
-    } catch (_) {}
+    const draft = getPromoDraft(authUser.id);
+    if (draft && draft.replacementLinks) return draft.replacementLinks;
     return {};
   });
 
@@ -2606,6 +2596,24 @@ export function InstructorPromotionSection({ authUser }: { authUser: User }) {
                 <Icon name="Save" size={14} />
                 {saveConfigMutation.isPending ? "Сохранение..." : "Сохранить всё"}
               </button>
+            </div>
+
+            <div className="flex items-center gap-3 bg-tactical-panel/40 p-3 border border-tactical-border/30 rounded-sm">
+              <label className="text-[10px] uppercase font-mono text-muted-foreground font-bold">Редактируемое подразделение:</label>
+              <select
+                className="bg-tactical-card border border-tactical-border px-3 py-1.5 text-xs text-foreground font-ibm focus:outline-none focus:border-primary cursor-pointer rounded-sm"
+                value={selectedUnit}
+                onChange={(e) => setSelectedUnit(e.target.value)}
+              >
+                <option value="АВНГ">АВНГ (Академия)</option>
+                <option value="УВО">УВО (Вневедомственная Охрана)</option>
+                <option value="ОМОН">ОМОН</option>
+                <option value="СОБР">СОБР</option>
+                <option value="УСБ">УСБ</option>
+              </select>
+              <span className="text-[10px] text-muted-foreground/80 font-mono">
+                (При редактировании настройки будут применены конкретно к выбранному отделу)
+              </span>
             </div>
 
             {saveStatus?.error && (

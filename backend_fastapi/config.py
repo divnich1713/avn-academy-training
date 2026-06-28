@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:54322/postgres"
     REDIS_URL: str = "redis://localhost:6379/0"
     DISCORD_BOT_TOKEN: str = ""
+    DISCORD_BOT_SECRET: str = ""
     
     @property
     def async_database_url(self) -> str:

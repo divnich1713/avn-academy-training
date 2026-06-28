@@ -268,6 +268,15 @@ export function TestingSystem() {
       const selectedInst = instructors.find(i => i.id === Number(selectedInstructorId));
       const instructorName = selectedInst ? `${selectedInst.rank} ${selectedInst.name}` : undefined;
 
+      // 1. Create request on database first to obtain request ID
+      const newRequest = await createRequest({
+        type: "exam",
+        subject: `Допуск к тесту: ${subject}`,
+        description: `Прошу выдать допуск к прохождению тестирования по теме: ${subject}`,
+        instructor_id: selectedInstructorId ? Number(selectedInstructorId) : undefined
+      });
+
+      // 2. Trigger Discord notifications via Bot
       sendGeneralRequestDiscord({
         name: authUser.name,
         rank: authUser.rank,
@@ -278,15 +287,10 @@ export function TestingSystem() {
         preferredDate: new Date().toLocaleDateString("sv-SE"),
         details: `Прошу выдать допуск к прохождению тестирования по теме: ${subject}`,
         cadetDiscordId: authUser.discord_id || undefined,
-        instructorName
+        instructorName,
+        request_id: newRequest?.id,
+        requestType: "exam"
       }).catch(err => console.error("Discord error:", err));
-
-      await createRequest({
-        type: "exam",
-        subject: `Допуск к тесту: ${subject}`,
-        description: `Прошу выдать допуск к прохождению тестирования по теме: ${subject}`,
-        instructor_id: selectedInstructorId ? Number(selectedInstructorId) : undefined
-      });
       toast.success("Запрос на допуск успешно отправлен инструктору!");
       checkAccess(subject);
     } catch (err: any) {

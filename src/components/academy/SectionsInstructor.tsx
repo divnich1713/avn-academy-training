@@ -171,7 +171,8 @@ export function InstructorPanel({ authUser, highlightRequestId, highlightReportI
               status: status,
               reviewerName: `${authUser.rank} ${authUser.name}`,
               comment: finalComment,
-              cadetDiscordId: req.cadet_discord_id || undefined
+              cadetDiscordId: req.cadet_discord_id || undefined,
+              reviewerDiscordId: authUser.discord_id || undefined
             });
           } catch (err) {
             console.error("Failed to send review to Discord:", err);

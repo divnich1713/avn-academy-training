@@ -21,6 +21,14 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.utcnow)
     discord_id = Column(String(255), nullable=True)
     avatar_url = Column(String(1024), nullable=True)
+    department_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.departments.id", ondelete="SET NULL"), nullable=True)
+    rank_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.ranks.id", ondelete="SET NULL"), nullable=True)
+    points = Column(Integer, default=0)
+    notes = Column(Text, default="")
+
+    department = relationship("Department", foreign_keys=[department_id])
+    rank_rel = relationship("Rank", foreign_keys=[rank_id])
+
 
 class Session(Base):
     __tablename__ = "sessions"
@@ -144,3 +152,122 @@ class AuditLog(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class Department(Base):
+    __tablename__ = "departments"
+    __table_args__ = {"schema": settings.SCHEMA}
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), unique=True, nullable=False)
+    description = Column(Text, nullable=True)
+    discord_role_id = Column(String(50), nullable=True)
+    leader_role_id = Column(String(50), nullable=True)
+    channel_id = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Rank(Base):
+    __tablename__ = "ranks"
+    __table_args__ = {"schema": settings.SCHEMA}
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), unique=True, nullable=False)
+    level = Column(Integer, unique=True, nullable=False)
+    discord_role_id = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class DismissalReport(Base):
+    __tablename__ = "dismissal_reports"
+    __table_args__ = {"schema": settings.SCHEMA}
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="CASCADE"), nullable=False)
+    reason = Column(String(255), nullable=False)
+    comment = Column(Text, nullable=True)
+    photo_url = Column(String(1024), nullable=True)
+    status = Column(String(20), nullable=False, default="pending")
+    reviewed_by = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="SET NULL"), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", foreign_keys=[user_id])
+    reviewer = relationship("User", foreign_keys=[reviewed_by])
+
+
+class Transfer(Base):
+    __tablename__ = "transfers"
+    __table_args__ = {"schema": settings.SCHEMA}
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="CASCADE"), nullable=False)
+    from_department_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.departments.id", ondelete="CASCADE"), nullable=False)
+    to_department_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.departments.id", ondelete="CASCADE"), nullable=False)
+    reason = Column(Text, nullable=False)
+    status = Column(String(30), nullable=False, default="pending")
+    sender_leader_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="SET NULL"), nullable=True)
+    receiver_leader_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", foreign_keys=[user_id])
+    from_department = relationship("Department", foreign_keys=[from_department_id])
+    to_department = relationship("Department", foreign_keys=[to_department_id])
+    sender_leader = relationship("User", foreign_keys=[sender_leader_id])
+    receiver_leader = relationship("User", foreign_keys=[receiver_leader_id])
+
+
+class WarehouseRequest(Base):
+    __tablename__ = "warehouse_requests"
+    __table_args__ = {"schema": settings.SCHEMA}
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="CASCADE"), nullable=False)
+    items = Column(JSONB, nullable=False)
+    comment = Column(Text, nullable=True)
+    status = Column(String(20), nullable=False, default="pending")
+    reviewed_by = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="SET NULL"), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", foreign_keys=[user_id])
+    reviewer = relationship("User", foreign_keys=[reviewed_by])
+
+
+class DepartmentTemplate(Base):
+    __tablename__ = "department_templates"
+    __table_args__ = {"schema": settings.SCHEMA}
+
+    id = Column(Integer, primary_key=True, index=True)
+    department_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.departments.id", ondelete="CASCADE"), nullable=False)
+    type = Column(String(50), nullable=False)
+    requirements = Column(JSONB, nullable=False)
+    min_points = Column(Integer, default=0)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    department = relationship("Department")
+
+
+
+class PromotionReport(Base):
+    __tablename__ = "promotion_reports"
+    __table_args__ = (
+        Index("ix_promotion_reports_user_status", "user_id", "status"),
+        {"schema": settings.SCHEMA}
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey(f"{settings.SCHEMA}.users.id", ondelete="CASCADE"), nullable=False)
+    promotion_type = Column(String(30), nullable=True)  # legacy field from V0005
+    from_rank = Column(String(255), nullable=True)
+    to_rank = Column(String(255), nullable=True)
+    department = Column(String(255), nullable=True)
+    submitted_by_discord_id = Column(String(255), nullable=True)
+    points = Column(Text, nullable=True)
+    links = Column(Text, nullable=True)
+    comment = Column(Text, nullable=True)
+    status = Column(String(20), nullable=False, default="pending")
+    reviewed_by_discord_id = Column(String(255), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", foreign_keys=[user_id])

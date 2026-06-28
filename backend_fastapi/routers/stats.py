@@ -1,12 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, and_, func
+from fastapi import APIRouter, Depends, HTTPException, Header
+from sqlalchemy import select, and_, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Dict, Any
 from datetime import datetime
+import json
+from pydantic import BaseModel
 
 from database import get_db
 from models import User, TestAttempt, TestAnswer, TestQuestion, StudentElo, TestSettings, AuditLog
 from routers.test_engine import get_current_user
+from config import settings
+from redis_client import redis_client
 
 router = APIRouter(prefix="/api/stats", tags=["Statistics"])
 
@@ -661,3 +665,227 @@ async def get_monitoring_alerts(
                 })
                 
     return alerts
+
+class DiscordResolveRequest(BaseModel):
+    request_id: int
+    action: str  # "approve" or "reject"
+    discord_user_id: str
+    discord_user_name: str
+
+@router.post("/admin/discord/resolve-request")
+async def resolve_request_from_discord(
+    payload: DiscordResolveRequest,
+    x_bot_secret: str = Header(None, alias="X-Bot-Secret"),
+    db: AsyncSession = Depends(get_db)
+):
+    # 1. Verify bot secret to prevent unauthorized access
+    if not x_bot_secret or x_bot_secret != settings.DISCORD_BOT_SECRET:
+        raise HTTPException(status_code=401, detail="Unauthorized. Invalid bot secret.")
+
+    # 2. Find the request in DB using raw query (due to missing requests ORM model)
+    req_stmt = text(f'SELECT id, status, user_id, type, subject FROM "{settings.SCHEMA}".requests WHERE id = :id')
+    req_res = await db.execute(req_stmt, {"id": payload.request_id})
+    request = req_res.fetchone()
+    if not request:
+        raise HTTPException(status_code=404, detail=f"Request with ID {payload.request_id} not found.")
+
+    req_id, status, cadet_id, req_type, subject = request
+    if status != "pending" and status != "created":
+        raise HTTPException(status_code=400, detail=f"Запрос уже обработан (статус: {status}).")
+
+    # 3. Find instructor by Discord ID
+    inst_stmt = select(User).where(User.discord_id == payload.discord_user_id)
+    inst_res = await db.execute(inst_stmt)
+    instructor = inst_res.scalar_one_or_none()
+    if not instructor:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Инструктор с Discord ID {payload.discord_user_id} не найден в базе данных AVN Academy. Пожалуйста, привяжите ваш Discord ID в личном профиле на сайте!"
+        )
+
+    # 4. Find cadet info for Audit Log
+    cadet_stmt = select(User).where(User.id == cadet_id)
+    cadet_res = await db.execute(cadet_stmt)
+    cadet = cadet_res.scalar_one_or_none()
+    cadet_name = cadet.name if cadet else "Неизвестный курсант"
+
+    # 5. Resolve request in DB
+    new_status = "approved" if payload.action == "approve" else "rejected"
+    comment = "Решено через Discord-бота"
+    
+    update_stmt = text(
+        f'UPDATE "{settings.SCHEMA}".requests '
+        f'SET status = :status, instructor_comment = :comment, reviewed_by = :reviewed_by, reviewed_at = NOW(), updated_at = NOW() '
+        f'WHERE id = :id'
+    )
+    await db.execute(update_stmt, {
+        "status": new_status,
+        "comment": comment,
+        "reviewed_by": instructor.id,
+        "id": req_id
+    })
+
+    # 6. Insert/Update grades for lecture/practice/exam blocks
+    if req_type in ("lecture", "practice", "exam"):
+        grade_val = 5 if payload.action == "approve" else 1
+        grade_comment = "Автоматический зачет по запросу из Discord" if payload.action == "approve" else "Автоматический незачет по запросу из Discord"
+        
+        # Check if grade already exists for this request
+        chk_grade = text(f'SELECT id FROM "{settings.SCHEMA}".grades WHERE request_id = :request_id')
+        chk_res = await db.execute(chk_grade, {"request_id": req_id})
+        existing = chk_res.fetchone()
+        
+        if not existing:
+            ins_grade = text(
+                f'INSERT INTO "{settings.SCHEMA}".grades (user_id, instructor_id, request_id, subject, type, grade, comment, graded_at) '
+                f'VALUES (:user_id, :instructor_id, :request_id, :subject, :type, :grade, :comment, NOW())'
+            )
+            await db.execute(ins_grade, {
+                "user_id": cadet_id,
+                "instructor_id": instructor.id,
+                "request_id": req_id,
+                "subject": subject,
+                "type": req_type,
+                "grade": grade_val,
+                "comment": grade_comment
+            })
+        else:
+            upd_grade = text(
+                f'UPDATE "{settings.SCHEMA}".grades '
+                f'SET grade = :grade, comment = :comment, instructor_id = :instructor_id, graded_at = NOW() '
+                f'WHERE request_id = :request_id'
+            )
+            await db.execute(upd_grade, {
+                "grade": grade_val,
+                "comment": grade_comment,
+                "instructor_id": instructor.id,
+                "request_id": req_id
+            })
+
+    # 7. Add notification for Cadet
+    notif_title = f"Запрос {'одобрен' if payload.action == 'approve' else 'отклонён'}"
+    notif_msg = f"Инструктор {instructor.name} {'одобрил' if payload.action == 'approve' else 'отклонил'} ваш запрос на тему \"{subject}\" через Discord-бота."
+    
+    ins_notif = text(
+        f'INSERT INTO "{settings.SCHEMA}".notifications (user_id, type, title, message, created_at) '
+        f'VALUES (:user_id, :type, :title, :message, NOW())'
+    )
+    await db.execute(ins_notif, {
+        "user_id": cadet_id,
+        "type": "request_reviewed",
+        "title": notif_title,
+        "message": notif_msg
+    })
+
+    # 8. Log action in AuditLog
+    audit_log = AuditLog(
+        operator_id=instructor.id,
+        operator_name=instructor.name,
+        action="approve_request" if payload.action == "approve" else "reject_request",
+        target_id=str(req_id),
+        target_name=subject,
+        details={
+            "type": req_type,
+            "comment": comment,
+            "resolved_via": "discord_bot"
+        }
+    )
+    db.add(audit_log)
+    
+    await db.commit()
+    logger_msg = f"Request ID {req_id} successfully {new_status} by instructor {instructor.name} (Discord ID: {payload.discord_user_id})"
+    print(logger_msg)
+    
+    return {"success": True, "message": logger_msg}
+
+class DiscordEvent(BaseModel):
+    event_type: str
+    data: dict
+
+@router.post("/admin/discord/publish-event")
+async def publish_discord_event(
+    payload: DiscordEvent,
+    x_bot_secret: str = Header(None, alias="X-Bot-Secret"),
+):
+    if not x_bot_secret or x_bot_secret != settings.DISCORD_BOT_SECRET:
+        raise HTTPException(status_code=401, detail="Unauthorized. Invalid bot secret.")
+        
+    event_payload = {
+        "type": payload.event_type,
+        "data": payload.data
+    }
+    
+    await redis_client.publish("discord_notifications", json.dumps(event_payload))
+    return {"success": True}
+
+@router.post("/admin/discord/publish-event-user")
+async def publish_discord_event_user(
+    payload: DiscordEvent,
+    user: User = Depends(get_current_user),
+):
+    event_payload = {
+        "type": payload.event_type,
+        "data": payload.data
+    }
+    
+    await redis_client.publish("discord_notifications", json.dumps(event_payload))
+    return {"success": True}
+
+
+class DiscordCreateUserPayload(BaseModel):
+    static_id: str
+    name: str
+    rank: str = "Рядовой"
+    role: str = "cadet"
+    discord_id: str = ""
+    category: str = "cadet"
+
+
+@router.post("/admin/discord/create-user")
+async def discord_create_user(
+    payload: DiscordCreateUserPayload,
+    x_bot_secret: str = Header(None, alias="X-Bot-Secret"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a new user from a Discord bot application acceptance."""
+    if not x_bot_secret or x_bot_secret != settings.DISCORD_BOT_SECRET:
+        raise HTTPException(status_code=401, detail="Unauthorized. Invalid bot secret.")
+
+    import re
+    import bcrypt as _bcrypt
+
+    # Validate static_id
+    clean_id = str(payload.static_id).replace("-", "").strip()
+    if not re.fullmatch(r"\d{6}", clean_id):
+        raise HTTPException(status_code=400, detail=f"Неверный static_id: {payload.static_id}. Должно быть 6 цифр.")
+
+    # Check uniqueness
+    exist_stmt = select(User).where(User.static_id == clean_id)
+    exist_res = await db.execute(exist_stmt)
+    if exist_res.scalar() is not None:
+        raise HTTPException(status_code=409, detail=f"Пользователь с ID {clean_id} уже существует.")
+
+    # Create user with password = static_id (user can change later)
+    pw_hash = _bcrypt.hashpw(clean_id.encode("utf-8"), _bcrypt.gensalt()).decode("utf-8")
+    new_user = User(
+        static_id=clean_id,
+        password_hash=pw_hash,
+        name=payload.name,
+        rank=payload.rank,
+        unit="АВНГ",
+        role=payload.role,
+        discord_id=payload.discord_id,
+        is_whitelisted=True,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+    db.add(new_user)
+    await db.commit()
+    await db.refresh(new_user)
+
+    return {
+        "success": True,
+        "id": new_user.id,
+        "static_id": new_user.static_id,
+        "name": new_user.name,
+    }

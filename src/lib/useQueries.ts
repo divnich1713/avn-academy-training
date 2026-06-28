@@ -219,10 +219,10 @@ export function useDeleteUser() {
   });
 }
 
-export function useInstructorPromotionConfig() {
+export function useInstructorPromotionConfig(unit?: string) {
   return useQuery({
-    queryKey: queryKeys.instructorPromotionConfig,
-    queryFn: fetchInstructorPromotionConfig,
+    queryKey: [...queryKeys.instructorPromotionConfig, unit],
+    queryFn: () => fetchInstructorPromotionConfig(unit),
     staleTime: 5 * 60_000,
   });
 }

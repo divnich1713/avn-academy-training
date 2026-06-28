@@ -487,16 +487,17 @@ export async function reviewPromotionReport(id: number, status: "approved" | "re
   });
 }
 
-export async function fetchInstructorPromotionConfig(): Promise<{ points_config: any[] | null; ranks_flow: any[] | null }> {
+export async function fetchInstructorPromotionConfig(unit?: string): Promise<{ points_config: any[] | null; ranks_flow: any[] | null }> {
   if (USE_MOCK) {
     return { points_config: null, ranks_flow: null };
   }
-  return safeFetch(`${PROMOTIONS_URL}?action=instructor_config`, {
+  const queryParam = unit ? `&unit=${encodeURIComponent(unit)}` : "";
+  return safeFetch(`${PROMOTIONS_URL}?action=instructor_config${queryParam}`, {
     headers: authHeaders(),
   });
 }
 
-export async function saveInstructorPromotionConfig(payload: { points_config: any[]; ranks_flow: any[] }) {
+export async function saveInstructorPromotionConfig(payload: { points_config: any[]; ranks_flow: any[]; unit?: string }) {
   if (USE_MOCK) {
     return { success: true };
   }
@@ -527,6 +528,7 @@ export interface InstructorPromotionReport {
   created_at: string;
   instructor_name?: string;
   instructor_static_id?: string;
+  instructor_unit?: string;
   instructor_id?: number;
   instructor_discord_id?: string | null;
   reviewer_name?: string | null;

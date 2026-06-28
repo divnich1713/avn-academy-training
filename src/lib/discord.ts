@@ -15,111 +15,41 @@ export async function sendDiscordEmbed(payload: {
   color: number; // Decimal color code
   fields?: DiscordEmbedField[];
   content?: string;
-}, targetType?: "dismissal" | "promotion" | "instructor_promotion" | "test" | "request" | "lecture_test"): Promise<{ messageId?: string; channelId?: string } | undefined> {
-  let webhookUrl = "";
-
-  // Try to find target-specific webhook URL
-  if (targetType === "dismissal") {
-    webhookUrl = import.meta.env.VITE_DISCORD_DISMISSAL_WEBHOOK_URL || localStorage.getItem("avng_discord_dismissal_webhook_url") || "";
-  } else if (targetType === "promotion") {
-    webhookUrl = import.meta.env.VITE_DISCORD_PROMOTION_WEBHOOK_URL || localStorage.getItem("avng_discord_promotion_webhook_url") || "";
-  } else if (targetType === "instructor_promotion") {
-    webhookUrl = import.meta.env.VITE_DISCORD_INSTRUCTOR_PROMOTION_WEBHOOK_URL || localStorage.getItem("avng_discord_instructor_promotion_webhook_url") || "";
-  } else if (targetType === "test") {
-    webhookUrl = import.meta.env.VITE_DISCORD_TEST_WEBHOOK_URL || localStorage.getItem("avng_discord_test_webhook_url") || "";
-  } else if (targetType === "lecture_test") {
-    webhookUrl = import.meta.env.VITE_DISCORD_LECTURES_WEBHOOK_URL || import.meta.env.VITE_DISCORD_TEST_WEBHOOK_URL || localStorage.getItem("avng_discord_test_webhook_url") || "";
-  } else if (targetType === "request") {
-    webhookUrl = import.meta.env.VITE_DISCORD_REQUEST_WEBHOOK_URL || localStorage.getItem("avng_discord_request_webhook_url") || "";
-  }
-
-  // Fallback to general webhook URL
-  if (!webhookUrl) {
-    webhookUrl = 
-      import.meta.env.VITE_DISCORD_WEBHOOK_URL || 
-      localStorage.getItem("avng_discord_webhook_url") || 
-      (window as any).VITE_DISCORD_WEBHOOK_URL;
-  }
-
-  if (!webhookUrl || !webhookUrl.startsWith("https://discord.com/api/webhooks/")) {
-    console.log(`Discord Webhook URL для ${targetType || "general"} не задан или некорректен. Пропустили отправку.`);
-    return;
-  }
-
+  reportId?: number;
+}, targetType?: "dismissal" | "promotion" | "promotion_reviewed" | "instructor_promotion" | "test" | "request" | "lecture_test"): Promise<{ messageId?: string; channelId?: string } | undefined> {
   try {
+    const token = localStorage.getItem("avng_token") || "";
     const pingRoleId = localStorage.getItem("avng_discord_ping_role_id") || import.meta.env.VITE_DISCORD_PING_ROLE_ID || "1516926223400435864";
     const content = payload.content !== undefined ? payload.content : (pingRoleId ? `<@&${pingRoleId.replace(/\D/g, "")}>` : undefined);
-    const token = localStorage.getItem("avng_token") || "";
-    const isMock = import.meta.env.VITE_USE_MOCK === "true";
-
-    let response;
-    if (isMock) {
-      const urlWithWait = webhookUrl.includes("?") ? `${webhookUrl}&wait=true` : `${webhookUrl}?wait=true`;
-      response = await fetch(urlWithWait, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+    
+    // We send a generic_embed event to our FastAPI backend which routes it to Redis for the bot client
+    const response = await fetch(`/fastapi-api/api/stats/admin/discord/publish-event-user`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Session-Token": token,
+      },
+      body: JSON.stringify({
+        event_type: "generic_embed",
+        data: {
+          title: payload.title,
+          description: payload.description || "",
+          color: payload.color,
+          fields: payload.fields || [],
           content,
-          embeds: [
-            {
-              title: payload.title,
-              description: payload.description || "",
-              color: payload.color,
-              fields: payload.fields || [],
-              timestamp: new Date().toISOString(),
-              footer: {
-                text: "Академия Росгвардии AVNG",
-              },
-            },
-          ],
-        }),
-      });
-      if (response.ok) {
-        const text = await response.text().catch(() => "");
-        const data = text ? JSON.parse(text) : {};
-        return { messageId: data.id, channelId: data.channel_id };
-      }
+          channel_type: targetType || "requests",
+          report_id: payload.reportId
+        }
+      })
+    });
+    
+    if (response.ok) {
+      return { messageId: "bot_msg", channelId: "bot_chan" };
     } else {
-      // Proxy through Supabase Edge Function to bypass regional blocks in Russia
-      response = await fetch(`/supabase-api/notifications?action=discord`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Session-Token": token,
-        },
-        body: JSON.stringify({
-          webhookUrl,
-          payload: {
-            content,
-            embeds: [
-              {
-                title: payload.title,
-                description: payload.description || "",
-                color: payload.color,
-                fields: payload.fields || [],
-                timestamp: new Date().toISOString(),
-                footer: {
-                  text: "Академия Росгвардии AVNG",
-                },
-              },
-            ],
-          }
-        }),
-      });
-      if (response.ok) {
-        const text = await response.text().catch(() => "");
-        const data = text ? JSON.parse(text) : {};
-        return { messageId: data.messageId, channelId: data.channelId };
-      }
-    }
-
-    if (!response.ok) {
-      console.error(`Ошибка при отправке в Discord Webhook: ${response.status} ${response.statusText}`);
+      console.error(`Ошибка при отправке события в Discord бот: ${response.status}`);
     }
   } catch (error) {
-    console.error("Ошибка сети при отправке в Discord:", error);
+    console.error("Ошибка сети при обращении к Discord-боту:", error);
   }
 }
 
@@ -161,13 +91,13 @@ export async function sendDismissalReportDiscord({
   const description = `1. ${name} | ${formattedStaticId}
 2. ${rank || "—"}
 3. ${reason}
-4. Приложил фотокарточку       удостоверения: ${photoUrl}
-5. ${headAvngMention} ${deputyHeadMention}`;
+4. Приложил фотокарточку       удостоверения: ${photoUrl}`;
 
   return await sendDiscordEmbed({
     title: "🚨 Рапорт на увольнение",
     description,
     color: 15548997, // Red
+    content: `${headAvngMention} ${deputyHeadMention}`,
   }, "dismissal");
 }
 
@@ -188,6 +118,7 @@ export async function sendPromotionReportDiscord({
   promotionType,
   promotionTypeLabel,
   cadetDiscordId,
+  reportId,
 }: {
   name: string;
   rank: string;
@@ -195,6 +126,7 @@ export async function sendPromotionReportDiscord({
   promotionType: "junior_sergeant" | "sergeant";
   promotionTypeLabel: string;
   cadetDiscordId?: string;
+  reportId?: number;
 }) {
   const isSergeant = promotionType === "sergeant";
   
@@ -314,6 +246,7 @@ ${attachments.join("\n")}
     description: reportText,
     color: 5763719, // Green
     content: embedContent || undefined,
+    reportId: reportId
   }, "promotion");
 }
 
@@ -445,6 +378,8 @@ export async function sendGeneralRequestDiscord({
   details,
   cadetDiscordId,
   instructorName,
+  request_id,
+  requestType
 }: {
   name: string;
   rank: string;
@@ -456,10 +391,39 @@ export async function sendGeneralRequestDiscord({
   details?: string;
   cadetDiscordId?: string;
   instructorName?: string;
+  request_id?: number;
+  requestType?: string;
 }) {
   if (shouldSkipDiscord(subject)) {
     console.log(`Пропускаем отправку уведомления в Discord для темы: ${subject}`);
     return;
+  }
+
+  // Если есть ID запроса, шлем специальное событие "request_created" для отображения кнопок!
+  if (request_id) {
+    const token = localStorage.getItem("avng_token") || "";
+    try {
+      await fetch(`/fastapi-api/api/stats/admin/discord/publish-event-user`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Session-Token": token,
+        },
+        body: JSON.stringify({
+          event_type: "request_created",
+          data: {
+            request_id,
+            user_name: name,
+            user_static_id: staticId,
+            type: requestType || "lecture",
+            subject
+          }
+        })
+      });
+      return;
+    } catch (error) {
+      console.error("Ошибка отправки request_created:", error);
+    }
   }
 
   const typeLower = typeLabel.toLowerCase();
@@ -514,6 +478,7 @@ export async function sendRequestReviewedDiscord({
   reviewerName,
   comment,
   cadetDiscordId,
+  reviewerDiscordId,
 }: {
   name: string;
   rank: string;
@@ -524,6 +489,7 @@ export async function sendRequestReviewedDiscord({
   reviewerName: string;
   comment?: string;
   cadetDiscordId?: string;
+  reviewerDiscordId?: string;
 }) {
   if (shouldSkipDiscord(subject)) {
     console.log(`Пропускаем отправку уведомления в Discord для темы: ${subject}`);
@@ -535,6 +501,7 @@ export async function sendRequestReviewedDiscord({
   const isExam = typeLower.includes("экзамен") || subjectLower.includes("экзамен");
   const isLecture = typeLower.includes("лекци") || subjectLower.includes("лекци");
   const isPractice = typeLower.includes("практик") || subjectLower.includes("практик");
+  const isDismissal = typeLower.includes("увольн") || subjectLower.includes("увольн");
   const isApproved = status === "approved";
   
   let targetType = "request";
@@ -542,6 +509,8 @@ export async function sendRequestReviewedDiscord({
     targetType = "test";
   } else if (isLecture || isPractice) {
     targetType = "lecture_test";
+  } else if (isDismissal) {
+    targetType = "dismissal";
   }
 
   let title = "✅ Запрос одобрен";
@@ -552,6 +521,8 @@ export async function sendRequestReviewedDiscord({
       title = "✅ Лекция проведена инструктором:";
     } else if (isPractice) {
       title = "✅ Практика проведена инструктором:";
+    } else if (isDismissal) {
+      title = "✅ Рапорт на увольнение одобрен:";
     }
   } else {
     if (isExam) {
@@ -560,22 +531,22 @@ export async function sendRequestReviewedDiscord({
       title = "❌ Лекция отклонена инструктором:";
     } else if (isPractice) {
       title = "❌ Практика отклонена инструктором:";
+    } else if (isDismissal) {
+      title = "❌ Рапорт на увольнение отклонен:";
     } else {
       title = "❌ Запрос отклонен";
     }
   }
   const color = isApproved ? 5763719 : 15548997; // Green for approved, Red for rejected
 
-  const cadetMention = cadetDiscordId ? `<@${cadetDiscordId.replace(/\D/g, "")}>` : "";
-  const pingRoleId = localStorage.getItem("avng_discord_ping_role_id") || import.meta.env.VITE_DISCORD_PING_ROLE_ID || "1516926223400435864";
-  const roleMention = pingRoleId ? `<@&${pingRoleId.replace(/\D/g, "")}>` : "";
-  const outerContent = [roleMention, cadetMention].filter(Boolean).join(" ");
+  const cadetMention = cadetDiscordId ? `<@${cadetDiscordId.replace(/\D/g, "")}>` : name;
+  const reviewerMention = reviewerDiscordId ? `<@${reviewerDiscordId.replace(/\D/g, "")}>` : reviewerName;
 
   const commentText = comment && comment.trim() 
     ? `\n\nКомментарий инструктора\n${comment.trim()}` 
     : "";
 
-  const descriptionText = `Курсант: ${name} | ${fmtStaticId(staticId)}
+  const descriptionText = `Курсант: ${cadetMention} | ${fmtStaticId(staticId)}
 Звание: ${rank || "—"}
 
 Категория: ${typeLabel}
@@ -583,7 +554,7 @@ export async function sendRequestReviewedDiscord({
 ${subject}
 
 Проверил
-${reviewerName}
+${reviewerMention}
 
 Статус
 ${isApproved ? "Зачтено / Выполнено" : "Отклонено"}${commentText}`;
@@ -593,7 +564,7 @@ ${isApproved ? "Зачтено / Выполнено" : "Отклонено"}${co
     description: descriptionText,
     color,
     fields: [],
-    content: outerContent || undefined,
+    content: "",
   }, targetType);
 }
 
@@ -615,12 +586,6 @@ export async function sendPromotionReviewedDiscord({
   reportId: number;
   cadetDiscordId?: string;
 }) {
-  const webhookUrl = import.meta.env.VITE_DISCORD_PROMOTION_APPROVED_WEBHOOK_URL;
-  if (!webhookUrl) {
-    console.warn("Discord promotion approved webhook is not configured.");
-    return;
-  }
-
   const formattedStaticId = fmtStaticId(staticId);
   const targetRankLabel = promotionType === "junior_sergeant" ? "Младшего сержанта" : "Сержанта";
   const systemUrl = typeof window !== "undefined" ? window.location.origin : "https://avn-academy.ru";
@@ -637,39 +602,16 @@ export async function sendPromotionReviewedDiscord({
     content += `\n**Комментарий:** ${comment.trim()}`;
   }
 
-  try {
-    const token = localStorage.getItem("avng_token") || "";
-    const isMock = import.meta.env.VITE_USE_MOCK === "true";
+  const title = isApproved ? "✅ Рапорт на повышение одобрен" : "❌ Рапорт на повышение отклонен";
+  const color = isApproved ? 5763719 : 15548997; // Green or Red
 
-    if (isMock) {
-      const urlWithWait = webhookUrl.includes("?") ? `${webhookUrl}&wait=true` : `${webhookUrl}?wait=true`;
-      await fetch(urlWithWait, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          content,
-        }),
-      });
-    } else {
-      await fetch(`/supabase-api/notifications?action=discord`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Session-Token": token,
-        },
-        body: JSON.stringify({
-          webhookUrl,
-          payload: {
-            content,
-          },
-        }),
-      });
-    }
-  } catch (error) {
-    console.error("Ошибка при отправке в Discord Webhook о проверке рапорта:", error);
-  }
+  await sendDiscordEmbed({
+    title,
+    description: content,
+    color,
+    content: "",
+    reportId: reportId
+  }, "promotion_reviewed");
 }
 
 // 7. Instructor Promotion Report Notification (Green)

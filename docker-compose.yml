@@ -58,6 +58,7 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_pass}@redis:6379/0
       - SCHEMA=t_p29017774_avn_academy_training
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - DISCORD_BOT_SECRET=${DISCORD_BOT_SECRET:-default_secret}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL}
       - HTTP_PROXY=${HTTP_PROXY}
@@ -118,6 +119,22 @@ services:
     cpus: 0.5
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  discord_bot:
+    build: ./discord_bot
+    environment:
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - DISCORD_GUILD_ID=${DISCORD_GUILD_ID}
+      - DISCORD_INSTRUCTORS_CHANNEL_ID=${DISCORD_INSTRUCTORS_CHANNEL_ID}
+      - DISCORD_BOT_SECRET=${DISCORD_BOT_SECRET:-default_secret}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_pass}@redis:6379/0
+      - API_URL=http://api:8000
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    mem_limit: 256m
+    cpus: 0.5
 
   web:
     image: node:20-alpine

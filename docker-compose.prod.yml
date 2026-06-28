@@ -61,6 +61,7 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_prod_pass}@redis:6379/0
       - SCHEMA=${SCHEMA:-t_p29017774_avn_academy_training}
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - DISCORD_BOT_SECRET=${DISCORD_BOT_SECRET:-default_secret}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL}
       - HTTP_PROXY=${HTTP_PROXY}
@@ -115,6 +116,36 @@ services:
     depends_on:
       db_migration:
         condition: service_completed_successfully
+    restart: always
+    mem_limit: 512m
+    cpus: 1.0
+
+  discord_bot:
+    build:
+      context: ./discord_bot
+      dockerfile: Dockerfile
+    environment:
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - DISCORD_GUILD_ID=${DISCORD_GUILD_ID}
+      - DISCORD_BOT_SECRET=${DISCORD_BOT_SECRET:-default_secret}
+      - DISCORD_INSTRUCTORS_CHANNEL_ID=${DISCORD_INSTRUCTORS_CHANNEL_ID}
+      - DISCORD_COURSES_REPORT_CHANNEL_ID=${DISCORD_COURSES_REPORT_CHANNEL_ID}
+      - DISCORD_EXAMS_REPORT_CHANNEL_ID=${DISCORD_EXAMS_REPORT_CHANNEL_ID}
+      - DISCORD_REQUESTS_CHANNEL_ID=${DISCORD_REQUESTS_CHANNEL_ID}
+      - DISCORD_TRANSFER_CHANNEL_ID=${DISCORD_TRANSFER_CHANNEL_ID}
+      - DISCORD_DISMISSAL_CHANNEL_ID=${DISCORD_DISMISSAL_CHANNEL_ID}
+      - DISCORD_PROMOTION_CHANNEL_ID=${DISCORD_PROMOTION_CHANNEL_ID}
+      - DISCORD_PROMOTION_REVIEWED_CHANNEL_ID=${DISCORD_PROMOTION_REVIEWED_CHANNEL_ID}
+      - DISCORD_WELCOME_CHANNEL_ID=${DISCORD_WELCOME_CHANNEL_ID}
+      - DISCORD_APPLICATIONS_CHANNEL_ID=${DISCORD_APPLICATIONS_CHANNEL_ID}
+      - DISCORD_CADET_ROLE_ID=${DISCORD_CADET_ROLE_ID}
+      - DISCORD_TRANSFER_ROLE_ID=${DISCORD_TRANSFER_ROLE_ID}
+      - DISCORD_VERIFIED_ROLE_ID=${DISCORD_VERIFIED_ROLE_ID}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_prod_pass}@redis:6379/0
+      - API_URL=http://api:8000
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: always
     mem_limit: 512m
     cpus: 1.0
