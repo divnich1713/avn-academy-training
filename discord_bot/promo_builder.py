@@ -329,7 +329,14 @@ class PromotionReportBuilderView(View):
                 for e in self.entries:
                     cfg = next((c for c in self.points_config if c["num"] == e["num"]), None)
                     if cfg:
-                        work_details.append(f"• **{cfg['name']}** — {e['count']} шт. (ссылки: {', '.join(e['links'])})")
+                        formatted_links = []
+                        for idx, lnk in enumerate(e["links"]):
+                            lnk_str = lnk.strip()
+                            if lnk_str.startswith("http://") or lnk_str.startswith("https://"):
+                                formatted_links.append(f"[№{idx + 1}]({lnk_str})")
+                            else:
+                                formatted_links.append(f"№{idx + 1}: {lnk_str}")
+                        work_details.append(f"• **{cfg['name']}** — {e['count']} шт. (ссылки: {', '.join(formatted_links)})")
                 
                 report_embed.add_field(name="Выполненная работа", value="\\n".join(work_details)[:1024], inline=False)
                 report_embed.set_footer(text='Росгвардия RMRP Арбат')
